@@ -77,6 +77,7 @@ export class SupabaseService {
       throw err;
     }
   }
+  
 
   /**
    * Classes Operations

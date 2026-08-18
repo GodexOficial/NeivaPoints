@@ -4,8 +4,11 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('As variáveis de ambiente do Supabase não foram configuradas corretamente.')
-  console.error('Certifique-se de que VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão definidas no arquivo .env')
+  console.warn('As variáveis de ambiente do Supabase não foram configuradas. O sistema utilizará o modo de armazenamento local (localStorage).')
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '')
+// Pass standard fallback values to prevent createClient from throwing an uncaught exception on initialization if env vars are missing
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder'
+)
