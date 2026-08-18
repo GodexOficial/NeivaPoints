@@ -104,27 +104,31 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
       return;
     }
 
+    handleSaveAsync();
+  };
+
+  const handleSaveAsync = async () => {
     try {
       if (isEditing && classToEdit) {
-        const updated = updateClass(classToEdit.id, {
-          name: trimmedName,
+        const updated = await updateClass(classToEdit.id, {
+          name: name.trim(),
           gradeNumber: gradeNumber.trim() ? Number(gradeNumber) : undefined,
           shortName: shortName.trim() || undefined,
           color,
           description: description.trim(),
         });
-        onClose();
         if (onSuccess) onSuccess(updated);
+        onClose();
       } else {
-        const created = addClass({
-          name: trimmedName,
+        const created = await addClass({
+          name: name.trim(),
           gradeNumber: gradeNumber.trim() ? Number(gradeNumber) : undefined,
           shortName: shortName.trim() || undefined,
           color,
           description: description.trim(),
         });
-        onClose();
         if (onSuccess) onSuccess(created);
+        onClose();
       }
     } catch (err: any) {
       setError(err.message || "Failed to save class.");

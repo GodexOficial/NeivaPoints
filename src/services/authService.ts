@@ -16,11 +16,8 @@ const AUTH_SESSION_KEY = "sistema_pontos_auth_session_v1";
 
 const DEFAULT_SECURITY_CODE = "PROF2025";
 
-// ✅ SECURITY CLEANED (2026-08-18)
-// Removed default teacher account - no hardcoded credentials exist.
-// Master security key PROF2025 is the only default.
-// New teachers must register with the proper security key.
-const DEFAULT_TEACHER: TeacherAccount | null = null;
+// ✅ No default teacher account - all teachers must register with PROF2025
+
 
 export class AuthService {
   /**
@@ -165,12 +162,12 @@ export class AuthService {
   /**
    * Register a new student (simple registration with name, class, username, password).
    */
-  static registerStudent(params: {
+  static async registerStudent(params: {
     name: string;
     classId: ClassId;
     username?: string;
     password?: string;
-  }): { success: boolean; student?: Student; error?: string } {
+  }): Promise<{ success: boolean; student?: Student; error?: string }> {
     try {
       const trimmedName = params.name.trim();
       if (!trimmedName) {
@@ -187,7 +184,7 @@ export class AuthService {
       const cleanPassword = params.password?.trim() || "123456";
 
       // Check if username is already taken
-      const students = StudentService.getAllStudents();
+      const students = await StudentService.getAllStudents();
       const existing = students.find(
         (s) => s.username?.toLowerCase() === cleanUsername,
       );
@@ -198,7 +195,7 @@ export class AuthService {
         };
       }
 
-      const student = StudentService.createStudent({
+      const student = await StudentService.createStudent({
         name: trimmedName,
         classId: params.classId,
         username: cleanUsername,
@@ -216,10 +213,10 @@ export class AuthService {
   /**
    * Authenticate student with username and password.
    */
-  static loginStudent(
+  static async loginStudent(
     username: string,
     password: string,
-  ): { success: boolean; student?: Student; error?: string } {
+  ): Promise<{ success: boolean; student?: Student; error?: string }> {
     const cleanUser = username.trim().toLowerCase();
     const cleanPass = password.trim();
 
@@ -230,7 +227,7 @@ export class AuthService {
       };
     }
 
-    const student = StudentService.authenticate(cleanUser, cleanPass);
+    const student = await StudentService.authenticate(cleanUser, cleanPass);
     if (!student) {
       return {
         success: false,

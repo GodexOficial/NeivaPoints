@@ -105,11 +105,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [refreshAuth]);
 
   const loginStudent = useCallback(
-    (
+    async (
       username: string,
       password: string,
-    ): { success: boolean; student?: Student; error?: string } => {
-      const result = AuthService.loginStudent(username, password);
+    ): Promise<{ success: boolean; student?: Student; error?: string }> => {
+      const result = await AuthService.loginStudent(username, password);
       if (result.success && result.student) {
         const authUser: AuthUser = {
           role: "student",
@@ -119,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         };
         AuthService.setSession(authUser);
         setCurrentUser(authUser);
-        const enriched = StudentService.getStudentWithStatsById(
+        const enriched = await StudentService.getStudentWithStatsById(
           result.student.id,
         );
         setCurrentStudent(enriched || null);
@@ -131,13 +131,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const registerStudent = useCallback(
-    (params: {
+    async (params: {
       name: string;
       classId: ClassId;
       username?: string;
       password?: string;
-    }): { success: boolean; student?: Student; error?: string } => {
-      const result = AuthService.registerStudent(params);
+    }): Promise<{ success: boolean; student?: Student; error?: string }> => {
+      const result = await AuthService.registerStudent(params);
       if (result.success && result.student) {
         const authUser: AuthUser = {
           role: "student",
@@ -147,7 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         };
         AuthService.setSession(authUser);
         setCurrentUser(authUser);
-        const enriched = StudentService.getStudentWithStatsById(
+        const enriched = await StudentService.getStudentWithStatsById(
           result.student.id,
         );
         setCurrentStudent(enriched || null);

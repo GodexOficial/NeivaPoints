@@ -35,7 +35,7 @@ export const JoinClassPage: React.FC<JoinClassProps> = ({
     }
   }, [classes, classId]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -51,7 +51,7 @@ export const JoinClassPage: React.FC<JoinClassProps> = ({
     }
 
     try {
-      const student = addStudent(trimmedName, classId);
+      const student = await addStudent(trimmedName, classId);
       setRegisteredStudent(student);
       setName("");
     } catch (err: any) {

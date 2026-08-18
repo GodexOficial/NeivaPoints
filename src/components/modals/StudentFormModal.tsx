@@ -88,30 +88,33 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
       return;
     }
 
+    handleSubmitAsync();
+  };
+
+  const handleSubmitAsync = async () => {
     try {
       if (isEditing && studentToEdit) {
-        const updated = updateStudent(studentToEdit.id, {
-          name: trimmedName,
+        const updated = await updateStudent(studentToEdit.id, {
+          name: name.trim(),
           classId,
           username: username.trim() || undefined,
           password: password.trim() || undefined,
         });
-        onClose();
         if (onSuccess) onSuccess(updated);
+        onClose();
       } else {
-        const created = addStudent({
-          name: trimmedName,
+        const created = await addStudent({
+          name: name.trim(),
           classId,
           username: username.trim() || undefined,
           password: password.trim() || undefined,
         });
-        onClose();
         if (onSuccess) onSuccess(created);
+        onClose();
       }
     } catch (err: any) {
       setError(err.message || 'Failed to save student.');
     }
-  };
 
   return (
     <div
