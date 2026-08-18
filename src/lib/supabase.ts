@@ -5,6 +5,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('As variáveis de ambiente do Supabase não foram configuradas corretamente.')
+  console.error('Certifique-se de que VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão definidas no arquivo .env')
 }
 
 export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '')
