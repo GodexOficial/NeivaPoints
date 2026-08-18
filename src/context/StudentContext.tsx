@@ -31,12 +31,12 @@ interface StudentContextType {
     shortName?: string;
     color?: string;
     description?: string;
-  }) => ClassInfo;
+  }) => Promise<ClassInfo>;
   updateClass: (
     id: string,
     updates: Partial<Omit<ClassInfo, 'id' | 'createdAt'>>
-  ) => ClassInfo;
-  deleteClass: (id: string) => boolean;
+  ) => Promise<ClassInfo>;
+  deleteClass: (id: string) => Promise<boolean>;
   resetClassesToDefault: () => void;
   getStudentById: (id: string) => StudentWithStats | undefined;
   getStudentTransactions: (studentId: string) => PointTransaction[];
@@ -53,7 +53,7 @@ interface StudentContextType {
           password?: string;
         },
     optionalClassId?: ClassId
-  ) => StudentWithStats;
+  ) => Promise<StudentWithStats>;
   updateStudent: (
     id: string,
     updates: {
@@ -62,12 +62,12 @@ interface StudentContextType {
       username?: string;
       password?: string;
     }
-  ) => StudentWithStats;
-  deleteStudent: (id: string) => boolean;
-  addPoints: (studentId: string, amount: number, reason?: string) => PointActionResult;
-  removePoints: (studentId: string, amount: number, reason?: string) => PointActionResult;
-  loadSampleData: () => void;
-  clearSampleData: () => void;
+  ) => Promise<StudentWithStats>;
+  deleteStudent: (id: string) => Promise<boolean>;
+  addPoints: (studentId: string, amount: number, reason?: string) => Promise<PointActionResult>;
+  removePoints: (studentId: string, amount: number, reason?: string) => Promise<PointActionResult>;
+  loadSampleData: () => Promise<void>;
+  clearSampleData: () => Promise<void>;
   clearAllData: () => void;
   refreshData: () => void;
 }
@@ -81,20 +81,22 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [levelUpNotification, setLevelUpNotification] = useState<LevelUpEvent | null>(null);
   const [hasSampleData, setHasSampleData] = useState<boolean>(false);
 
-  const refreshData = useCallback(() => {
-    const loadedClasses = ClassService.getAllClasses();
-    const enriched = StudentService.getAllStudentsWithStats();
-    const allTx = PointsService.getAllTransactions();
-    setClasses(loadedClasses);
-    setStudents(enriched);
-    setTransactions(allTx);
-    setHasSampleData(SampleDataService.hasSampleData());
+  const refreshData = useCallback(async () => {
+    try {
+      const loadedClasses = await ClassService.getAllClasses();
+      const enriched = await StudentService.getAllStudentsWithStats();
+      const allTx = await PointsService.getAllTransactions();
+      setClasses(loadedClasses);
+      setStudents(enriched);
+      setTransactions(allTx);
+      setHasSampleData(SampleDataService.hasSampleData());
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
   }, []);
 
   // Initialize data on mount
   useEffect(() => {
-    // Check if initial storage is empty; if completely fresh, we do not force sample data
-    // but we check if sample data is present
     refreshData();
   }, [refreshData]);
 
@@ -110,37 +112,37 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 
   const addClass = useCallback(
-    (params: {
+    async (params: {
       name: string;
       gradeNumber?: number;
       shortName?: string;
       color?: string;
       description?: string;
-    }): ClassInfo => {
-      const created = ClassService.createClass(params);
-      refreshData();
+    }): Promise<ClassInfo> => {
+      const created = await ClassService.createClass(params);
+      await refreshData();
       return created;
     },
     [refreshData]
   );
 
   const updateClass = useCallback(
-    (
+    async (
       id: string,
       updates: Partial<Omit<ClassInfo, 'id' | 'createdAt'>>
-    ): ClassInfo => {
-      const updated = ClassService.updateClass(id, updates);
-      refreshData();
+    ): Promise<ClassInfo> => {
+      const updated = await ClassService.updateClass(id, updates);
+      await refreshData();
       return updated;
     },
     [refreshData]
   );
 
   const deleteClass = useCallback(
-    (id: string): boolean => {
-      const success = ClassService.deleteClass(id);
+    async (id: string): Promise<boolean> => {
+      const success = await ClassService.deleteClass(id);
       if (success) {
-        refreshData();
+        await refreshData();
       }
       return success;
     },
@@ -255,7 +257,7 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [students, classes]);
 
   const addStudent = useCallback(
-    (
+    async (
       paramsOrName:
         | string
         | {
@@ -265,27 +267,27 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
             password?: string;
           },
       optionalClassId?: ClassId
-    ): StudentWithStats => {
+    ): Promise<StudentWithStats> => {
       let created: Student;
       if (typeof paramsOrName === 'string') {
         if (!optionalClassId) {
           throw new Error('Class ID is required');
         }
-        created = StudentService.createStudent({
+        created = await StudentService.createStudent({
           name: paramsOrName,
           classId: optionalClassId,
         });
       } else {
-        created = StudentService.createStudent(paramsOrName);
+        created = await StudentService.createStudent(paramsOrName);
       }
-      refreshData();
-      return StudentService.getStudentWithStatsById(created.id)!;
+      await refreshData();
+      return (await StudentService.getStudentWithStatsById(created.id))!;
     },
     [refreshData]
   );
 
   const updateStudent = useCallback(
-    (
+    async (
       id: string,
       updates: {
         name?: string;
@@ -293,20 +295,20 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         username?: string;
         password?: string;
       }
-    ): StudentWithStats => {
-      const updated = StudentService.updateStudent(id, updates);
-      refreshData();
-      return StudentService.getStudentWithStatsById(updated.id)!;
+    ): Promise<StudentWithStats> => {
+      const updated = await StudentService.updateStudent(id, updates);
+      await refreshData();
+      return (await StudentService.getStudentWithStatsById(updated.id))!;
     },
     [refreshData]
   );
 
   const deleteStudent = useCallback(
-    (id: string): boolean => {
-      const success = StudentService.deleteStudent(id);
+    async (id: string): Promise<boolean> => {
+      const success = await StudentService.deleteStudent(id);
       if (success) {
-        PointsService.deleteStudentTransactions(id);
-        refreshData();
+        await PointsService.deleteStudentTransactions(id);
+        await refreshData();
       }
       return success;
     },
@@ -314,9 +316,9 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 
   const addPoints = useCallback(
-    (studentId: string, amount: number, reason?: string): PointActionResult => {
-      const result = PointsService.addPoints({ studentId, amount, reason });
-      refreshData();
+    async (studentId: string, amount: number, reason?: string): Promise<PointActionResult> => {
+      const result = await PointsService.addPoints({ studentId, amount, reason });
+      await refreshData();
 
       if (result.leveledUp) {
         setLevelUpNotification({
@@ -334,27 +336,27 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   );
 
   const removePoints = useCallback(
-    (studentId: string, amount: number, reason?: string): PointActionResult => {
-      const result = PointsService.removePoints({ studentId, amount, reason });
-      refreshData();
+    async (studentId: string, amount: number, reason?: string): Promise<PointActionResult> => {
+      const result = await PointsService.removePoints({ studentId, amount, reason });
+      await refreshData();
       return result;
     },
     [refreshData]
   );
 
-  const loadSampleData = useCallback(() => {
+  const loadSampleData = useCallback(async () => {
     SampleDataService.loadSampleData();
-    refreshData();
+    await refreshData();
   }, [refreshData]);
 
-  const clearSampleData = useCallback(() => {
+  const clearSampleData = useCallback(async () => {
     SampleDataService.clearSampleData();
-    refreshData();
+    await refreshData();
   }, [refreshData]);
 
-  const clearAllData = useCallback(() => {
+  const clearAllData = useCallback(async () => {
     StorageService.clearAll();
-    refreshData();
+    await refreshData();
   }, [refreshData]);
 
   const value = useMemo(

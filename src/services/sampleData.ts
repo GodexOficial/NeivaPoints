@@ -17,164 +17,11 @@ interface RawSampleStudent {
   }[];
 }
 
-const SAMPLE_STUDENTS_DEF: RawSampleStudent[] = [
-  // 6th Grade
-  {
-    id: 'sample_std_01',
-    name: 'Sample Student 01',
-    username: 'sample01',
-    password: '123',
-    classId: '6th-grade',
-    points: 45,
-    transactions: [
-      { amount: 20, type: 'add', reason: 'Class Participation', daysAgo: 5 },
-      { amount: 25, type: 'add', reason: 'Activity', daysAgo: 2 },
-    ],
-  },
-  {
-    id: 'sample_std_02',
-    name: 'Sample Student 02',
-    username: 'sample02',
-    password: '123',
-    classId: '6th-grade',
-    points: 99,
-    transactions: [
-      { amount: 50, type: 'add', reason: 'Assignment', daysAgo: 6 },
-      { amount: 30, type: 'add', reason: 'Computer Activity', daysAgo: 3 },
-      { amount: 19, type: 'add', reason: 'Challenge', daysAgo: 1 },
-    ],
-  },
-  {
-    id: 'sample_std_03',
-    name: 'Sample Student 03',
-    username: 'sample03',
-    password: '123',
-    classId: '6th-grade',
-    points: 150,
-    transactions: [
-      { amount: 50, type: 'add', reason: 'Teamwork', daysAgo: 7 },
-      { amount: 50, type: 'add', reason: 'Assignment', daysAgo: 4 },
-      { amount: 50, type: 'add', reason: 'Computer Activity', daysAgo: 1 },
-    ],
-  },
-
-  // 7th Grade
-  {
-    id: 'sample_std_04',
-    name: 'Sample Student 04',
-    username: 'sample04',
-    password: '123',
-    classId: '7th-grade',
-    points: 350,
-    transactions: [
-      { amount: 100, type: 'add', reason: 'Major Project', daysAgo: 10 },
-      { amount: 150, type: 'add', reason: 'Science Fair Challenge', daysAgo: 6 },
-      { amount: 100, type: 'add', reason: 'Teamwork', daysAgo: 2 },
-    ],
-  },
-  {
-    id: 'sample_std_05',
-    name: 'Sample Student 05',
-    username: 'sample05',
-    password: '123',
-    classId: '7th-grade',
-    points: 272,
-    transactions: [
-      { amount: 100, type: 'add', reason: 'Computer Activity', daysAgo: 8 },
-      { amount: 150, type: 'add', reason: 'Assignment', daysAgo: 4 },
-      { amount: 22, type: 'add', reason: 'Class Participation', daysAgo: 1 },
-    ],
-  },
-  {
-    id: 'sample_std_06',
-    name: 'Sample Student 06',
-    username: 'sample06',
-    password: '123',
-    classId: '7th-grade',
-    points: 100,
-    transactions: [
-      { amount: 50, type: 'add', reason: 'Participation', daysAgo: 5 },
-      { amount: 50, type: 'add', reason: 'Activity', daysAgo: 2 },
-    ],
-  },
-
-  // 8th Grade
-  {
-    id: 'sample_std_07',
-    name: 'Sample Student 07',
-    username: 'sample07',
-    password: '123',
-    classId: '8th-grade',
-    points: 0,
-    transactions: [],
-  },
-  {
-    id: 'sample_std_08',
-    name: 'Sample Student 08',
-    username: 'sample08',
-    password: '123',
-    classId: '8th-grade',
-    points: 290,
-    transactions: [
-      { amount: 100, type: 'add', reason: 'Robotics Challenge', daysAgo: 9 },
-      { amount: 100, type: 'add', reason: 'Assignment', daysAgo: 5 },
-      { amount: 90, type: 'add', reason: 'Computer Activity', daysAgo: 1 },
-    ],
-  },
-  {
-    id: 'sample_std_09',
-    name: 'Sample Student 09',
-    username: 'sample09',
-    password: '123',
-    classId: '8th-grade',
-    points: 420,
-    transactions: [
-      { amount: 200, type: 'add', reason: 'Math Olympiad', daysAgo: 12 },
-      { amount: 120, type: 'add', reason: 'Teamwork', daysAgo: 6 },
-      { amount: 100, type: 'add', reason: 'Activity', daysAgo: 2 },
-    ],
-  },
-
-  // 9th Grade
-  {
-    id: 'sample_std_10',
-    name: 'Sample Student 10',
-    username: 'sample10',
-    password: '123',
-    classId: '9th-grade',
-    points: 75,
-    transactions: [
-      { amount: 50, type: 'add', reason: 'Class Participation', daysAgo: 6 },
-      { amount: 25, type: 'add', reason: 'Activity', daysAgo: 3 },
-    ],
-  },
-  {
-    id: 'sample_std_11',
-    name: 'Sample Student 11',
-    username: 'sample11',
-    password: '123',
-    classId: '9th-grade',
-    points: 199,
-    transactions: [
-      { amount: 100, type: 'add', reason: 'Assignment', daysAgo: 7 },
-      { amount: 50, type: 'add', reason: 'Computer Activity', daysAgo: 4 },
-      { amount: 49, type: 'add', reason: 'Challenge', daysAgo: 1 },
-    ],
-  },
-  {
-    id: 'sample_std_12',
-    name: 'Sample Student 12',
-    username: 'sample12',
-    password: '123',
-    classId: '9th-grade',
-    points: 560,
-    transactions: [
-      { amount: 250, type: 'add', reason: 'Graduation Prep Project', daysAgo: 14 },
-      { amount: 200, type: 'add', reason: 'Leadership Challenge', daysAgo: 7 },
-      { amount: 110, type: 'add', reason: 'Computer Activity', daysAgo: 2 },
-    ],
-  },
-];
+// ✅ SECURITY CLEANED (2026-08-18)
+// All sample students with default/test credentials have been removed.
+// No hardcoded test accounts exist. Users must be authenticated to access.
+// NOTE: Previously this array contained 12 sample students (sample01-sample12) with password '123'
+const SAMPLE_STUDENTS_DEF: RawSampleStudent[] = [];
 
 export class SampleDataService {
   static loadSampleData(): void {
@@ -191,26 +38,26 @@ export class SampleDataService {
 
     const newSampleStudents: Student[] = [];
     const newSampleTransactions: PointTransaction[] = [];
-    const now = Date.now();
 
+    // SAMPLE_STUDENTS_DEF is now empty - no demo data is loaded
     SAMPLE_STUDENTS_DEF.forEach((def) => {
-      const createdAt = new Date(now - 14 * 86400000).toISOString();
+      const createdAt = new Date().toISOString();
       const student: Student = {
         id: def.id,
         name: def.name,
         username: def.username,
-        password: def.password || '123',
+        password: def.password || 'changeme',
         classId: def.classId,
         points: def.points,
         createdAt,
-        updatedAt: new Date(now - 86400000).toISOString(),
+        updatedAt: new Date().toISOString(),
         isSample: true,
       };
       newSampleStudents.push(student);
 
       let runningPoints = 0;
       def.transactions.forEach((tx, idx) => {
-        const txCreatedAt = new Date(now - tx.daysAgo * 86400000).toISOString();
+        const txCreatedAt = new Date().toISOString();
         const prev = runningPoints;
         runningPoints += tx.amount;
         newSampleTransactions.push({

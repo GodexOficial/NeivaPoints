@@ -16,25 +16,22 @@ const AUTH_SESSION_KEY = "sistema_pontos_auth_session_v1";
 
 const DEFAULT_SECURITY_CODE = "PROF2025";
 
-const DEFAULT_TEACHER: TeacherAccount = {
-  id: "teacher_default_01",
-  name: "Teacher Admin",
-  emailOrUsername: "teacher",
-  password: "admin123",
-  createdAt: new Date().toISOString(),
-};
+// ✅ SECURITY CLEANED (2026-08-18)
+// Removed default teacher account - no hardcoded credentials exist.
+// Master security key PROF2025 is the only default.
+// New teachers must register with the proper security key.
+const DEFAULT_TEACHER: TeacherAccount | null = null;
 
 export class AuthService {
   /**
    * Get all registered teacher accounts.
    */
   static getTeachers(): TeacherAccount[] {
-    const teachers = StorageService.getItem<TeacherAccount[]>(TEACHERS_KEY, [
-      DEFAULT_TEACHER,
-    ]);
+    const teachers = StorageService.getItem<TeacherAccount[]>(TEACHERS_KEY, []);
     if (!teachers || teachers.length === 0) {
-      StorageService.setItem(TEACHERS_KEY, [DEFAULT_TEACHER]);
-      return [DEFAULT_TEACHER];
+      // No default teacher - start with empty list
+      StorageService.setItem(TEACHERS_KEY, []);
+      return [];
     }
     return teachers;
   }

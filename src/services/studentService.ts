@@ -1,6 +1,7 @@
 import type { Student, ClassId, StudentWithStats } from '../types';
 import { StorageService } from './storage';
 import { enrichStudentWithStats } from '../utils/levelCalculator';
+import { SupabaseService } from './supabaseService';
 
 export class StudentService {
   /**
@@ -29,9 +30,23 @@ export class StudentService {
   }
 
   /**
-   * Get all registered students with fallback username/password migration.
+   * Get all registered students (async - loads from Supabase first).
    */
-  static getAllStudents(): Student[] {
+  static async getAllStudents(): Promise<Student[]> {
+    // Try Supabase first
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        const supabaseStudents = await SupabaseService.getAllStudents();
+        if (supabaseStudents.length > 0) {
+          StorageService.setStudents(supabaseStudents); // Cache locally
+          return supabaseStudents;
+        }
+      } catch (error) {
+        console.warn('Supabase error loading students, falling back to localStorage:', error);
+      }
+    }
+
+    // Fallback to localStorage
     const rawStudents = StorageService.getStudents<Student[]>([]);
     let hasUpdates = false;
 
@@ -62,15 +77,15 @@ export class StudentService {
   /**
    * Authenticate student by username or name and password.
    */
-  static authenticate(
+  static async authenticate(
     identifier: string,
     password: string
-  ): Student | undefined {
+  ): Promise<Student | undefined> {
     const cleanId = identifier.trim().toLowerCase();
     const cleanPass = password.trim();
     if (!cleanId || !cleanPass) return undefined;
 
-    const students = this.getAllStudents();
+    const students = await this.getAllStudents();
     return students.find((s) => {
       const usernameMatch = s.username?.toLowerCase() === cleanId;
       const nameMatch = s.name.toLowerCase() === cleanId;
@@ -83,24 +98,24 @@ export class StudentService {
   /**
    * Get all registered students enriched with calculated level and progress stats.
    */
-  static getAllStudentsWithStats(): StudentWithStats[] {
-    const students = this.getAllStudents();
+  static async getAllStudentsWithStats(): Promise<StudentWithStats[]> {
+    const students = await this.getAllStudents();
     return students.map(enrichStudentWithStats);
   }
 
   /**
-   * Get a student by ID.
+   * Get a student by ID (async).
    */
-  static getStudentById(id: string): Student | undefined {
-    const students = this.getAllStudents();
+  static async getStudentById(id: string): Promise<Student | undefined> {
+    const students = await this.getAllStudents();
     return students.find((s) => s.id === id);
   }
 
   /**
    * Get a student by ID with calculated stats.
    */
-  static getStudentWithStatsById(id: string): StudentWithStats | undefined {
-    const student = this.getStudentById(id);
+  static async getStudentWithStatsById(id: string): Promise<StudentWithStats | undefined> {
+    const student = await this.getStudentById(id);
     if (!student) return undefined;
     return enrichStudentWithStats(student);
   }
@@ -108,22 +123,22 @@ export class StudentService {
   /**
    * Get students belonging to a specific class.
    */
-  static getStudentsByClass(classId: ClassId): StudentWithStats[] {
-    const students = this.getAllStudentsWithStats();
+  static async getStudentsByClass(classId: ClassId): Promise<StudentWithStats[]> {
+    const students = await this.getAllStudentsWithStats();
     return students.filter((s) => s.classId === classId);
   }
 
   /**
-   * Register a new student.
+   * Register a new student (syncs with Supabase).
    */
-  static createStudent(params: {
+  static async createStudent(params: {
     name: string;
     classId: ClassId;
     username?: string;
     password?: string;
     isSample?: boolean;
     initialPoints?: number;
-  }): Student {
+  }): Promise<Student> {
     const trimmedName = params.name.trim();
     if (!trimmedName) {
       throw new Error("Please enter the student's name.");
@@ -151,7 +166,22 @@ export class StudentService {
       isSample: params.isSample ?? false,
     };
 
-    const students = this.getAllStudents();
+    // Save to Supabase
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        await SupabaseService.createStudent({
+          name: trimmedName,
+          classId: params.classId,
+          username,
+          password,
+        });
+      } catch (error) {
+        console.error('Error saving student to Supabase:', error);
+      }
+    }
+
+    // Save to localStorage as backup
+    const students = await this.getAllStudents();
     const updated = [newStudent, ...students];
     StorageService.setStudents(updated);
 
@@ -159,13 +189,13 @@ export class StudentService {
   }
 
   /**
-   * Update student details (e.g., name, class, username, password).
+   * Update student details (syncs with Supabase).
    */
-  static updateStudent(
+  static async updateStudent(
     id: string,
     updates: Partial<Pick<Student, "name" | "classId" | "username" | "password">>
-  ): Student {
-    const students = this.getAllStudents();
+  ): Promise<Student> {
+    const students = await this.getAllStudents();
     const index = students.findIndex((s) => s.id === id);
     if (index === -1) {
       throw new Error("Student not found.");
@@ -183,19 +213,39 @@ export class StudentService {
 
     students[index] = updatedStudent;
     StorageService.setStudents(students);
+
+    // Sync to Supabase
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        await SupabaseService.updateStudent(id, updates);
+      } catch (error) {
+        console.error('Error updating student in Supabase:', error);
+      }
+    }
+
     return updatedStudent;
   }
 
   /**
-   * Delete a student by ID.
+   * Delete a student by ID (syncs with Supabase).
    */
-  static deleteStudent(id: string): boolean {
-    const students = this.getAllStudents();
+  static async deleteStudent(id: string): Promise<boolean> {
+    const students = await this.getAllStudents();
     const filtered = students.filter((s) => s.id !== id);
     if (filtered.length === students.length) {
       return false;
     }
     StorageService.setStudents(filtered);
+
+    // Sync to Supabase
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        await SupabaseService.deleteStudent(id);
+      } catch (error) {
+        console.error('Error deleting student from Supabase:', error);
+      }
+    }
+
     return true;
   }
 }

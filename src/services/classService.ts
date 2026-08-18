@@ -1,6 +1,7 @@
 import type { ClassInfo } from "../types";
 import { DEFAULT_CLASSES } from "../types";
 import { StorageService } from "./storage";
+import { SupabaseService } from "./supabaseService";
 
 export class ClassService {
   /**
@@ -21,10 +22,23 @@ export class ClassService {
   }
 
   /**
-   * Get all registered classes.
-   * If storage is empty, seeds and returns DEFAULT_CLASSES.
+   * Get all registered classes (async - loads from Supabase first, then localStorage)
    */
-  static getAllClasses(): ClassInfo[] {
+  static async getAllClasses(): Promise<ClassInfo[]> {
+    // Try Supabase first
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        const supabaseClasses = await SupabaseService.getAllClasses();
+        if (supabaseClasses.length > 0) {
+          StorageService.setClasses(supabaseClasses); // Cache locally
+          return supabaseClasses;
+        }
+      } catch (error) {
+        console.warn('Supabase error loading classes, falling back to localStorage:', error);
+      }
+    }
+
+    // Fallback to localStorage
     const stored = StorageService.getClasses<ClassInfo[] | null>(null);
     if (!stored || !Array.isArray(stored) || stored.length === 0) {
       StorageService.setClasses(DEFAULT_CLASSES);
@@ -34,29 +48,29 @@ export class ClassService {
   }
 
   /**
-   * Get a class by ID.
+   * Get a class by ID (async).
    */
-  static getClassById(id: string): ClassInfo | undefined {
-    const classes = this.getAllClasses();
+  static async getClassById(id: string): Promise<ClassInfo | undefined> {
+    const classes = await this.getAllClasses();
     return classes.find((c) => c.id === id);
   }
 
   /**
-   * Register a new class.
+   * Register a new class (saves to both Supabase and localStorage).
    */
-  static createClass(params: {
+  static async createClass(params: {
     name: string;
     gradeNumber?: number;
     shortName?: string;
     color?: string;
     description?: string;
-  }): ClassInfo {
+  }): Promise<ClassInfo> {
     const trimmedName = params.name.trim();
     if (!trimmedName) {
       throw new Error("Please enter the class name.");
     }
 
-    const classes = this.getAllClasses();
+    const classes = await this.getAllClasses();
     const existing = classes.find(
       (c) => c.name.toLowerCase() === trimmedName.toLowerCase(),
     );
@@ -64,7 +78,6 @@ export class ClassService {
       throw new Error(`A class named "${trimmedName}" already exists.`);
     }
 
-    const id = this.generateId(trimmedName);
     const shortName =
       params.shortName?.trim() ||
       (params.gradeNumber
@@ -72,7 +85,7 @@ export class ClassService {
         : trimmedName.substring(0, 4).toUpperCase());
 
     const newClass: ClassInfo = {
-      id,
+      id: this.generateId(trimmedName),
       name: trimmedName,
       gradeNumber: params.gradeNumber ? Number(params.gradeNumber) : undefined,
       shortName,
@@ -81,19 +94,31 @@ export class ClassService {
       createdAt: new Date().toISOString(),
     };
 
-    const updated = [...classes, newClass];
+    // Save to Supabase
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        await SupabaseService.createClass(params);
+      } catch (error) {
+        console.error('Error saving class to Supabase:', error);
+      }
+    }
+
+    // Save to localStorage as backup
+    const allClasses = await this.getAllClasses();
+    const updated = [...allClasses, newClass];
     StorageService.setClasses(updated);
+
     return newClass;
   }
 
   /**
-   * Update an existing class.
+   * Update an existing class (syncs with Supabase).
    */
-  static updateClass(
+  static async updateClass(
     id: string,
     updates: Partial<Omit<ClassInfo, "id" | "createdAt">>,
-  ): ClassInfo {
-    const classes = this.getAllClasses();
+  ): Promise<ClassInfo> {
+    const classes = await this.getAllClasses();
     const index = classes.findIndex((c) => c.id === id);
     if (index === -1) {
       throw new Error("Class not found.");
@@ -132,19 +157,39 @@ export class ClassService {
 
     classes[index] = current;
     StorageService.setClasses(classes);
+
+    // Sync to Supabase
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        await SupabaseService.updateClass(id, updates);
+      } catch (error) {
+        console.error('Error updating class in Supabase:', error);
+      }
+    }
+
     return current;
   }
 
   /**
-   * Delete a class by ID.
+   * Delete a class by ID (syncs with Supabase).
    */
-  static deleteClass(id: string): boolean {
-    const classes = this.getAllClasses();
+  static async deleteClass(id: string): Promise<boolean> {
+    const classes = await this.getAllClasses();
     const filtered = classes.filter((c) => c.id !== id);
     if (filtered.length === classes.length) {
       return false;
     }
     StorageService.setClasses(filtered);
+
+    // Sync to Supabase
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        await SupabaseService.deleteClass(id);
+      } catch (error) {
+        console.error('Error deleting class from Supabase:', error);
+      }
+    }
+
     return true;
   }
 

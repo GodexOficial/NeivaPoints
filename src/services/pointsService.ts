@@ -1,6 +1,7 @@
 import type { PointTransaction, Student, StudentWithStats } from '../types';
 import { StorageService } from './storage';
 import { enrichStudentWithStats, checkLevelUp } from '../utils/levelCalculator';
+import { SupabaseService } from './supabaseService';
 
 export interface PointActionResult {
   student: StudentWithStats;
@@ -19,9 +20,23 @@ export class PointsService {
   }
 
   /**
-   * Get all transactions.
+   * Get all transactions (async - loads from Supabase first).
    */
-  static getAllTransactions(): PointTransaction[] {
+  static async getAllTransactions(): Promise<PointTransaction[]> {
+    // Try Supabase first
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        const supabaseTransactions = await SupabaseService.getAllTransactions();
+        if (supabaseTransactions.length > 0) {
+          StorageService.setTransactions(supabaseTransactions); // Cache locally
+          return supabaseTransactions;
+        }
+      } catch (error) {
+        console.warn('Supabase error loading transactions, falling back to localStorage:', error);
+      }
+    }
+
+    // Fallback to localStorage
     const transactions = StorageService.getTransactions<PointTransaction[]>([]);
     // Sort newest first
     return transactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -30,19 +45,19 @@ export class PointsService {
   /**
    * Get transactions for a specific student, newest first.
    */
-  static getStudentTransactions(studentId: string): PointTransaction[] {
-    const all = this.getAllTransactions();
+  static async getStudentTransactions(studentId: string): Promise<PointTransaction[]> {
+    const all = await this.getAllTransactions();
     return all.filter((t) => t.studentId === studentId);
   }
 
   /**
-   * Add points to a student.
+   * Add points to a student (async - syncs with Supabase).
    */
-  static addPoints(params: {
+  static async addPoints(params: {
     studentId: string;
     amount: number;
     reason?: string;
-  }): PointActionResult {
+  }): Promise<PointActionResult> {
     const amount = Math.floor(params.amount);
     if (isNaN(amount) || amount <= 0) {
       throw new Error('Please enter a valid positive number.');
@@ -80,9 +95,20 @@ export class PointsService {
       createdAt: now,
     };
 
+    // Save transaction to localStorage
     const transactions = StorageService.getTransactions<PointTransaction[]>([]);
     transactions.unshift(transaction);
     StorageService.setTransactions(transactions);
+
+    // Sync to Supabase
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        await SupabaseService.updateStudent(params.studentId, { points: newPoints });
+        await SupabaseService.createTransaction(transaction);
+      } catch (error) {
+        console.error('Error saving transaction to Supabase:', error);
+      }
+    }
 
     const levelCheck = checkLevelUp(previousPoints, newPoints);
 
@@ -96,14 +122,14 @@ export class PointsService {
   }
 
   /**
-   * Remove points from a student.
+   * Remove points from a student (async - syncs with Supabase).
    * Rejects if amount > previousPoints or invalid amount.
    */
-  static removePoints(params: {
+  static async removePoints(params: {
     studentId: string;
     amount: number;
     reason?: string;
-  }): PointActionResult {
+  }): Promise<PointActionResult> {
     const amount = Math.floor(params.amount);
     if (isNaN(amount) || amount <= 0) {
       throw new Error('Please enter a valid positive number.');
@@ -146,9 +172,20 @@ export class PointsService {
       createdAt: now,
     };
 
+    // Save transaction to localStorage
     const transactions = StorageService.getTransactions<PointTransaction[]>([]);
     transactions.unshift(transaction);
     StorageService.setTransactions(transactions);
+
+    // Sync to Supabase
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        await SupabaseService.updateStudent(params.studentId, { points: newPoints });
+        await SupabaseService.createTransaction(transaction);
+      } catch (error) {
+        console.error('Error saving transaction to Supabase:', error);
+      }
+    }
 
     const levelCheck = checkLevelUp(previousPoints, newPoints);
 
@@ -164,7 +201,7 @@ export class PointsService {
   /**
    * Delete all transactions for a student.
    */
-  static deleteStudentTransactions(studentId: string): void {
+  static async deleteStudentTransactions(studentId: string): Promise<void> {
     const transactions = StorageService.getTransactions<PointTransaction[]>([]);
     const filtered = transactions.filter((t) => t.studentId !== studentId);
     StorageService.setTransactions(filtered);
