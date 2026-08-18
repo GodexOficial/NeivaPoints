@@ -115,6 +115,7 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
     } catch (err: any) {
       setError(err.message || 'Failed to save student.');
     }
+  };
 
   return (
     <div
