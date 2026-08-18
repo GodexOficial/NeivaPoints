@@ -28,13 +28,13 @@ interface AuthContextType {
   loginStudent: (
     username: string,
     password: string,
-  ) => { success: boolean; student?: Student; error?: string };
+  ) => Promise<{ success: boolean; student?: Student; error?: string }>;
   registerStudent: (params: {
     name: string;
     classId: ClassId;
     username?: string;
     password?: string;
-  }) => { success: boolean; student?: Student; error?: string };
+  }) => Promise<{ success: boolean; student?: Student; error?: string }>;
   loginTeacher: (
     emailOrUsername: string,
     password: string,
@@ -75,13 +75,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     null,
   );
 
-  const refreshAuth = useCallback(() => {
+  const refreshAuth = useCallback(async () => {
     const session = AuthService.getSession();
     setCurrentUser(session);
     setTeacherSecurityKeyState(AuthService.getTeacherSecurityKey());
 
     if (session && session.role === "student" && session.studentId) {
-      const found = StudentService.getStudentWithStatsById(session.studentId);
+      const found = await StudentService.getStudentWithStatsById(session.studentId);
       setCurrentStudent(found || null);
     } else {
       setCurrentStudent(null);

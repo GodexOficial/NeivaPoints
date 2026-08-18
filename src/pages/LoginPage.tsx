@@ -81,16 +81,16 @@ export const LoginPage: React.FC = () => {
     setErrorMessage(null);
   };
 
-  const handleStudentLogin = (e: React.FormEvent) => {
+  const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    const res = loginStudent(studentUsername, studentPassword);
+    const res = await loginStudent(studentUsername, studentPassword);
     if (!res.success) {
       setErrorMessage(res.error || t("auth.errorFillAll"));
     }
   };
 
-  const handleStudentRegister = (e: React.FormEvent) => {
+  const handleStudentRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     if (!studentRegName.trim()) {
@@ -101,7 +101,7 @@ export const LoginPage: React.FC = () => {
       setErrorMessage(t("auth.errorSelectClass"));
       return;
     }
-    const res = registerStudent({
+    const res = await registerStudent({
       name: studentRegName,
       classId: studentRegClassId,
       username: studentRegUsername || undefined,
