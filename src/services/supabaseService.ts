@@ -1,6 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { ClassInfo, Student, PointTransaction, StudentWithStats } from '../types';
-import { enrichStudentWithStats, checkLevelUp } from '../utils/levelCalculator';
+import type { ClassInfo, Student, PointTransaction } from '../types';
 
 /**
  * Supabase Database Service
@@ -432,9 +431,5 @@ export class SupabaseService {
 
   private static generateStudentId(): string {
     return `std_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  }
-
-  private static generateTransactionId(): string {
-    return `tx_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }
 }
