@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { ClassInfo, Student, PointTransaction } from '../types';
+import type { TeacherAccount } from './authService';
 
 /**
  * Supabase Database Service
@@ -7,6 +8,75 @@ import type { ClassInfo, Student, PointTransaction } from '../types';
  */
 export class SupabaseService {
   private static isConfigured = !!import.meta.env.VITE_SUPABASE_URL;
+
+  /**
+   * Teachers Operations
+   */
+  static async getAllTeachers(): Promise<TeacherAccount[]> {
+    if (!this.isConfigured) return [];
+
+    try {
+      const { data, error } = await supabase
+        .from('teachers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching teachers from Supabase:', error);
+        return [];
+      }
+
+      return (data || []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        emailOrUsername: row.email_or_username,
+        password: row.password,
+        createdAt: row.created_at,
+      }));
+    } catch (err) {
+      console.error('Error in getAllTeachers:', err);
+      return [];
+    }
+  }
+
+  static async createTeacher(params: {
+    id?: string;
+    name: string;
+    emailOrUsername: string;
+    password: string;
+  }): Promise<TeacherAccount> {
+    if (!this.isConfigured) throw new Error('Supabase is not configured');
+
+    try {
+      const id = params.id || `teacher_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      const now = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from('teachers')
+        .insert({
+          id,
+          name: params.name,
+          email_or_username: params.emailOrUsername,
+          password: params.password,
+          created_at: now,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        id: data.id,
+        name: data.name,
+        emailOrUsername: data.email_or_username,
+        password: data.password,
+        createdAt: data.created_at,
+      };
+    } catch (err) {
+      console.error('Error in createTeacher:', err);
+      throw err;
+    }
+  }
 
   /**
    * Classes Operations

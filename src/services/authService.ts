@@ -1,5 +1,6 @@
 import { StorageService } from "./storage";
 import { StudentService } from "./studentService";
+import { SupabaseService } from "./supabaseService";
 import type { AuthUser, ClassId, Student } from "../types";
 
 export interface TeacherAccount {
@@ -21,12 +22,23 @@ const DEFAULT_SECURITY_CODE = "PROF2025";
 
 export class AuthService {
   /**
-   * Get all registered teacher accounts.
+   * Get all registered teacher accounts (async - loads from Supabase first).
    */
-  static getTeachers(): TeacherAccount[] {
+  static async getTeachers(): Promise<TeacherAccount[]> {
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        const supabaseTeachers = await SupabaseService.getAllTeachers();
+        if (supabaseTeachers.length > 0) {
+          StorageService.setItem(TEACHERS_KEY, supabaseTeachers);
+          return supabaseTeachers;
+        }
+      } catch (error) {
+        console.warn('Supabase error loading teachers, falling back to localStorage:', error);
+      }
+    }
+
     const teachers = StorageService.getItem<TeacherAccount[]>(TEACHERS_KEY, []);
     if (!teachers || teachers.length === 0) {
-      // No default teacher - start with empty list
       StorageService.setItem(TEACHERS_KEY, []);
       return [];
     }
@@ -65,12 +77,12 @@ export class AuthService {
   /**
    * Register a new Teacher account. Requires the teacher security code.
    */
-  static registerTeacher(params: {
+  static async registerTeacher(params: {
     name: string;
     emailOrUsername: string;
     password: string;
     securityKey: string;
-  }): { success: boolean; teacher?: TeacherAccount; error?: string } {
+  }): Promise<{ success: boolean; teacher?: TeacherAccount; error?: string }> {
     const trimmedName = params.name.trim();
     const trimmedUser = params.emailOrUsername.trim().toLowerCase();
     const trimmedPass = params.password.trim();
@@ -98,7 +110,7 @@ export class AuthService {
       };
     }
 
-    const teachers = this.getTeachers();
+    const teachers = await this.getTeachers();
     const existing = teachers.find(
       (t) => t.emailOrUsername.toLowerCase() === trimmedUser,
     );
@@ -109,27 +121,41 @@ export class AuthService {
       };
     }
 
-    const newTeacher: TeacherAccount = {
-      id: `teacher_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    const newTeacherId = `teacher_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    let createdTeacher: TeacherAccount = {
+      id: newTeacherId,
       name: trimmedName,
       emailOrUsername: trimmedUser,
       password: trimmedPass,
       createdAt: new Date().toISOString(),
     };
 
-    teachers.push(newTeacher);
+    if (import.meta.env.VITE_SUPABASE_URL) {
+      try {
+        createdTeacher = await SupabaseService.createTeacher({
+          id: newTeacherId,
+          name: trimmedName,
+          emailOrUsername: trimmedUser,
+          password: trimmedPass,
+        });
+      } catch (error) {
+        console.error('Error saving teacher to Supabase:', error);
+      }
+    }
+
+    teachers.push(createdTeacher);
     this.saveTeachers(teachers);
 
-    return { success: true, teacher: newTeacher };
+    return { success: true, teacher: createdTeacher };
   }
 
   /**
    * Authenticate a teacher with username/email and password.
    */
-  static loginTeacher(
+  static async loginTeacher(
     emailOrUsername: string,
     password: string,
-  ): { success: boolean; teacher?: TeacherAccount; error?: string } {
+  ): Promise<{ success: boolean; teacher?: TeacherAccount; error?: string }> {
     const cleanUser = emailOrUsername.trim().toLowerCase();
     const cleanPass = password.trim();
 
@@ -140,7 +166,7 @@ export class AuthService {
       };
     }
 
-    const teachers = this.getTeachers();
+    const teachers = await this.getTeachers();
     const found = teachers.find(
       (t) =>
         (t.emailOrUsername.toLowerCase() === cleanUser ||

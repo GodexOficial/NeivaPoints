@@ -112,23 +112,23 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleTeacherLogin = (e: React.FormEvent) => {
+  const handleTeacherLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    const res = loginTeacher(teacherUser, teacherPassword);
+    const res = await loginTeacher(teacherUser, teacherPassword);
     if (!res.success) {
       setErrorMessage(res.error || t("auth.errorFillAll"));
     }
   };
 
-  const handleTeacherRegister = (e: React.FormEvent) => {
+  const handleTeacherRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     if (!teacherRegName.trim() || !teacherRegUser.trim() || !teacherRegPassword) {
       setErrorMessage(t("auth.errorFillAll"));
       return;
     }
-    const res = registerTeacher({
+    const res = await registerTeacher({
       name: teacherRegName,
       emailOrUsername: teacherRegUser,
       password: teacherRegPassword,

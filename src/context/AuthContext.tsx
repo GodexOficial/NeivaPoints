@@ -38,13 +38,13 @@ interface AuthContextType {
   loginTeacher: (
     emailOrUsername: string,
     password: string,
-  ) => { success: boolean; teacher?: TeacherAccount; error?: string };
+  ) => Promise<{ success: boolean; teacher?: TeacherAccount; error?: string }>;
   registerTeacher: (params: {
     name: string;
     emailOrUsername: string;
     password: string;
     securityKey: string;
-  }) => { success: boolean; teacher?: TeacherAccount; error?: string };
+  }) => Promise<{ success: boolean; teacher?: TeacherAccount; error?: string }>;
   logout: () => void;
   updateTeacherSecurityKey: (newKey: string) => void;
   refreshAuth: () => void;
@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     if (session && session.role === "teacher") {
-      const teachers = AuthService.getTeachers();
+      const teachers = await AuthService.getTeachers();
       const found = teachers.find(
         (t) =>
           t.emailOrUsername.toLowerCase() === session.username?.toLowerCase() ||
@@ -159,11 +159,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const loginTeacher = useCallback(
-    (
+    async (
       emailOrUsername: string,
       password: string,
-    ): { success: boolean; teacher?: TeacherAccount; error?: string } => {
-      const result = AuthService.loginTeacher(emailOrUsername, password);
+    ): Promise<{ success: boolean; teacher?: TeacherAccount; error?: string }> => {
+      const result = await AuthService.loginTeacher(emailOrUsername, password);
       if (result.success && result.teacher) {
         const authUser: AuthUser = {
           role: "teacher",
@@ -182,13 +182,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const registerTeacher = useCallback(
-    (params: {
+    async (params: {
       name: string;
       emailOrUsername: string;
       password: string;
       securityKey: string;
-    }): { success: boolean; teacher?: TeacherAccount; error?: string } => {
-      const result = AuthService.registerTeacher(params);
+    }): Promise<{ success: boolean; teacher?: TeacherAccount; error?: string }> => {
+      const result = await AuthService.registerTeacher(params);
       if (result.success && result.teacher) {
         const authUser: AuthUser = {
           role: "teacher",
