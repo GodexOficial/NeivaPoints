@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { SupabaseService } from '../services/supabaseService';
+import { isSupabaseConfigured } from '../lib/supabase';
 import type { Student, ClassInfo } from '../types';
 
 interface SupabaseContextType {
@@ -24,7 +25,7 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
   const [loadingStudents, setLoadingStudents] = useState(false);
-  const isSupabaseEnabled = !!import.meta.env.VITE_SUPABASE_URL;
+  const isSupabaseEnabled = isSupabaseConfigured;
 
   const refreshClasses = async () => {
     if (!isSupabaseEnabled) return;

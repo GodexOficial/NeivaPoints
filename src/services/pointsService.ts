@@ -2,6 +2,7 @@ import type { PointTransaction, Student, StudentWithStats } from '../types';
 import { StorageService } from './storage';
 import { enrichStudentWithStats, checkLevelUp } from '../utils/levelCalculator';
 import { SupabaseService } from './supabaseService';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 export interface PointActionResult {
   student: StudentWithStats;
@@ -24,7 +25,7 @@ export class PointsService {
    */
   static async getAllTransactions(): Promise<PointTransaction[]> {
     // Try Supabase first
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         const supabaseTransactions = await SupabaseService.getAllTransactions();
         if (supabaseTransactions.length > 0) {
@@ -101,7 +102,7 @@ export class PointsService {
     StorageService.setTransactions(transactions);
 
     // Sync to Supabase
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         await SupabaseService.updateStudent(params.studentId, { points: newPoints });
         await SupabaseService.createTransaction(transaction);
@@ -178,7 +179,7 @@ export class PointsService {
     StorageService.setTransactions(transactions);
 
     // Sync to Supabase
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         await SupabaseService.updateStudent(params.studentId, { points: newPoints });
         await SupabaseService.createTransaction(transaction);

@@ -2,6 +2,7 @@ import type { Student, ClassId, StudentWithStats } from '../types';
 import { StorageService } from './storage';
 import { enrichStudentWithStats } from '../utils/levelCalculator';
 import { SupabaseService } from './supabaseService';
+import { isSupabaseConfigured } from '../lib/supabase';
 
 export class StudentService {
   /**
@@ -34,7 +35,7 @@ export class StudentService {
    */
   static async getAllStudents(): Promise<Student[]> {
     // Try Supabase first
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         const supabaseStudents = await SupabaseService.getAllStudents();
         if (supabaseStudents.length > 0) {
@@ -167,7 +168,7 @@ export class StudentService {
     };
 
     // Save to Supabase
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         await SupabaseService.createStudent({
           name: trimmedName,
@@ -216,7 +217,7 @@ export class StudentService {
     StorageService.setStudents(students);
 
     // Sync to Supabase
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         await SupabaseService.updateStudent(id, updates);
       } catch (error) {
@@ -239,7 +240,7 @@ export class StudentService {
     StorageService.setStudents(filtered);
 
     // Sync to Supabase
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         await SupabaseService.deleteStudent(id);
       } catch (error) {

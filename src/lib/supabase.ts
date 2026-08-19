@@ -1,9 +1,25 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const rawSupabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
+const rawSupabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 
-if (!supabaseUrl || !supabaseAnonKey) {
+function isValidSupabaseUrl(value: string | undefined): value is string {
+  if (!value) return false
+
+  try {
+    const url = new URL(value)
+    return (url.protocol === 'https:' || url.protocol === 'http:') && Boolean(url.hostname)
+  } catch {
+    return false
+  }
+}
+
+const supabaseUrl = isValidSupabaseUrl(rawSupabaseUrl) ? rawSupabaseUrl : undefined
+const supabaseAnonKey = rawSupabaseAnonKey || undefined
+
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
+
+if (!isSupabaseConfigured) {
   console.warn('As variáveis de ambiente do Supabase não foram configuradas. O sistema utilizará o modo de armazenamento local (localStorage).')
 }
 

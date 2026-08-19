@@ -1,6 +1,7 @@
 import { StorageService } from "./storage";
 import { StudentService } from "./studentService";
 import { SupabaseService } from "./supabaseService";
+import { isSupabaseConfigured } from "../lib/supabase";
 import type { AuthUser, ClassId, Student } from "../types";
 
 export interface TeacherAccount {
@@ -25,7 +26,7 @@ export class AuthService {
    * Get all registered teacher accounts (async - loads from Supabase first).
    */
   static async getTeachers(): Promise<TeacherAccount[]> {
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         const supabaseTeachers = await SupabaseService.getAllTeachers();
         if (supabaseTeachers.length > 0) {
@@ -130,7 +131,7 @@ export class AuthService {
       createdAt: new Date().toISOString(),
     };
 
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         createdTeacher = await SupabaseService.createTeacher({
           id: newTeacherId,

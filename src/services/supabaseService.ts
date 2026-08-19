@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import type { ClassInfo, Student, PointTransaction } from '../types';
 import type { TeacherAccount } from './authService';
 
@@ -7,7 +7,7 @@ import type { TeacherAccount } from './authService';
  * Handles all database operations with automatic fallback to localStorage if Supabase is unavailable
  */
 export class SupabaseService {
-  private static isConfigured = !!import.meta.env.VITE_SUPABASE_URL;
+  private static isConfigured = isSupabaseConfigured;
 
   /**
    * Teachers Operations

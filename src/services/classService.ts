@@ -2,6 +2,7 @@ import type { ClassInfo } from "../types";
 import { DEFAULT_CLASSES } from "../types";
 import { StorageService } from "./storage";
 import { SupabaseService } from "./supabaseService";
+import { isSupabaseConfigured } from "../lib/supabase";
 
 export class ClassService {
   /**
@@ -26,7 +27,7 @@ export class ClassService {
    */
   static async getAllClasses(): Promise<ClassInfo[]> {
     // Try Supabase first
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         const supabaseClasses = await SupabaseService.getAllClasses();
         if (supabaseClasses.length > 0) {
@@ -95,7 +96,7 @@ export class ClassService {
     };
 
     // Save to Supabase
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         await SupabaseService.createClass(params);
       } catch (error) {
@@ -160,7 +161,7 @@ export class ClassService {
     StorageService.setClasses(classes);
 
     // Sync to Supabase
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         await SupabaseService.updateClass(id, updates);
       } catch (error) {
@@ -183,7 +184,7 @@ export class ClassService {
     StorageService.setClasses(filtered);
 
     // Sync to Supabase
-    if (import.meta.env.VITE_SUPABASE_URL) {
+    if (isSupabaseConfigured) {
       try {
         await SupabaseService.deleteClass(id);
       } catch (error) {
