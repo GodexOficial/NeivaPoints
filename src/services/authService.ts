@@ -140,6 +140,10 @@ export class AuthService {
         });
       } catch (error) {
         console.error('Error saving teacher to Supabase:', error);
+        return {
+          success: false,
+          error: "Não foi possível salvar o professor no Supabase. Verifique as políticas RLS da tabela teachers.",
+        };
       }
     }
 

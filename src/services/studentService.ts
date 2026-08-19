@@ -177,6 +177,7 @@ export class StudentService {
         });
       } catch (error) {
         console.error('Error saving student to Supabase:', error);
+        throw new Error("Não foi possível salvar o aluno no Supabase. Verifique as políticas RLS da tabela students.");
       }
     }
 

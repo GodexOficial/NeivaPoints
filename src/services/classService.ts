@@ -100,6 +100,7 @@ export class ClassService {
         await SupabaseService.createClass(params);
       } catch (error) {
         console.error('Error saving class to Supabase:', error);
+        throw new Error("Não foi possível salvar a turma no Supabase. Verifique as políticas RLS da tabela classes.");
       }
     }
 
