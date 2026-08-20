@@ -67,7 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-xs group-hover:scale-105 transition-transform shrink-0">
                 P
               </div>
-              <div className="shrink-0">
+              <div className="hidden sm:block shrink-0">
                 <span className="font-extrabold text-slate-900 dark:text-white text-base leading-tight block tracking-tight">
                   {t("nav.brand")}
                 </span>
@@ -79,7 +79,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center space-x-0.5 xl:space-x-1 shrink-0">
+          <nav className="hidden xl:flex items-center space-x-0.5 xl:space-x-1 shrink-0">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentTab === item.id;
@@ -104,7 +104,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
 
           {/* Quick Actions: Dark Mode Button, Language Switcher, Join Mode, Teacher Badge & Logout */}
-          <div className="hidden lg:flex items-center gap-1.5 xl:gap-2 shrink-0">
+          <div className="hidden xl:flex items-center gap-1.5 xl:gap-2 shrink-0">
             <ThemeSwitcher variant="pill" />
             <LanguageSwitcher variant="pill" />
 
@@ -137,7 +137,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Mobile menu button & quick switch */}
-          <div className="flex lg:hidden items-center gap-1.5">
+          <div className="flex xl:hidden items-center gap-1.5">
             <ThemeSwitcher variant="icon" className="scale-90" />
             <LanguageSwitcher variant="pill" className="scale-90" />
             <button
@@ -146,7 +146,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 cursor-pointer whitespace-nowrap"
             >
               <UserCheck size={14} />
-              <span>{t("nav.joinClassShort")}</span>
+              <span className="hidden sm:inline">{t("nav.joinClassShort")}</span>
             </button>
             <button
               onClick={onToggleMobileMenu}
@@ -161,7 +161,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Mobile menu dropdown */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pt-2 pb-4 space-y-1">
+        <div className="xl:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 pt-2 pb-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;

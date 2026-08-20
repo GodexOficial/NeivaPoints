@@ -73,7 +73,7 @@ export const JoinClassPage: React.FC<JoinClassProps> = ({
           <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-extrabold text-sm shadow-xs">
             P
           </div>
-          <span className="font-bold text-slate-800 dark:text-white text-sm tracking-tight">
+          <span className="hidden sm:inline font-bold text-slate-800 dark:text-white text-sm tracking-tight">
             PointsTracker
           </span>
         </div>
@@ -88,7 +88,7 @@ export const JoinClassPage: React.FC<JoinClassProps> = ({
             className="text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-medium inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 shadow-2xs transition-colors cursor-pointer"
           >
             <ArrowLeft size={13} />
-            <span>{t("join.teacherBtn")}</span>
+            <span className="hidden sm:inline">{t("join.teacherBtn")}</span>
           </button>
         </div>
       </div>

@@ -165,7 +165,7 @@ export const LoginPage: React.FC = () => {
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-xl shadow-md">
             P
           </div>
-          <div>
+          <div className="hidden sm:block">
             <span className="font-extrabold text-slate-900 dark:text-white text-base leading-tight block tracking-tight">
               {t("nav.brand")}
             </span>
@@ -176,7 +176,12 @@ export const LoginPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <ThemeSwitcher variant="pill" />
+          <div className="sm:hidden">
+            <ThemeSwitcher variant="icon" />
+          </div>
+          <div className="hidden sm:block">
+            <ThemeSwitcher variant="pill" />
+          </div>
           <LanguageSwitcher variant="pill" />
         </div>
       </header>

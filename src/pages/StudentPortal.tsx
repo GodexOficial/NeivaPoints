@@ -70,7 +70,7 @@ export const StudentPortal: React.FC = () => {
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-xs">
                 P
               </div>
-              <div>
+              <div className="hidden sm:block">
                 <span className="font-extrabold text-slate-900 dark:text-white text-base leading-tight block tracking-tight">
                   {t("nav.brand")}
                 </span>
@@ -82,7 +82,12 @@ export const StudentPortal: React.FC = () => {
 
             {/* Quick Actions: Theme, Language, Log Out */}
             <div className="flex items-center gap-2.5">
-              <ThemeSwitcher variant="pill" />
+              <div className="sm:hidden">
+                <ThemeSwitcher variant="icon" />
+              </div>
+              <div className="hidden sm:block">
+                <ThemeSwitcher variant="pill" />
+              </div>
               <LanguageSwitcher variant="pill" />
 
               <button
@@ -140,7 +145,7 @@ export const StudentPortal: React.FC = () => {
                   </span>
                 )}
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight uppercase mt-2">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight uppercase mt-2 break-words">
                 {currentStudent.name}
               </h1>
               <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500 dark:text-slate-400">
