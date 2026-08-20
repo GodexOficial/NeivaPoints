@@ -48,8 +48,8 @@ interface AuthContextType {
     securityKey: string;
   }) => Promise<{ success: boolean; teacher?: TeacherAccount; error?: string }>;
   logout: () => void;
-  updateTeacherSecurityKey: (newKey: string) => void;
-  updateStudentSecurityKey: (newKey: string) => void;
+  updateTeacherSecurityKey: (newKey: string) => Promise<void>;
+  updateStudentSecurityKey: (newKey: string) => Promise<void>;
   refreshAuth: () => void;
 }
 
@@ -84,6 +84,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const refreshAuth = useCallback(async () => {
     const session = AuthService.getSession();
     setCurrentUser(session);
+    try {
+      await AuthService.loadSecurityKeys();
+    } catch (error) {
+      console.error("Could not load shared security keys:", error);
+    }
     setTeacherSecurityKeyState(AuthService.getTeacherSecurityKey());
     setStudentSecurityKeyState(AuthService.getStudentSecurityKey());
 
@@ -221,13 +226,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentTeacher(null);
   }, []);
 
-  const updateTeacherSecurityKey = useCallback((newKey: string) => {
-    AuthService.setTeacherSecurityKey(newKey);
+  const updateTeacherSecurityKey = useCallback(async (newKey: string) => {
+    await AuthService.setTeacherSecurityKey(newKey);
     setTeacherSecurityKeyState(newKey);
   }, []);
 
-  const updateStudentSecurityKey = useCallback((newKey: string) => {
-    AuthService.setStudentSecurityKey(newKey);
+  const updateStudentSecurityKey = useCallback(async (newKey: string) => {
+    await AuthService.setStudentSecurityKey(newKey);
     setStudentSecurityKeyState(newKey);
   }, []);
 

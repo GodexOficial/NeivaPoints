@@ -158,10 +158,15 @@ export const SettingsPage: React.FC = () => {
           </div>
           <button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               if (newKeyInput.trim()) {
-                updateTeacherSecurityKey(newKeyInput.trim());
-                showFeedback(t("settings.keyUpdated"));
+                try {
+                  await updateTeacherSecurityKey(newKeyInput.trim());
+                  showFeedback(t("settings.keyUpdated"));
+                } catch (error) {
+                  console.error("Could not update teacher security key:", error);
+                  showFeedback("Não foi possível atualizar a chave no Supabase.");
+                }
               }
             }}
             className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
@@ -190,10 +195,15 @@ export const SettingsPage: React.FC = () => {
             </div>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (newStudentKeyInput.trim()) {
-                  updateStudentSecurityKey(newStudentKeyInput.trim());
-                  showFeedback(t("settings.studentKeyUpdated"));
+                  try {
+                    await updateStudentSecurityKey(newStudentKeyInput.trim());
+                    showFeedback(t("settings.studentKeyUpdated"));
+                  } catch (error) {
+                    console.error("Could not update student security key:", error);
+                    showFeedback("Não foi possível atualizar a chave no Supabase.");
+                  }
                 }
               }}
               className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"

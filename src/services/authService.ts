@@ -1,7 +1,7 @@
 import { StorageService } from "./storage";
 import { StudentService } from "./studentService";
 import { SupabaseService } from "./supabaseService";
-import { isSupabaseConfigured } from "../lib/supabase";
+import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import type { AuthUser, ClassId, Student } from "../types";
 
 export interface TeacherAccount {
@@ -13,8 +13,6 @@ export interface TeacherAccount {
 }
 
 const TEACHERS_KEY = "sistema_pontos_teachers_v1";
-const TEACHER_SECURITY_KEY = "sistema_pontos_teacher_key_v1";
-const STUDENT_SECURITY_KEY = "sistema_pontos_student_key_v1";
 const AUTH_SESSION_KEY = "sistema_pontos_auth_session_v1";
 
 const DEFAULT_SECURITY_CODE = "PROF2025";
@@ -24,6 +22,45 @@ const DEFAULT_STUDENT_SECURITY_CODE = "ALUNO2026";
 
 
 export class AuthService {
+  private static teacherSecurityKey = DEFAULT_SECURITY_CODE;
+  private static studentSecurityKey = DEFAULT_STUDENT_SECURITY_CODE;
+
+  /** Load shared registration keys from Supabase into memory. */
+  static async loadSecurityKeys(): Promise<void> {
+    if (!isSupabaseConfigured) return;
+
+    const { data, error } = await supabase
+      .from("app_settings")
+      .select("key, value")
+      .in("key", ["teacher_security_key", "student_security_key"]);
+
+    if (error) throw error;
+
+    for (const setting of data || []) {
+      if (setting.key === "teacher_security_key" && setting.value) {
+        this.teacherSecurityKey = setting.value;
+      }
+      if (setting.key === "student_security_key" && setting.value) {
+        this.studentSecurityKey = setting.value;
+      }
+    }
+  }
+
+  private static async saveSecurityKey(
+    key: "teacher_security_key" | "student_security_key",
+    value: string,
+  ): Promise<void> {
+    if (!isSupabaseConfigured) {
+      throw new Error("Supabase is not configured.");
+    }
+
+    const { error } = await supabase.from("app_settings").upsert(
+      { key, value, updated_at: new Date().toISOString() },
+      { onConflict: "key" },
+    );
+    if (error) throw error;
+  }
+
   /**
    * Get all registered teacher accounts (async - loads from Supabase first).
    */
@@ -59,40 +96,34 @@ export class AuthService {
    * Get the Teacher Security Access Key.
    */
   static getTeacherSecurityKey(): string {
-    const key = StorageService.getItem<string>(
-      TEACHER_SECURITY_KEY,
-      DEFAULT_SECURITY_CODE,
-    );
-    return key || DEFAULT_SECURITY_CODE;
+    return this.teacherSecurityKey;
   }
 
   /**
    * Update the Teacher Security Access Key.
    */
-  static setTeacherSecurityKey(newKey: string): void {
+  static async setTeacherSecurityKey(newKey: string): Promise<void> {
     const trimmed = newKey.trim();
     if (!trimmed) {
       throw new Error("Security key cannot be empty.");
     }
-    StorageService.setItem(TEACHER_SECURITY_KEY, trimmed);
+    await this.saveSecurityKey("teacher_security_key", trimmed);
+    this.teacherSecurityKey = trimmed;
   }
 
   /** Get the key required to create a student account. */
   static getStudentSecurityKey(): string {
-    const key = StorageService.getItem<string>(
-      STUDENT_SECURITY_KEY,
-      DEFAULT_STUDENT_SECURITY_CODE,
-    );
-    return key || DEFAULT_STUDENT_SECURITY_CODE;
+    return this.studentSecurityKey;
   }
 
   /** Update the key required to create a student account. */
-  static setStudentSecurityKey(newKey: string): void {
+  static async setStudentSecurityKey(newKey: string): Promise<void> {
     const trimmed = newKey.trim();
     if (!trimmed) {
       throw new Error("Security key cannot be empty.");
     }
-    StorageService.setItem(STUDENT_SECURITY_KEY, trimmed);
+    await this.saveSecurityKey("student_security_key", trimmed);
+    this.studentSecurityKey = trimmed;
   }
 
   /**
@@ -122,8 +153,9 @@ export class AuthService {
       };
     }
 
+    await this.loadSecurityKeys();
     const currentKey = this.getTeacherSecurityKey();
-    if (trimmedKey !== currentKey && trimmedKey !== DEFAULT_SECURITY_CODE) {
+    if (trimmedKey !== currentKey) {
       return {
         success: false,
         error:
@@ -228,6 +260,7 @@ export class AuthService {
       if (!params.classId) {
         return { success: false, error: "Please select your class." };
       }
+      await this.loadSecurityKeys();
       if (params.securityKey.trim() !== this.getStudentSecurityKey()) {
         return {
           success: false,
