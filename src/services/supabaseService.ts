@@ -15,28 +15,23 @@ export class SupabaseService {
   static async getAllTeachers(): Promise<TeacherAccount[]> {
     if (!this.isConfigured) return [];
 
-    try {
-      const { data, error } = await supabase
-        .from('teachers')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching teachers from Supabase:', error);
-        return [];
-      }
-
-      return (data || []).map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        emailOrUsername: row.email_or_username,
-        password: row.password,
-        createdAt: row.created_at,
-      }));
-    } catch (err) {
-      console.error('Error in getAllTeachers:', err);
-      return [];
+    if (error) {
+      console.error('Error fetching teachers from Supabase:', error);
+      throw error;
     }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      emailOrUsername: row.email_or_username,
+      password: row.password,
+      createdAt: row.created_at,
+    }));
   }
 
   static async createTeacher(params: {
@@ -77,7 +72,7 @@ export class SupabaseService {
       throw err;
     }
   }
-  
+
 
   /**
    * Classes Operations
@@ -85,30 +80,25 @@ export class SupabaseService {
   static async getAllClasses(): Promise<ClassInfo[]> {
     if (!this.isConfigured) return [];
 
-    try {
-      const { data, error } = await supabase
-        .from('classes')
-        .select('*')
-        .order('created_at', { ascending: true });
+    const { data, error } = await supabase
+      .from('classes')
+      .select('*')
+      .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching classes:', error);
-        return [];
-      }
-
-      return (data || []).map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        gradeNumber: row.grade_number,
-        shortName: row.short_name,
-        color: row.color,
-        description: row.description,
-        createdAt: row.created_at,
-      }));
-    } catch (err) {
-      console.error('Error in getAllClasses:', err);
-      return [];
+    if (error) {
+      console.error('Error fetching classes:', error);
+      throw error;
     }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      gradeNumber: row.grade_number,
+      shortName: row.short_name,
+      color: row.color,
+      description: row.description,
+      createdAt: row.created_at,
+    }));
   }
 
   static async getClassById(id: string): Promise<ClassInfo | undefined> {
@@ -243,29 +233,27 @@ export class SupabaseService {
   static async getAllStudents(): Promise<Student[]> {
     if (!this.isConfigured) return [];
 
-    try {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('students')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
-
-      return (data || []).map((row: any) => ({
-        id: row.id,
-        name: row.name,
-        username: row.username,
-        password: row.password,
-        classId: row.class_id,
-        points: row.points,
-        createdAt: row.created_at,
-        updatedAt: row.updated_at,
-        isSample: row.is_sample,
-      }));
-    } catch (err) {
-      console.error('Error in getAllStudents:', err);
-      return [];
+    if (error) {
+      console.error('Error fetching students from Supabase:', error);
+      throw error;
     }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      username: row.username,
+      password: row.password,
+      classId: row.class_id,
+      points: row.points,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      isSample: row.is_sample,
+    }));
   }
 
   static async getStudentById(id: string): Promise<Student | undefined> {
@@ -408,55 +396,68 @@ export class SupabaseService {
   static async getAllTransactions(): Promise<PointTransaction[]> {
     if (!this.isConfigured) return [];
 
-    try {
-      const { data, error } = await supabase
-        .from('point_transactions')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('point_transactions')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-      if (error) throw error;
-
-      return (data || []).map((row: any) => ({
-        id: row.id,
-        studentId: row.student_id,
-        amount: row.amount,
-        type: row.type,
-        reason: row.reason,
-        previousPoints: row.previous_points,
-        newPoints: row.new_points,
-        createdAt: row.created_at,
-      }));
-    } catch (err) {
-      console.error('Error in getAllTransactions:', err);
-      return [];
+    if (error) {
+      console.error('Error fetching transactions from Supabase:', error);
+      throw error;
     }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      studentId: row.student_id,
+      amount: row.amount,
+      type: row.type,
+      reason: row.reason,
+      previousPoints: row.previous_points,
+      newPoints: row.new_points,
+      createdAt: row.created_at,
+    }));
   }
 
   static async getStudentTransactions(studentId: string): Promise<PointTransaction[]> {
     if (!this.isConfigured) return [];
 
+    const { data, error } = await supabase
+      .from('point_transactions')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error in getStudentTransactions:', error);
+      throw error;
+    }
+
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      studentId: row.student_id,
+      amount: row.amount,
+      type: row.type,
+      reason: row.reason,
+      previousPoints: row.previous_points,
+      newPoints: row.new_points,
+      createdAt: row.created_at,
+    }));
+  }
+
+  static async deleteStudentTransactions(studentId: string): Promise<boolean> {
+    if (!this.isConfigured) return false;
+
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('point_transactions')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('created_at', { ascending: false });
+        .delete()
+        .eq('student_id', studentId);
 
       if (error) throw error;
-
-      return (data || []).map((row: any) => ({
-        id: row.id,
-        studentId: row.student_id,
-        amount: row.amount,
-        type: row.type,
-        reason: row.reason,
-        previousPoints: row.previous_points,
-        newPoints: row.new_points,
-        createdAt: row.created_at,
-      }));
+      return true;
     } catch (err) {
-      console.error('Error in getStudentTransactions:', err);
-      return [];
+      console.error('Error in deleteStudentTransactions:', err);
+      return false;
     }
   }
 

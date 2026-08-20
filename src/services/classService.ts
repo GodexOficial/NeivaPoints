@@ -30,12 +30,16 @@ export class ClassService {
     if (isSupabaseConfigured) {
       try {
         const supabaseClasses = await SupabaseService.getAllClasses();
-        if (supabaseClasses.length > 0) {
-          StorageService.setClasses(supabaseClasses); // Cache locally
-          return supabaseClasses;
-        }
+        StorageService.setClasses(supabaseClasses); // Cache locally
+        return supabaseClasses;
       } catch (error) {
         console.warn('Supabase error loading classes, falling back to localStorage:', error);
+        const stored = StorageService.getClasses<ClassInfo[] | null>(null);
+        if (!stored || !Array.isArray(stored) || stored.length === 0) {
+          StorageService.setClasses(DEFAULT_CLASSES);
+          return DEFAULT_CLASSES;
+        }
+        return stored;
       }
     }
 
@@ -85,6 +89,27 @@ export class ClassService {
         ? `${params.gradeNumber}th`
         : trimmedName.substring(0, 4).toUpperCase());
 
+    // Save to Supabase first if configured
+    if (isSupabaseConfigured) {
+      try {
+        const createdInSupabase = await SupabaseService.createClass({
+          ...params,
+          name: trimmedName,
+          shortName,
+        });
+
+        const currentClasses = StorageService.getClasses<ClassInfo[]>([]);
+        const updated = [...currentClasses.filter((c) => c.id !== createdInSupabase.id), createdInSupabase];
+        StorageService.setClasses(updated);
+
+        return createdInSupabase;
+      } catch (error) {
+        console.error('Error saving class to Supabase:', error);
+        throw new Error("Não foi possível salvar a turma no Supabase. Verifique a conexão com a nuvem.");
+      }
+    }
+
+    // Fallback if Supabase is not configured
     const newClass: ClassInfo = {
       id: this.generateId(trimmedName),
       name: trimmedName,
@@ -95,19 +120,8 @@ export class ClassService {
       createdAt: new Date().toISOString(),
     };
 
-    // Save to Supabase
-    if (isSupabaseConfigured) {
-      try {
-        await SupabaseService.createClass(params);
-      } catch (error) {
-        console.error('Error saving class to Supabase:', error);
-        throw new Error("Não foi possível salvar a turma no Supabase. Verifique as políticas RLS da tabela classes.");
-      }
-    }
-
-    // Save to localStorage as backup
-    const allClasses = await this.getAllClasses();
-    const updated = [...allClasses, newClass];
+    const currentClasses = StorageService.getClasses<ClassInfo[]>(DEFAULT_CLASSES);
+    const updated = [...currentClasses, newClass];
     StorageService.setClasses(updated);
 
     return newClass;
@@ -176,14 +190,6 @@ export class ClassService {
    * Delete a class by ID (syncs with Supabase).
    */
   static async deleteClass(id: string): Promise<boolean> {
-    const classes = await this.getAllClasses();
-    const filtered = classes.filter((c) => c.id !== id);
-    if (filtered.length === classes.length) {
-      return false;
-    }
-    StorageService.setClasses(filtered);
-
-    // Sync to Supabase
     if (isSupabaseConfigured) {
       try {
         await SupabaseService.deleteClass(id);
@@ -191,6 +197,10 @@ export class ClassService {
         console.error('Error deleting class from Supabase:', error);
       }
     }
+
+    const classes = StorageService.getClasses<ClassInfo[]>([]);
+    const filtered = classes.filter((c) => c.id !== id);
+    StorageService.setClasses(filtered);
 
     return true;
   }

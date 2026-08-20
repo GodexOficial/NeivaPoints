@@ -38,12 +38,13 @@ export class StudentService {
     if (isSupabaseConfigured) {
       try {
         const supabaseStudents = await SupabaseService.getAllStudents();
-        if (supabaseStudents.length > 0) {
-          StorageService.setStudents(supabaseStudents); // Cache locally
-          return supabaseStudents;
-        }
+        // The cloud is the single source of truth when configured.
+        // Update local cache with cloud state (even if empty).
+        StorageService.setStudents(supabaseStudents);
+        return supabaseStudents;
       } catch (error) {
         console.warn('Supabase error loading students, falling back to localStorage:', error);
+        return StorageService.getStudents<Student[]>([]);
       }
     }
 
@@ -155,6 +156,28 @@ export class StudentService {
       : this.generateUsername(trimmedName, tempId);
     const password = params.password?.trim() || "123456";
 
+    // Save to Supabase first if configured
+    if (isSupabaseConfigured) {
+      try {
+        const createdInSupabase = await SupabaseService.createStudent({
+          name: trimmedName,
+          classId: params.classId,
+          username,
+          password,
+        });
+
+        const currentStudents = StorageService.getStudents<Student[]>([]);
+        const updated = [createdInSupabase, ...currentStudents.filter((s) => s.id !== createdInSupabase.id)];
+        StorageService.setStudents(updated);
+
+        return createdInSupabase;
+      } catch (error) {
+        console.error('Error saving student to Supabase:', error);
+        throw new Error("Não foi possível salvar o aluno no Supabase. Verifique a conexão com a nuvem.");
+      }
+    }
+
+    // Fallback if Supabase is not configured
     const newStudent: Student = {
       id: tempId,
       name: trimmedName,
@@ -167,24 +190,8 @@ export class StudentService {
       isSample: params.isSample ?? false,
     };
 
-    // Save to Supabase
-    if (isSupabaseConfigured) {
-      try {
-        await SupabaseService.createStudent({
-          name: trimmedName,
-          classId: params.classId,
-          username,
-          password,
-        });
-      } catch (error) {
-        console.error('Error saving student to Supabase:', error);
-        throw new Error("Não foi possível salvar o aluno no Supabase. Verifique as políticas RLS da tabela students.");
-      }
-    }
-
-    // Save to localStorage as backup
-    const students = await this.getAllStudents();
-    const updated = [newStudent, ...students];
+    const currentStudents = StorageService.getStudents<Student[]>([]);
+    const updated = [newStudent, ...currentStudents];
     StorageService.setStudents(updated);
 
     return newStudent;
@@ -232,21 +239,19 @@ export class StudentService {
    * Delete a student by ID (syncs with Supabase).
    */
   static async deleteStudent(id: string): Promise<boolean> {
-    const students = await this.getAllStudents();
-    const filtered = students.filter((s) => s.id !== id);
-    if (filtered.length === students.length) {
-      return false;
-    }
-    StorageService.setStudents(filtered);
-
-    // Sync to Supabase
+    // Delete from Supabase first if configured
     if (isSupabaseConfigured) {
       try {
+        await SupabaseService.deleteStudentTransactions(id);
         await SupabaseService.deleteStudent(id);
       } catch (error) {
         console.error('Error deleting student from Supabase:', error);
       }
     }
+
+    const students = StorageService.getStudents<Student[]>([]);
+    const filtered = students.filter((s) => s.id !== id);
+    StorageService.setStudents(filtered);
 
     return true;
   }

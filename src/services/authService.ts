@@ -68,10 +68,8 @@ export class AuthService {
     if (isSupabaseConfigured) {
       try {
         const supabaseTeachers = await SupabaseService.getAllTeachers();
-        if (supabaseTeachers.length > 0) {
-          StorageService.setItem(TEACHERS_KEY, supabaseTeachers);
-          return supabaseTeachers;
-        }
+        StorageService.setItem(TEACHERS_KEY, supabaseTeachers);
+        return supabaseTeachers;
       } catch (error) {
         console.warn('Supabase error loading teachers, falling back to localStorage:', error);
       }
@@ -174,19 +172,11 @@ export class AuthService {
       };
     }
 
-    const newTeacherId = `teacher_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    let createdTeacher: TeacherAccount = {
-      id: newTeacherId,
-      name: trimmedName,
-      emailOrUsername: trimmedUser,
-      password: trimmedPass,
-      createdAt: new Date().toISOString(),
-    };
+    let createdTeacher: TeacherAccount;
 
     if (isSupabaseConfigured) {
       try {
         createdTeacher = await SupabaseService.createTeacher({
-          id: newTeacherId,
           name: trimmedName,
           emailOrUsername: trimmedUser,
           password: trimmedPass,
@@ -195,13 +185,23 @@ export class AuthService {
         console.error('Error saving teacher to Supabase:', error);
         return {
           success: false,
-          error: "Não foi possível salvar o professor no Supabase. Verifique as políticas RLS da tabela teachers.",
+          error: "Não foi possível salvar o professor no Supabase. Verifique a conexão com a nuvem.",
         };
       }
+    } else {
+      const newTeacherId = `teacher_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      createdTeacher = {
+        id: newTeacherId,
+        name: trimmedName,
+        emailOrUsername: trimmedUser,
+        password: trimmedPass,
+        createdAt: new Date().toISOString(),
+      };
     }
 
-    teachers.push(createdTeacher);
-    this.saveTeachers(teachers);
+    const currentTeachers = StorageService.getItem<TeacherAccount[]>(TEACHERS_KEY, []);
+    const updated = [...currentTeachers.filter((t) => t.id !== createdTeacher.id), createdTeacher];
+    this.saveTeachers(updated);
 
     return { success: true, teacher: createdTeacher };
   }

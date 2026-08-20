@@ -3,6 +3,7 @@ import { StorageService } from './storage';
 import { enrichStudentWithStats, checkLevelUp } from '../utils/levelCalculator';
 import { SupabaseService } from './supabaseService';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { StudentService } from './studentService';
 
 export interface PointActionResult {
   student: StudentWithStats;
@@ -28,10 +29,8 @@ export class PointsService {
     if (isSupabaseConfigured) {
       try {
         const supabaseTransactions = await SupabaseService.getAllTransactions();
-        if (supabaseTransactions.length > 0) {
-          StorageService.setTransactions(supabaseTransactions); // Cache locally
-          return supabaseTransactions;
-        }
+        StorageService.setTransactions(supabaseTransactions); // Cache locally
+        return supabaseTransactions;
       } catch (error) {
         console.warn('Supabase error loading transactions, falling back to localStorage:', error);
       }
@@ -64,7 +63,7 @@ export class PointsService {
       throw new Error('Please enter a valid positive number.');
     }
 
-    const students = StorageService.getStudents<Student[]>([]);
+    const students = await StudentService.getAllStudents();
     const studentIndex = students.findIndex((s) => s.id === params.studentId);
     if (studentIndex === -1) {
       throw new Error('Student not found.');
@@ -136,7 +135,7 @@ export class PointsService {
       throw new Error('Please enter a valid positive number.');
     }
 
-    const students = StorageService.getStudents<Student[]>([]);
+    const students = await StudentService.getAllStudents();
     const studentIndex = students.findIndex((s) => s.id === params.studentId);
     if (studentIndex === -1) {
       throw new Error('Student not found.');
@@ -206,5 +205,13 @@ export class PointsService {
     const transactions = StorageService.getTransactions<PointTransaction[]>([]);
     const filtered = transactions.filter((t) => t.studentId !== studentId);
     StorageService.setTransactions(filtered);
+
+    if (isSupabaseConfigured) {
+      try {
+        await SupabaseService.deleteStudentTransactions(studentId);
+      } catch (error) {
+        console.error('Error deleting transactions from Supabase:', error);
+      }
+    }
   }
 }
