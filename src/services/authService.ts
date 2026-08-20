@@ -14,9 +14,11 @@ export interface TeacherAccount {
 
 const TEACHERS_KEY = "sistema_pontos_teachers_v1";
 const TEACHER_SECURITY_KEY = "sistema_pontos_teacher_key_v1";
+const STUDENT_SECURITY_KEY = "sistema_pontos_student_key_v1";
 const AUTH_SESSION_KEY = "sistema_pontos_auth_session_v1";
 
 const DEFAULT_SECURITY_CODE = "PROF2025";
+const DEFAULT_STUDENT_SECURITY_CODE = "ALUNO2026";
 
 // ✅ No default teacher account - all teachers must register with PROF2025
 
@@ -73,6 +75,24 @@ export class AuthService {
       throw new Error("Security key cannot be empty.");
     }
     StorageService.setItem(TEACHER_SECURITY_KEY, trimmed);
+  }
+
+  /** Get the key required to create a student account. */
+  static getStudentSecurityKey(): string {
+    const key = StorageService.getItem<string>(
+      STUDENT_SECURITY_KEY,
+      DEFAULT_STUDENT_SECURITY_CODE,
+    );
+    return key || DEFAULT_STUDENT_SECURITY_CODE;
+  }
+
+  /** Update the key required to create a student account. */
+  static setStudentSecurityKey(newKey: string): void {
+    const trimmed = newKey.trim();
+    if (!trimmed) {
+      throw new Error("Security key cannot be empty.");
+    }
+    StorageService.setItem(STUDENT_SECURITY_KEY, trimmed);
   }
 
   /**
@@ -198,6 +218,7 @@ export class AuthService {
     classId: ClassId;
     username?: string;
     password?: string;
+    securityKey: string;
   }): Promise<{ success: boolean; student?: Student; error?: string }> {
     try {
       const trimmedName = params.name.trim();
@@ -206,6 +227,12 @@ export class AuthService {
       }
       if (!params.classId) {
         return { success: false, error: "Please select your class." };
+      }
+      if (params.securityKey.trim() !== this.getStudentSecurityKey()) {
+        return {
+          success: false,
+          error: "Invalid Student Security Key. Ask your teacher for the registration key.",
+        };
       }
 
       const cleanUsername = params.username?.trim()

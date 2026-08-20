@@ -57,6 +57,9 @@ export const translations = {
     'auth.teacherSecurityKey': 'Teacher Security Key (Master Key)',
     'auth.teacherSecurityKeyPlaceholder': 'Enter master teacher security code',
     'auth.teacherSecurityKeyHelp': 'Security key required to prevent unauthorized student registrations as teacher.',
+    'auth.studentSecurityKey': 'Student Registration Key',
+    'auth.studentSecurityKeyPlaceholder': 'Enter the student registration key',
+    'auth.studentSecurityKeyHelp': 'Ask your teacher for this key before creating an account.',
     'auth.loginBtn': 'Sign In',
     'auth.registerBtn': 'Register Account',
     'auth.alreadyHaveAccount': 'Already have an account? Sign In',
@@ -337,6 +340,9 @@ export const translations = {
     'settings.currentKey': 'Current Security Code',
     'settings.updateKey': 'Update Security Key',
     'settings.keyUpdated': 'Teacher security key updated successfully.',
+    'settings.studentSecurityTitle': 'Student Registration Key',
+    'settings.studentSecurityDesc': 'Authorization key required before a student can create an account.',
+    'settings.studentKeyUpdated': 'Student registration key updated successfully.',
 
     // Reasons
     'reason.Participation': 'Participation',
@@ -395,6 +401,9 @@ export const translations = {
     'auth.teacherSecurityKey': 'Chave de Segurança do Professor (Código Mestre)',
     'auth.teacherSecurityKeyPlaceholder': 'Digite a chave de segurança do professor',
     'auth.teacherSecurityKeyHelp': 'Código de autorização obrigatório para impedir que alunos criem contas de professor.',
+    'auth.studentSecurityKey': 'Chave de Cadastro do Aluno',
+    'auth.studentSecurityKeyPlaceholder': 'Digite a chave de cadastro do aluno',
+    'auth.studentSecurityKeyHelp': 'Peça esta chave ao seu professor antes de criar a conta.',
     'auth.loginBtn': 'Entrar no Sistema',
     'auth.registerBtn': 'Cadastrar Conta',
     'auth.alreadyHaveAccount': 'Já possui conta? Clique para entrar',
@@ -675,6 +684,9 @@ export const translations = {
     'settings.currentKey': 'Chave de Segurança Atual',
     'settings.updateKey': 'Atualizar Chave',
     'settings.keyUpdated': 'Chave de segurança atualizada com sucesso.',
+    'settings.studentSecurityTitle': 'Chave de Cadastro do Aluno',
+    'settings.studentSecurityDesc': 'Chave de autorização exigida antes que um aluno possa criar uma conta.',
+    'settings.studentKeyUpdated': 'Chave de cadastro do aluno atualizada com sucesso.',
 
     // Reasons
     'reason.Participation': 'Participação',

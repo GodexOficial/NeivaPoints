@@ -44,6 +44,7 @@ export const LoginPage: React.FC = () => {
   );
   const [studentRegUsername, setStudentRegUsername] = useState("");
   const [studentRegPassword, setStudentRegPassword] = useState("");
+  const [studentSecurityKey, setStudentSecurityKey] = useState("");
 
   // Teacher Login fields
   const [teacherUser, setTeacherUser] = useState("");
@@ -106,6 +107,7 @@ export const LoginPage: React.FC = () => {
       classId: studentRegClassId,
       username: studentRegUsername || undefined,
       password: studentRegPassword || "123456",
+      securityKey: studentSecurityKey,
     });
     if (!res.success) {
       setErrorMessage(res.error || t("auth.errorFillAll"));
@@ -402,6 +404,31 @@ export const LoginPage: React.FC = () => {
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">
+                    {t("auth.studentSecurityKey")} <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={studentSecurityKey}
+                      onChange={(e) => setStudentSecurityKey(e.target.value)}
+                      placeholder={t("auth.studentSecurityKeyPlaceholder")}
+                      className="w-full pl-10 pr-10 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-semibold text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:bg-white dark:focus:bg-slate-800 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                    />
+                    <KeyRound size={16} className="absolute left-3.5 top-3 text-slate-400 dark:text-slate-500" />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">{t("auth.studentSecurityKeyHelp")}</p>
                 </div>
 
                 <button

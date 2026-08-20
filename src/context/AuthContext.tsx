@@ -25,6 +25,7 @@ interface AuthContextType {
   currentStudent: StudentWithStats | null;
   currentTeacher: TeacherAccount | null;
   teacherSecurityKey: string;
+  studentSecurityKey: string;
   loginStudent: (
     username: string,
     password: string,
@@ -34,6 +35,7 @@ interface AuthContextType {
     classId: ClassId;
     username?: string;
     password?: string;
+    securityKey: string;
   }) => Promise<{ success: boolean; student?: Student; error?: string }>;
   loginTeacher: (
     emailOrUsername: string,
@@ -47,6 +49,7 @@ interface AuthContextType {
   }) => Promise<{ success: boolean; teacher?: TeacherAccount; error?: string }>;
   logout: () => void;
   updateTeacherSecurityKey: (newKey: string) => void;
+  updateStudentSecurityKey: (newKey: string) => void;
   refreshAuth: () => void;
 }
 
@@ -64,6 +67,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return AuthService.getTeacherSecurityKey();
     },
   );
+  const [studentSecurityKey, setStudentSecurityKeyState] = useState<string>(
+    () => AuthService.getStudentSecurityKey(),
+  );
 
   // Track the enriched student if role is student
   const [currentStudent, setCurrentStudent] = useState<StudentWithStats | null>(
@@ -79,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const session = AuthService.getSession();
     setCurrentUser(session);
     setTeacherSecurityKeyState(AuthService.getTeacherSecurityKey());
+    setStudentSecurityKeyState(AuthService.getStudentSecurityKey());
 
     if (session && session.role === "student" && session.studentId) {
       const found = await StudentService.getStudentWithStatsById(session.studentId);
@@ -136,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       classId: ClassId;
       username?: string;
       password?: string;
+      securityKey: string;
     }): Promise<{ success: boolean; student?: Student; error?: string }> => {
       const result = await AuthService.registerStudent(params);
       if (result.success && result.student) {
@@ -218,6 +226,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setTeacherSecurityKeyState(newKey);
   }, []);
 
+  const updateStudentSecurityKey = useCallback((newKey: string) => {
+    AuthService.setStudentSecurityKey(newKey);
+    setStudentSecurityKeyState(newKey);
+  }, []);
+
   const role = currentUser?.role || null;
   const isAuthenticated = !!currentUser;
   const isTeacher = role === "teacher";
@@ -233,12 +246,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       currentStudent,
       currentTeacher,
       teacherSecurityKey,
+      studentSecurityKey,
       loginStudent,
       registerStudent,
       loginTeacher,
       registerTeacher,
       logout,
       updateTeacherSecurityKey,
+      updateStudentSecurityKey,
       refreshAuth,
     }),
     [
@@ -250,12 +265,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       currentStudent,
       currentTeacher,
       teacherSecurityKey,
+      studentSecurityKey,
       loginStudent,
       registerStudent,
       loginTeacher,
       registerTeacher,
       logout,
       updateTeacherSecurityKey,
+      updateStudentSecurityKey,
       refreshAuth,
     ],
   );
