@@ -27,6 +27,11 @@ const parseHtmlToParagraphs = (html: string): Paragraph[] => {
       const el = node as HTMLElement;
       const tagName = el.tagName.toLowerCase();
 
+      // Handle Page Breaks
+      if (el.classList.contains('a4-page-break') || el.style.pageBreakBefore === 'always' || el.style.breakBefore === 'page') {
+        return [new Paragraph({ pageBreakBefore: true })];
+      }
+
       let headingLevel: (typeof HeadingLevel)[keyof typeof HeadingLevel] | undefined;
       if (tagName === 'h1') headingLevel = HeadingLevel.HEADING_1;
       else if (tagName === 'h2') headingLevel = HeadingLevel.HEADING_2;
@@ -105,7 +110,19 @@ const parseHtmlToParagraphs = (html: string): Paragraph[] => {
 
 export const exportToDocx = async (doc: WordDocument): Promise<void> => {
   try {
-    const paragraphs = parseHtmlToParagraphs(doc.content);
+    let paragraphs: Paragraph[] = [];
+
+    if (doc.pages && doc.pages.length > 0) {
+      doc.pages.forEach((pageHtml, pageIdx) => {
+        const pageParas = parseHtmlToParagraphs(pageHtml);
+        if (pageIdx > 0 && pageParas.length > 0) {
+          paragraphs.push(new Paragraph({ pageBreakBefore: true }));
+        }
+        paragraphs.push(...pageParas);
+      });
+    } else {
+      paragraphs = parseHtmlToParagraphs(doc.content);
+    }
 
     const docxDoc = new DocxDocument({
       sections: [

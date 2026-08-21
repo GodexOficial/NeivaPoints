@@ -77,3 +77,32 @@
   animation: levelUpPulse 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Print styles for Word Editor page breaks and A4 sheets */
+@media print {
+  body {
+    background: transparent !important;
+  }
+  .a4-page-sheet {
+    box-shadow: none !important;
+    border: none !important;
+    break-after: page !important;
+    page-break-after: always !important;
+    margin: 0 !important;
+    width: 100% !important;
+    min-height: 100vh !important;
+  }
+  .a4-page-break {
+    break-before: page !important;
+    page-break-before: always !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    display: block !important;
+  }
+  .a4-page-break * {
+    display: none !important;
+  }
+}
+

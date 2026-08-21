@@ -17,6 +17,8 @@ import {
   Highlighter,
   Eraser,
   Bookmark,
+  PaintBucket,
+  Minus,
 } from 'lucide-react';
 
 interface WordContextMenuProps {
@@ -24,6 +26,10 @@ interface WordContextMenuProps {
   y: number;
   onClose: () => void;
   onExecCommand: (command: string, value?: string) => void;
+  onApplyLineBackground?: (color: string) => void;
+  onRemovePageBreak?: (targetBreak?: HTMLElement | null) => void;
+  onRemoveAllPageBreaks?: () => void;
+  hasPageBreaks?: boolean;
   targetElement: HTMLElement | null;
   onOpenTableModal: () => void;
   onOpenFindReplace: () => void;
@@ -37,6 +43,10 @@ export const WordContextMenu: React.FC<WordContextMenuProps> = ({
   y,
   onClose,
   onExecCommand,
+  onApplyLineBackground,
+  onRemovePageBreak,
+  onRemoveAllPageBreaks: _onRemoveAllPageBreaks,
+  hasPageBreaks = false,
   targetElement,
   onOpenFindReplace,
   onInsertFootnote,
@@ -69,8 +79,9 @@ export const WordContextMenu: React.FC<WordContextMenuProps> = ({
     }
   }, [x, y]);
 
-  // Check if click was inside a table
+  // Check if click was inside a table or on a page break
   const isInsideTable = targetElement ? !!targetElement.closest('td, th, table') : false;
+  const isPageBreak = targetElement ? !!targetElement.closest('.a4-page-break') : false;
 
   const handleAction = (action: () => void) => {
     action();
@@ -84,6 +95,24 @@ export const WordContextMenu: React.FC<WordContextMenuProps> = ({
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
       onClick={(e) => e.stopPropagation()}
     >
+      {/* Page Break Options */}
+      {isPageBreak && onRemovePageBreak && (
+        <div className="py-1 bg-amber-50/70 dark:bg-amber-950/40">
+          <div className="px-3 py-1 text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
+            <Minus size={12} />
+            <span>Quebra de Página</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleAction(() => onRemovePageBreak(targetElement?.closest('.a4-page-break') as HTMLElement))}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 cursor-pointer text-left font-bold"
+          >
+            <Trash2 size={13} />
+            <span>Remover Esta Quebra</span>
+          </button>
+        </div>
+      )}
+
       {/* Clipboard / Edit */}
       <div className="py-1">
         <button
@@ -192,6 +221,35 @@ export const WordContextMenu: React.FC<WordContextMenuProps> = ({
             <AlignJustify size={15} />
           </button>
         </div>
+
+        {onApplyLineBackground && (
+          <div className="px-3 py-1.5 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 text-[11px]">
+            <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+              <PaintBucket size={13} className="text-blue-500" />
+              <span>Fundo da Linha:</span>
+            </span>
+            <div className="flex items-center gap-1">
+              <input
+                type="color"
+                defaultValue="#e2e8f0"
+                onChange={(e) => {
+                  onApplyLineBackground(e.target.value);
+                  onClose();
+                }}
+                className="w-5 h-5 rounded cursor-pointer border-0"
+                title="Escolher cor de fundo da linha"
+              />
+              <button
+                type="button"
+                onClick={() => handleAction(() => onApplyLineBackground(''))}
+                className="text-[10px] text-slate-400 hover:text-red-500 font-medium px-1 cursor-pointer"
+                title="Remover cor de fundo"
+              >
+                Limpar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Table Context Options */}
@@ -285,6 +343,17 @@ export const WordContextMenu: React.FC<WordContextMenuProps> = ({
           <Bookmark size={14} className="text-slate-400" />
           <span>Inserir Nota de Rodapé</span>
         </button>
+
+        {hasPageBreaks && !isPageBreak && onRemovePageBreak && (
+          <button
+            type="button"
+            onClick={() => handleAction(() => onRemovePageBreak())}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-700 dark:text-slate-300 hover:text-red-600 cursor-pointer text-left"
+          >
+            <Minus size={14} className="text-slate-400" />
+            <span>Remover Quebra de Página</span>
+          </button>
+        )}
 
         <button
           type="button"

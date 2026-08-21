@@ -17,7 +17,6 @@ import {
   Square,
   Image as ImageIcon,
   Table as TableIcon,
-  Minus,
   Highlighter,
   Palette,
   Subscript,
@@ -32,14 +31,22 @@ import {
   Sliders,
   PaintBucket,
   FileCheck,
+  FilePlus,
+  Trash2,
 } from 'lucide-react';
+import type { ActiveFormatting } from '../../../types/doc';
+import { WordColorPicker } from './WordColorPicker';
 
 interface WordToolbarProps {
   onExecCommand: (command: string, value?: string) => void;
+  onApplyLineBackground: (color: string) => void;
   onOpenInsertShape: () => void;
   onOpenInsertImage: () => void;
   onOpenInsertTable: () => void;
-  onInsertPageBreak: () => void;
+  onAddPage: () => void;
+  onDeletePage?: () => void;
+  currentPageNumber?: number;
+  totalPages?: number;
   onInsertSymbol: (symbol: string) => void;
   onOpenFindReplace: () => void;
   onInsertFootnote: () => void;
@@ -51,18 +58,30 @@ interface WordToolbarProps {
   onChangePaperMargin: (margin: 'normal' | 'narrow' | 'wide') => void;
   leftMarginCm: number;
   rightMarginCm: number;
+  topMarginCm: number;
+  bottomMarginCm: number;
   firstLineIndentCm: number;
   onChangeLeftMargin: (val: number) => void;
   onChangeRightMargin: (val: number) => void;
+  onChangeTopMargin: (val: number) => void;
+  onChangeBottomMargin: (val: number) => void;
   onChangeFirstLineIndent: (val: number) => void;
+  scopeMode?: 'paragraph' | 'all';
+  targetSummary?: string;
+  onToggleScopeMode?: () => void;
+  activeFormat?: ActiveFormatting;
 }
 
 export const WordToolbar: React.FC<WordToolbarProps> = ({
   onExecCommand,
+  onApplyLineBackground,
   onOpenInsertShape,
   onOpenInsertImage,
   onOpenInsertTable,
-  onInsertPageBreak,
+  onAddPage,
+  onDeletePage,
+  currentPageNumber = 1,
+  totalPages = 1,
   onInsertSymbol,
   onOpenFindReplace,
   onInsertFootnote,
@@ -74,14 +93,23 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
   onChangePaperMargin,
   leftMarginCm,
   rightMarginCm,
+  topMarginCm,
+  bottomMarginCm,
   firstLineIndentCm,
   onChangeLeftMargin,
   onChangeRightMargin,
+  onChangeTopMargin,
+  onChangeBottomMargin,
   onChangeFirstLineIndent,
+  scopeMode = 'all',
+  targetSummary,
+  onToggleScopeMode,
+  activeFormat,
 }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'layout'>('home');
   const [textColor, setTextColor] = useState('#000000');
   const [bgColor, setBgColor] = useState('#fef08a');
+  const [lineBgColor, setLineBgColor] = useState('#e2e8f0');
   const [fontFamily, setFontFamily] = useState('Calibri');
   const [fontSize, setFontSize] = useState('3');
 
@@ -130,6 +158,26 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
     onExecCommand('fontSize', val);
   };
 
+  // Helper for active button styling box
+  const getToolBtnClass = (isActive: boolean | undefined) =>
+    `p-1.5 rounded-lg transition-all cursor-pointer ${
+      isActive
+        ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-500 font-bold scale-105'
+        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+    }`;
+
+  const getHeadingBtnClass = (blockName: string) =>
+    `px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+      activeFormat?.formatBlock === blockName
+        ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-500 font-bold'
+        : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white'
+    }`;
+
+  const currentFontFamily = activeFormat?.fontFamily || fontFamily;
+  const currentFontSize = activeFormat?.fontSize || fontSize;
+  const currentTextColor = activeFormat?.textColor || textColor;
+  const currentBgColor = activeFormat?.bgColor || bgColor;
+
   return (
     <div className="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 rounded-t-2xl shadow-2xs overflow-x-auto">
       {/* Ribbon Tabs */}
@@ -154,7 +202,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-transparent'
           }`}
         >
-          Inserir (Vetores / Mídia)
+          Inserir (Páginas / Vetores / Mídia)
         </button>
         <button
           type="button"
@@ -197,7 +245,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
 
             {/* Font Family */}
             <select
-              value={fontFamily}
+              value={currentFontFamily}
               onChange={(e) => handleFontFamilyChange(e.target.value)}
               className="text-xs font-medium p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white cursor-pointer"
             >
@@ -210,7 +258,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
 
             {/* Font Size */}
             <select
-              value={fontSize}
+              value={currentFontSize}
               onChange={(e) => handleFontSizeChange(e.target.value)}
               className="text-xs font-medium p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white cursor-pointer"
             >
@@ -228,7 +276,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('bold')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-800 dark:text-white cursor-pointer"
+                className={getToolBtnClass(activeFormat?.bold)}
                 title="Negrito (Ctrl+B)"
               >
                 <Bold size={15} />
@@ -236,7 +284,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('italic')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-800 dark:text-white cursor-pointer"
+                className={getToolBtnClass(activeFormat?.italic)}
                 title="Itálico (Ctrl+I)"
               >
                 <Italic size={15} />
@@ -244,7 +292,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('underline')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-800 dark:text-white cursor-pointer"
+                className={getToolBtnClass(activeFormat?.underline)}
                 title="Sublinhado (Ctrl+U)"
               >
                 <Underline size={15} />
@@ -252,7 +300,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('strikeThrough')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-800 dark:text-white cursor-pointer"
+                className={getToolBtnClass(activeFormat?.strikeThrough)}
                 title="Tachado"
               >
                 <Strikethrough size={15} />
@@ -260,7 +308,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('subscript')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-800 dark:text-white cursor-pointer"
+                className={getToolBtnClass(activeFormat?.subscript)}
                 title="Subscrito"
               >
                 <Subscript size={15} />
@@ -268,7 +316,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('superscript')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-800 dark:text-white cursor-pointer"
+                className={getToolBtnClass(activeFormat?.superscript)}
                 title="Sobrescrito"
               >
                 <Superscript size={15} />
@@ -278,33 +326,55 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
             <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
 
             {/* Colors & Text Shading */}
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 px-2 rounded-xl border border-slate-200 dark:border-slate-700">
-              <label className="flex items-center gap-1 cursor-pointer" title="Cor do Texto">
-                <Palette size={14} className="text-slate-500" />
-                <input type="color" value={textColor} onChange={handleTextColorChange} className="w-5 h-5 rounded cursor-pointer border-0" />
-              </label>
-              <label className="flex items-center gap-1 cursor-pointer" title="Marca-Texto / Destaque">
-                <Highlighter size={14} className="text-amber-500" />
-                <input type="color" value={bgColor} onChange={handleBgColorChange} className="w-5 h-5 rounded cursor-pointer border-0" />
-              </label>
-              <label className="flex items-center gap-1 cursor-pointer" title="Cor de Fundo do Bloco / Sombreamento">
-                <PaintBucket size={14} className="text-blue-500" />
-                <input
-                  type="color"
-                  onChange={(e) => onExecCommand('backColor', e.target.value)}
-                  className="w-5 h-5 rounded cursor-pointer border-0"
-                />
-              </label>
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-0.5 px-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+              <WordColorPicker
+                value={currentTextColor}
+                onChange={(val) => {
+                  const finalColor = val || '#000000';
+                  setTextColor(finalColor);
+                  onExecCommand('foreColor', finalColor);
+                }}
+                title="Cor da Fonte"
+                icon={<Palette size={15} />}
+                hasNoColorOption={true}
+                noColorLabel="Automático"
+              />
+
+              <WordColorPicker
+                value={currentBgColor}
+                onChange={(val) => {
+                  setBgColor(val);
+                  onExecCommand('hiliteColor', val || 'transparent');
+                }}
+                title="Marca-Texto / Destaque"
+                icon={<Highlighter size={15} className="text-amber-500" />}
+                hasNoColorOption={true}
+                noColorLabel="Sem Cor"
+              />
+
+              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-0.5" />
+
+              <WordColorPicker
+                value={activeFormat?.lineBgColor || lineBgColor}
+                onChange={(val) => {
+                  setLineBgColor(val);
+                  onApplyLineBackground(val);
+                }}
+                title="Preenchimento de Fundo da Linha"
+                icon={<PaintBucket size={15} className="text-blue-500" />}
+                hasNoColorOption={true}
+                noColorLabel="Sem Cor"
+              />
             </div>
 
             <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
 
-            {/* Alignments */}
+            {/* Alignments with active indicator box */}
             <div className="flex items-center gap-0.5 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
               <button
                 type="button"
                 onClick={() => onExecCommand('justifyLeft')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg cursor-pointer"
+                className={getToolBtnClass(activeFormat?.align === 'left')}
                 title="Alinhar à Esquerda"
               >
                 <AlignLeft size={15} />
@@ -312,7 +382,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('justifyCenter')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg cursor-pointer"
+                className={getToolBtnClass(activeFormat?.align === 'center')}
                 title="Centralizar"
               >
                 <AlignCenter size={15} />
@@ -320,7 +390,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('justifyRight')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg cursor-pointer"
+                className={getToolBtnClass(activeFormat?.align === 'right')}
                 title="Alinhar à Direita"
               >
                 <AlignRight size={15} />
@@ -328,7 +398,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('justifyFull')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg cursor-pointer"
+                className={getToolBtnClass(activeFormat?.align === 'justify')}
                 title="Justificar"
               >
                 <AlignJustify size={15} />
@@ -340,7 +410,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('insertUnorderedList')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg cursor-pointer"
+                className={getToolBtnClass(activeFormat?.unorderedList)}
                 title="Lista com Marcadores"
               >
                 <List size={15} />
@@ -348,7 +418,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('insertOrderedList')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg cursor-pointer"
+                className={getToolBtnClass(activeFormat?.orderedList)}
                 title="Lista Numerada"
               >
                 <ListOrdered size={15} />
@@ -381,11 +451,13 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <Search size={14} />
               <span>Localizar / Substituir</span>
             </button>
+
+            {/* Headings */}
             <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
               <button
                 type="button"
                 onClick={() => onExecCommand('formatBlock', '<h1>')}
-                className="px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-xs font-bold cursor-pointer"
+                className={getHeadingBtnClass('h1')}
                 title="Título 1"
               >
                 <Heading1 size={15} />
@@ -393,7 +465,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('formatBlock', '<h2>')}
-                className="px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-xs font-bold cursor-pointer"
+                className={getHeadingBtnClass('h2')}
                 title="Título 2"
               >
                 <Heading2 size={15} />
@@ -401,7 +473,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('formatBlock', '<h3>')}
-                className="px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-xs font-bold cursor-pointer"
+                className={getHeadingBtnClass('h3')}
                 title="Título 3"
               >
                 <Heading3 size={15} />
@@ -409,7 +481,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               <button
                 type="button"
                 onClick={() => onExecCommand('formatBlock', '<blockquote>')}
-                className="px-2 py-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-xs font-bold cursor-pointer"
+                className={getHeadingBtnClass('blockquote')}
                 title="Citação"
               >
                 <Quote size={15} />
@@ -420,6 +492,32 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
 
         {activeTab === 'insert' && (
           <>
+            {/* Multi-Page A4 Management Button */}
+            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
+              <button
+                type="button"
+                onClick={onAddPage}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+                title="Adicionar Nova Folha A4"
+              >
+                <FilePlus size={15} />
+                <span>+ Adicionar Página A4</span>
+              </button>
+              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 px-2">
+                Pág. {currentPageNumber} de {totalPages}
+              </span>
+              {totalPages > 1 && onDeletePage && (
+                <button
+                  type="button"
+                  onClick={onDeletePage}
+                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
+                  title="Excluir Página Atual"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+
             {/* Vector Shapes Button */}
             <button
               type="button"
@@ -448,16 +546,6 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
             >
               <TableIcon size={16} />
               <span>+ Inserir Tabela</span>
-            </button>
-
-            {/* Page Break */}
-            <button
-              type="button"
-              onClick={onInsertPageBreak}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-            >
-              <Minus size={16} />
-              <span>Inserir Quebra de Página</span>
             </button>
 
             {/* Footnote button */}
@@ -492,12 +580,28 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
         {activeTab === 'layout' && (
           <>
             {/* Precision Ruler Numerical Adjustment Controls */}
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-              <span className="font-bold text-slate-500 flex items-center gap-1">
-                <Sliders size={13} />
-                <span>Régua (cm):</span>
-              </span>
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs flex-wrap">
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-slate-500 flex items-center gap-1">
+                  <Sliders size={13} />
+                  <span>Régua:</span>
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${scopeMode === 'paragraph' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}`}>
+                  {scopeMode === 'paragraph' ? `Parágrafo ${targetSummary ? `(${targetSummary})` : ''}` : 'Documento Inteiro'}
+                </span>
+                {onToggleScopeMode && (
+                  <button
+                    type="button"
+                    onClick={onToggleScopeMode}
+                    className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer ml-0.5"
+                    title="Alternar entre Parágrafo Selecionado e Documento Inteiro"
+                  >
+                    (Alternar)
+                  </button>
+                )}
+              </div>
 
+              {/* Horizontal Margins */}
               <label className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
                 <span>Esq:</span>
                 <input
@@ -524,6 +628,34 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
                 />
               </label>
 
+              {/* Vertical Margins */}
+              <label className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                <span>Topo:</span>
+                <input
+                  type="number"
+                  step={0.1}
+                  min={0.5}
+                  max={10}
+                  value={topMarginCm}
+                  onChange={(e) => onChangeTopMargin(Number(e.target.value))}
+                  className="w-12 p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center font-mono"
+                />
+              </label>
+
+              <label className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
+                <span>Base:</span>
+                <input
+                  type="number"
+                  step={0.1}
+                  min={0.5}
+                  max={10}
+                  value={bottomMarginCm}
+                  onChange={(e) => onChangeBottomMargin(Number(e.target.value))}
+                  className="w-12 p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center font-mono"
+                />
+              </label>
+
+              {/* Indent */}
               <label className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
                 <span>Recuo:</span>
                 <input

@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { Target, Globe } from 'lucide-react';
 
 interface WordRulerProps {
   leftMarginCm: number;
@@ -8,6 +9,9 @@ interface WordRulerProps {
   onChangeRightMargin: (valCm: number) => void;
   onChangeFirstLineIndent: (valCm: number) => void;
   paperWidthPx?: number; // default A4 ~ 794px
+  scopeMode?: 'paragraph' | 'all';
+  targetSummary?: string;
+  onToggleScopeMode?: () => void;
 }
 
 export const WordRuler: React.FC<WordRulerProps> = ({
@@ -18,6 +22,9 @@ export const WordRuler: React.FC<WordRulerProps> = ({
   onChangeRightMargin,
   onChangeFirstLineIndent,
   paperWidthPx = 794,
+  scopeMode = 'all',
+  targetSummary,
+  onToggleScopeMode,
 }) => {
   const rulerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<'left' | 'right' | 'indent' | null>(null);
@@ -39,13 +46,13 @@ export const WordRuler: React.FC<WordRulerProps> = ({
       const roundedCm = Math.round(cmVal * 10) / 10;
 
       if (dragging === 'left') {
-        const maxLeft = 21 - rightMarginCm - 2;
-        onChangeLeftMargin(Math.min(roundedCm, maxLeft));
+        const maxLeft = 21 - rightMarginCm - 1;
+        onChangeLeftMargin(Math.max(0, Math.min(roundedCm, maxLeft)));
       } else if (dragging === 'right') {
-        const maxRight = 21 - leftMarginCm - 2;
-        onChangeRightMargin(Math.min(21 - roundedCm, maxRight));
+        const maxRight = 21 - leftMarginCm - 1;
+        onChangeRightMargin(Math.max(0, Math.min(21 - roundedCm, maxRight)));
       } else if (dragging === 'indent') {
-        onChangeFirstLineIndent(roundedCm);
+        onChangeFirstLineIndent(Math.max(0, Math.min(15, roundedCm)));
       }
     };
 
@@ -71,7 +78,36 @@ export const WordRuler: React.FC<WordRulerProps> = ({
   const indentPx = firstLineIndentCm * pxPerCm;
 
   return (
-    <div className="w-full flex justify-center bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-1 selection:bg-none">
+    <div className="w-full flex flex-col items-center bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-1 select-none">
+      {/* Scope Status Banner */}
+      <div className="w-full flex items-center justify-between px-4 max-w-[794px] mb-0.5 text-[11px]">
+        <div className="flex items-center gap-1.5">
+          {scopeMode === 'paragraph' ? (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold">
+              <Target size={12} className="text-blue-600 dark:text-blue-400" />
+              <span>Régua: Parágrafo Selecionado ({targetSummary || '1 bloco'})</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold">
+              <Globe size={12} className="text-slate-500" />
+              <span>Régua: Documento Inteiro (Margens A4)</span>
+            </span>
+          )}
+        </div>
+
+        {onToggleScopeMode && (
+          <button
+            type="button"
+            onClick={onToggleScopeMode}
+            className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer font-medium"
+            title="Alternar entre aplicar ao parágrafo ativo ou a todo o documento"
+          >
+            {scopeMode === 'paragraph' ? 'Aplicar a todo documento' : 'Aplicar ao parágrafo atual'}
+          </button>
+        )}
+      </div>
+
+      {/* Physical Ruler Bar */}
       <div
         ref={rulerRef}
         className="relative h-6 bg-slate-200 dark:bg-slate-800 rounded-md border border-slate-300 dark:border-slate-700 shadow-inner select-none font-mono text-[9px] text-slate-500 dark:text-slate-400"
@@ -120,7 +156,7 @@ export const WordRuler: React.FC<WordRulerProps> = ({
           onMouseDown={(e) => handleMouseDown('left', e)}
           className="absolute bottom-0 -translate-x-1/2 cursor-col-resize z-20 group"
           style={{ left: `${leftPx}px` }}
-          title={`Margem Esquerda: ${leftMarginCm.toFixed(1)} cm`}
+          title={`Margem/Recuo Esquerdo: ${leftMarginCm.toFixed(1)} cm (${scopeMode === 'paragraph' ? 'Parágrafo' : 'Documento'})`}
         >
           <div className="w-3 h-3 bg-blue-600 border border-white dark:border-slate-900 rounded-b-xs shadow-xs group-hover:scale-125 transition-transform" />
           <div className="w-0.5 h-6 bg-blue-500/50 mx-auto -mt-3 pointer-events-none" />
@@ -131,7 +167,7 @@ export const WordRuler: React.FC<WordRulerProps> = ({
           onMouseDown={(e) => handleMouseDown('indent', e)}
           className="absolute top-0 -translate-x-1/2 cursor-col-resize z-20 group"
           style={{ left: `${indentPx}px` }}
-          title={`Recuo de Primeira Linha: ${firstLineIndentCm.toFixed(1)} cm`}
+          title={`Recuo da 1ª Linha: ${firstLineIndentCm.toFixed(1)} cm (${scopeMode === 'paragraph' ? 'Parágrafo' : 'Documento'})`}
         >
           <div className="w-3 h-2.5 bg-purple-600 border border-white dark:border-slate-900 rounded-t-xs shadow-xs group-hover:scale-125 transition-transform" />
         </div>
@@ -141,7 +177,7 @@ export const WordRuler: React.FC<WordRulerProps> = ({
           onMouseDown={(e) => handleMouseDown('right', e)}
           className="absolute bottom-0 -translate-x-1/2 cursor-col-resize z-20 group"
           style={{ left: `${rightPx}px` }}
-          title={`Margem Direita: ${rightMarginCm.toFixed(1)} cm`}
+          title={`Margem/Recuo Direito: ${rightMarginCm.toFixed(1)} cm (${scopeMode === 'paragraph' ? 'Parágrafo' : 'Documento'})`}
         >
           <div className="w-3 h-3 bg-blue-600 border border-white dark:border-slate-900 rounded-b-xs shadow-xs group-hover:scale-125 transition-transform" />
           <div className="w-0.5 h-6 bg-blue-500/50 mx-auto -mt-3 pointer-events-none" />
