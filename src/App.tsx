@@ -8,6 +8,7 @@ import { Navbar, type NavTab } from './components/layout/Navbar';
 import { Dashboard } from './pages/Dashboard';
 import { StudentsPage } from './pages/Students';
 import { ClassesPage } from './pages/Classes';
+import { AppsHub } from './pages/AppsHub';
 import { StudentDetails } from './pages/StudentDetails';
 import { SettingsPage } from './pages/Settings';
 import { JoinClassPage } from './pages/JoinClass';
@@ -134,6 +135,8 @@ const MainContent: React.FC = () => {
             onOpenAddModal={handleOpenAddStudentModal}
             onOpenPointsModal={(student) => handleOpenPointsModal(student, 'add')}
           />
+        ) : activeTab === 'apps' ? (
+          <AppsHub />
         ) : activeTab === 'settings' ? (
           <SettingsPage />
         ) : null}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Award,
   Sparkles,
@@ -9,7 +9,10 @@ import {
   Calendar,
   Shield,
   Info,
+  AppWindow,
+  LayoutDashboard,
 } from "lucide-react";
+import { AppsHub } from "./AppsHub";
 import { useAuth } from "../context/AuthContext";
 import { useStudentContext } from "../context/StudentContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -24,6 +27,7 @@ export const StudentPortal: React.FC = () => {
   const { currentStudent, logout, currentUser } = useAuth();
   const { getClassById, transactions } = useStudentContext();
   const { t, language, getClassName } = useLanguage();
+  const [activeTab, setActiveTab] = useState<'portal' | 'apps'>('portal');
 
   if (!currentStudent) {
     return (
@@ -80,6 +84,34 @@ export const StudentPortal: React.FC = () => {
               </div>
             </div>
 
+            {/* Navigation Tabs for Student: Meu Painel / Apps */}
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => setActiveTab('portal')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                  activeTab === 'portal'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <LayoutDashboard size={15} />
+                <span>Meu Painel</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('apps')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                  activeTab === 'apps'
+                    ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <AppWindow size={15} />
+                <span>Aplicativos (Word)</span>
+              </button>
+            </div>
+
             {/* Quick Actions: Theme, Language, Log Out */}
             <div className="flex items-center gap-2.5">
               <div className="sm:hidden">
@@ -104,8 +136,13 @@ export const StudentPortal: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Student Portal Content */}
-      <main className="max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6 flex-1">
+      {/* Main Content View */}
+      {activeTab === 'apps' ? (
+        <main className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
+          <AppsHub />
+        </main>
+      ) : (
+        <main className="max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6 flex-1">
         {/* Welcome & Privacy Banner */}
         <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border border-blue-200/80 dark:border-blue-800/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -284,6 +321,7 @@ export const StudentPortal: React.FC = () => {
           </div>
         </div>
       </main>
+      )}
 
       {/* Footer */}
       <footer className="bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800 py-4 text-center text-xs text-slate-400 dark:text-slate-500">

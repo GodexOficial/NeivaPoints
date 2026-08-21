@@ -7,6 +7,7 @@ import {
   UserCheck,
   Menu,
   X,
+  AppWindow,
 } from "lucide-react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useAuth } from "../../context/AuthContext";
@@ -18,6 +19,7 @@ export type NavTab =
   | "dashboard"
   | "students"
   | "classes"
+  | "apps"
   | "settings"
   | "join-class";
 
@@ -41,6 +43,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: "dashboard" as NavTab, label: t("nav.dashboard"), icon: LayoutDashboard },
     { id: "students" as NavTab, label: t("nav.students"), icon: Users },
     { id: "classes" as NavTab, label: t("nav.classes"), icon: GraduationCap },
+    { id: "apps" as NavTab, label: t("nav.apps"), icon: AppWindow },
     { id: "settings" as NavTab, label: t("nav.settings"), icon: Settings },
   ];
 
