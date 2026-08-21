@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useLayoutEffect } from 'react';
 import {
   Scissors,
   Copy,
@@ -43,6 +43,32 @@ export const WordContextMenu: React.FC<WordContextMenuProps> = ({
   onChangeCellBg,
   onModifyTable,
 }) => {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ top: number; left: number }>({ top: y, left: x });
+
+  useLayoutEffect(() => {
+    if (menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      const menuWidth = rect.width || 224;
+      const menuHeight = rect.height || 360;
+
+      let top = y;
+      let left = x;
+
+      // Detect if context menu exceeds bottom of screen -> display above cursor
+      if (y + menuHeight > window.innerHeight - 12) {
+        top = Math.max(12, y - menuHeight);
+      }
+
+      // Detect if context menu exceeds right of screen -> display to the left of cursor
+      if (x + menuWidth > window.innerWidth - 12) {
+        left = Math.max(12, x - menuWidth);
+      }
+
+      setPosition({ top, left });
+    }
+  }, [x, y]);
+
   // Check if click was inside a table
   const isInsideTable = targetElement ? !!targetElement.closest('td, th, table') : false;
 
@@ -53,8 +79,9 @@ export const WordContextMenu: React.FC<WordContextMenuProps> = ({
 
   return (
     <div
+      ref={menuRef}
       className="fixed z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 w-56 text-xs font-semibold text-slate-700 dark:text-slate-200 divide-y divide-slate-100 dark:divide-slate-800 selection:bg-none animate-in fade-in zoom-in-95 duration-100"
-      style={{ top: `${y}px`, left: `${x}px` }}
+      style={{ top: `${position.top}px`, left: `${position.left}px` }}
       onClick={(e) => e.stopPropagation()}
     >
       {/* Clipboard / Edit */}

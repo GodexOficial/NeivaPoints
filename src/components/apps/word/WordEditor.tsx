@@ -403,155 +403,158 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   };
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-5rem)] bg-slate-200 dark:bg-slate-950 rounded-3xl border border-slate-300 dark:border-slate-800 overflow-hidden">
-      {/* Top Header Bar */}
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
-        {/* Left: Back button & Title input */}
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <button
-            type="button"
-            onClick={onBackToHub}
-            className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-            title="Voltar para Suíte de Apps"
-          >
-            <ArrowLeft size={18} />
-          </button>
+    <div className="flex flex-col min-h-[calc(100vh-5rem)] bg-slate-200 dark:bg-slate-950 rounded-3xl border border-slate-300 dark:border-slate-800 overflow-hidden relative">
+      {/* Sticky Fixed Toolbar & Controls Block */}
+      <div className="sticky top-0 z-30 bg-white dark:bg-slate-900 shadow-md border-b border-slate-200/80 dark:border-slate-800">
+        {/* Top Header Bar */}
+        <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
+          {/* Left: Back button & Title input */}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={onBackToHub}
+              className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+              title="Voltar para Suíte de Apps"
+            >
+              <ArrowLeft size={18} />
+            </button>
 
-          <div className="p-2 bg-blue-600 text-white rounded-xl shadow-2xs shrink-0">
-            <FileText size={18} />
-          </div>
+            <div className="p-2 bg-blue-600 text-white rounded-xl shadow-2xs shrink-0">
+              <FileText size={18} />
+            </div>
 
-          <div className="flex-1 min-w-0">
-            <input
-              type="text"
-              value={docTitle}
-              onChange={(e) => {
-                setDocTitle(e.target.value);
-                setHasUnsavedChanges(true);
-              }}
-              placeholder="Nome do Documento..."
-              className="text-base font-extrabold text-slate-900 dark:text-white bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 px-2 py-0.5 rounded-lg border border-transparent focus:border-blue-500 transition-colors w-full truncate"
-            />
-            <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 px-2">
-              <span>Word App</span>
-              <span>•</span>
-              {/* Auto-Save status badge */}
-              <span className="flex items-center gap-1 font-semibold">
-                {saveStatus === 'saved' && (
-                  <>
-                    <CheckCircle2 size={12} className="text-emerald-500" />
-                    <span className="text-emerald-600 dark:text-emerald-400">Salvo localmente ({lastSavedTime})</span>
-                  </>
-                )}
-                {saveStatus === 'saving' && (
-                  <>
-                    <Clock size={12} className="text-blue-500 animate-spin" />
-                    <span className="text-blue-600 dark:text-blue-400">Salvando rascunho...</span>
-                  </>
-                )}
-                {saveStatus === 'unsaved' && (
-                  <>
-                    <AlertCircle size={12} className="text-amber-500" />
-                    <span className="text-amber-600 dark:text-amber-400">Alterações pendentes</span>
-                  </>
-                )}
-                {saveStatus === 'draft_restored' && (
-                  <>
-                    <Sparkles size={12} className="text-purple-500" />
-                    <span className="text-purple-600 dark:text-purple-400">Rascunho restaurado!</span>
-                  </>
-                )}
-              </span>
+            <div className="flex-1 min-w-0">
+              <input
+                type="text"
+                value={docTitle}
+                onChange={(e) => {
+                  setDocTitle(e.target.value);
+                  setHasUnsavedChanges(true);
+                }}
+                placeholder="Nome do Documento..."
+                className="text-base font-extrabold text-slate-900 dark:text-white bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 px-2 py-0.5 rounded-lg border border-transparent focus:border-blue-500 transition-colors w-full truncate"
+              />
+              <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 px-2">
+                <span>Word App</span>
+                <span>•</span>
+                {/* Auto-Save status badge */}
+                <span className="flex items-center gap-1 font-semibold">
+                  {saveStatus === 'saved' && (
+                    <>
+                      <CheckCircle2 size={12} className="text-emerald-500" />
+                      <span className="text-emerald-600 dark:text-emerald-400">Salvo localmente ({lastSavedTime})</span>
+                    </>
+                  )}
+                  {saveStatus === 'saving' && (
+                    <>
+                      <Clock size={12} className="text-blue-500 animate-spin" />
+                      <span className="text-blue-600 dark:text-blue-400">Salvando rascunho...</span>
+                    </>
+                  )}
+                  {saveStatus === 'unsaved' && (
+                    <>
+                      <AlertCircle size={12} className="text-amber-500" />
+                      <span className="text-amber-600 dark:text-amber-400">Alterações pendentes</span>
+                    </>
+                  )}
+                  {saveStatus === 'draft_restored' && (
+                    <>
+                      <Sparkles size={12} className="text-purple-500" />
+                      <span className="text-purple-600 dark:text-purple-400">Rascunho restaurado!</span>
+                    </>
+                  )}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Right: Quick actions (New, Save, Download .docx, Print) */}
-        <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
-          <button
-            type="button"
-            onClick={handleCreateNewDoc}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-            title="Novo Documento"
-          >
-            <FilePlus size={15} />
-            <span className="hidden md:inline">Novo</span>
-          </button>
+          {/* Right: Quick actions (New, Save, Download .docx, Print) */}
+          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={handleCreateNewDoc}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              title="Novo Documento"
+            >
+              <FilePlus size={15} />
+              <span className="hidden md:inline">Novo</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handleSaveToBackend}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer"
-            title="Salvar no Servidor e Local"
-          >
-            <Save size={15} />
-            <span>Salvar</span>
-          </button>
+            <button
+              type="button"
+              onClick={handleSaveToBackend}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer"
+              title="Salvar no Servidor e Local"
+            >
+              <Save size={15} />
+              <span>Salvar</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={handleExportDocx}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 shadow-2xs transition-colors cursor-pointer"
-            title="Baixar arquivo no formato .docx"
-          >
-            <Download size={15} />
-            <span>Baixar .docx</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Ribbon Formatting Toolbar */}
-      <WordToolbar
-        onExecCommand={handleExecCommand}
-        onOpenInsertShape={() => setIsShapeModalOpen(true)}
-        onOpenInsertImage={() => setIsImageModalOpen(true)}
-        onOpenInsertTable={() => setIsTableModalOpen(true)}
-        onInsertPageBreak={handleInsertPageBreak}
-        onInsertSymbol={handleInsertSymbol}
-        onOpenFindReplace={() => setIsFindReplaceOpen(true)}
-        onInsertFootnote={handleInsertFootnote}
-        watermarkText={watermarkText}
-        onChangeWatermark={setWatermarkText}
-        paperTheme={paperTheme}
-        onChangePaperTheme={setPaperTheme}
-        paperMargin={paperMargin}
-        onChangePaperMargin={setPaperMargin}
-        leftMarginCm={leftMarginCm}
-        rightMarginCm={rightMarginCm}
-        firstLineIndentCm={firstLineIndentCm}
-        onChangeLeftMargin={setLeftMarginCm}
-        onChangeRightMargin={setRightMarginCm}
-        onChangeFirstLineIndent={setFirstLineIndentCm}
-      />
-
-      {/* Interactive Ruler Component */}
-      <WordRuler
-        leftMarginCm={leftMarginCm}
-        rightMarginCm={rightMarginCm}
-        firstLineIndentCm={firstLineIndentCm}
-        onChangeLeftMargin={setLeftMarginCm}
-        onChangeRightMargin={setRightMarginCm}
-        onChangeFirstLineIndent={setFirstLineIndentCm}
-      />
-
-      {/* Restored Draft Banner Notice */}
-      {showDraftRestoredBanner && (
-        <div className="bg-purple-50 dark:bg-purple-950/80 border-b border-purple-200 dark:border-purple-800 px-4 py-2 flex items-center justify-between text-xs text-purple-900 dark:text-purple-200">
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-purple-600 dark:text-purple-400" />
-            <span>
-              <strong>Proteção de Salvamento Local:</strong> Encontramos e restauramos um rascunho recente que não havia sido salvo antes de fechar o navegador!
-            </span>
+            <button
+              type="button"
+              onClick={handleExportDocx}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 shadow-2xs transition-colors cursor-pointer"
+              title="Baixar arquivo no formato .docx"
+            >
+              <Download size={15} />
+              <span>Baixar .docx</span>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowDraftRestoredBanner(false)}
-            className="font-bold underline hover:text-purple-700 cursor-pointer"
-          >
-            Entendido
-          </button>
-        </div>
-      )}
+        </header>
+
+        {/* Ribbon Formatting Toolbar */}
+        <WordToolbar
+          onExecCommand={handleExecCommand}
+          onOpenInsertShape={() => setIsShapeModalOpen(true)}
+          onOpenInsertImage={() => setIsImageModalOpen(true)}
+          onOpenInsertTable={() => setIsTableModalOpen(true)}
+          onInsertPageBreak={handleInsertPageBreak}
+          onInsertSymbol={handleInsertSymbol}
+          onOpenFindReplace={() => setIsFindReplaceOpen(true)}
+          onInsertFootnote={handleInsertFootnote}
+          watermarkText={watermarkText}
+          onChangeWatermark={setWatermarkText}
+          paperTheme={paperTheme}
+          onChangePaperTheme={setPaperTheme}
+          paperMargin={paperMargin}
+          onChangePaperMargin={setPaperMargin}
+          leftMarginCm={leftMarginCm}
+          rightMarginCm={rightMarginCm}
+          firstLineIndentCm={firstLineIndentCm}
+          onChangeLeftMargin={setLeftMarginCm}
+          onChangeRightMargin={setRightMarginCm}
+          onChangeFirstLineIndent={setFirstLineIndentCm}
+        />
+
+        {/* Interactive Ruler Component */}
+        <WordRuler
+          leftMarginCm={leftMarginCm}
+          rightMarginCm={rightMarginCm}
+          firstLineIndentCm={firstLineIndentCm}
+          onChangeLeftMargin={setLeftMarginCm}
+          onChangeRightMargin={setRightMarginCm}
+          onChangeFirstLineIndent={setFirstLineIndentCm}
+        />
+
+        {/* Restored Draft Banner Notice */}
+        {showDraftRestoredBanner && (
+          <div className="bg-purple-50 dark:bg-purple-950/80 border-b border-purple-200 dark:border-purple-800 px-4 py-2 flex items-center justify-between text-xs text-purple-900 dark:text-purple-200">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-purple-600 dark:text-purple-400" />
+              <span>
+                <strong>Proteção de Salvamento Local:</strong> Encontramos e restauramos um rascunho recente que não havia sido salvo antes de fechar o navegador!
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDraftRestoredBanner(false)}
+              className="font-bold underline hover:text-purple-700 cursor-pointer"
+            >
+              Entendido
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Main Canvas Container (A4 Sheet View) */}
       <main className="flex-1 overflow-y-auto p-4 sm:p-8 flex justify-center bg-slate-300/60 dark:bg-slate-950 relative">
