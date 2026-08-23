@@ -617,36 +617,46 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     if (!activeRef) return;
     activeRef.focus();
 
-    let svgPath = '';
-    if (shape.type === 'rectangle' || shape.type === 'rounded-rectangle') {
-      const rx = shape.type === 'rounded-rectangle' ? 12 : 0;
-      svgPath = `<rect x="2" y="2" width="${shape.width - 4}" height="${shape.height - 4}" rx="${rx}" fill="${shape.fillColor}" stroke="${shape.borderColor}" stroke-width="${shape.borderWidth}"/>`;
-    } else if (shape.type === 'circle') {
-      const cx = shape.width / 2;
-      const cy = shape.height / 2;
-      const rx = (shape.width - 4) / 2;
-      const ry = (shape.height - 4) / 2;
-      svgPath = `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${shape.fillColor}" stroke="${shape.borderColor}" stroke-width="${shape.borderWidth}"/>`;
-    } else if (shape.type === 'triangle') {
-      const p1 = `${shape.width / 2},2`;
-      const p2 = `${shape.width - 2},${shape.height - 2}`;
-      const p3 = `2,${shape.height - 2}`;
-      svgPath = `<polygon points="${p1} ${p2} ${p3}" fill="${shape.fillColor}" stroke="${shape.borderColor}" stroke-width="${shape.borderWidth}"/>`;
-    } else if (shape.type === 'arrow-right') {
-      svgPath = `<path d="M2 ${shape.height * 0.35} H${shape.width * 0.6} V${shape.height * 0.15} L${shape.width - 2} ${shape.height / 2} L${shape.width * 0.6} ${shape.height * 0.85} V${shape.height * 0.65} H2 Z" fill="${shape.fillColor}" stroke="${shape.borderColor}" stroke-width="${shape.borderWidth}"/>`;
-    } else if (shape.type === 'star') {
-      svgPath = `<path d="M ${shape.width/2} 2 L ${shape.width*0.62} ${shape.height*0.35} L ${shape.width-2} ${shape.height*0.35} L ${shape.width*0.7} ${shape.height*0.6} L ${shape.width*0.82} ${shape.height-2} L ${shape.width/2} ${shape.height*0.75} L ${shape.width*0.18} ${shape.height-2} L ${shape.width*0.3} ${shape.height*0.6} L 2 ${shape.height*0.35} L ${shape.width*0.38} ${shape.height*0.35} Z" fill="${shape.fillColor}" stroke="${shape.borderColor}" stroke-width="${shape.borderWidth}"/>`;
-    } else {
-      svgPath = `<rect x="2" y="2" width="${shape.width - 4}" height="${shape.height - 4}" fill="${shape.fillColor}" stroke="${shape.borderColor}" stroke-width="${shape.borderWidth}"/>`;
-    }
+    const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] || char);
+    const shapeMarkup = (attributes: string) => {
+      if (shape.type === 'rectangle' || shape.type === 'rounded-rectangle') {
+        return `<rect x="2" y="2" width="${shape.width - 4}" height="${shape.height - 4}" rx="${shape.type === 'rounded-rectangle' ? 12 : 0}" ${attributes}/>`;
+      }
+      if (shape.type === 'circle') {
+        return `<ellipse cx="${shape.width / 2}" cy="${shape.height / 2}" rx="${(shape.width - 4) / 2}" ry="${(shape.height - 4) / 2}" ${attributes}/>`;
+      }
+      if (shape.type === 'triangle') {
+        return `<polygon points="${shape.width / 2},2 ${shape.width - 2},${shape.height - 2} 2,${shape.height - 2}" ${attributes}/>`;
+      }
+      if (shape.type === 'arrow-right') {
+        return `<path d="M2 ${shape.height * 0.35} H${shape.width * 0.6} V${shape.height * 0.15} L${shape.width - 2} ${shape.height / 2} L${shape.width * 0.6} ${shape.height * 0.85} V${shape.height * 0.65} H2 Z" ${attributes}/>`;
+      }
+      if (shape.type === 'arrow-left') {
+        return `<path d="M${shape.width - 2} ${shape.height * 0.35} H${shape.width * 0.4} V${shape.height * 0.15} L2 ${shape.height / 2} L${shape.width * 0.4} ${shape.height * 0.85} V${shape.height * 0.65} H${shape.width - 2} Z" ${attributes}/>`;
+      }
+      if (shape.type === 'star') {
+        return `<path d="M ${shape.width / 2} 2 L ${shape.width * 0.62} ${shape.height * 0.35} L ${shape.width - 2} ${shape.height * 0.35} L ${shape.width * 0.7} ${shape.height * 0.6} L ${shape.width * 0.82} ${shape.height - 2} L ${shape.width / 2} ${shape.height * 0.75} L ${shape.width * 0.18} ${shape.height - 2} L ${shape.width * 0.3} ${shape.height * 0.6} L 2 ${shape.height * 0.35} L ${shape.width * 0.38} ${shape.height * 0.35} Z" ${attributes}/>`;
+      }
+      if (shape.type === 'heart') {
+        return `<path d="M ${shape.width / 2} ${shape.height - 3} C ${shape.width * 0.1} ${shape.height * 0.72}, 2 ${shape.height * 0.4}, ${shape.width * 0.2} ${shape.height * 0.16} C ${shape.width * 0.36} -2, ${shape.width / 2} ${shape.height * 0.15}, ${shape.width / 2} ${shape.height * 0.29} C ${shape.width / 2} ${shape.height * 0.15}, ${shape.width * 0.64} -2, ${shape.width * 0.8} ${shape.height * 0.16} C ${shape.width - 2} ${shape.height * 0.4}, ${shape.width * 0.9} ${shape.height * 0.72}, ${shape.width / 2} ${shape.height - 3} Z" ${attributes}/>`;
+      }
+      return `<line x1="2" y1="${shape.height / 2}" x2="${shape.width - 2}" y2="${shape.height / 2}" ${attributes}/>`;
+    };
 
-    const labelHtml = shape.label ? `<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold">${shape.label}</text>` : '';
+    const clipId = `shape-mask-${shape.id}`;
+    const hasMaskImage = Boolean(shape.maskImageSrc) && shape.type !== 'line';
+    const maskHtml = hasMaskImage
+      ? `<defs><clipPath id="${clipId}">${shapeMarkup('fill="#000" stroke="none"')}</clipPath></defs><image href="${escapeHtml(shape.maskImageSrc || '')}" x="0" y="0" width="${shape.width}" height="${shape.height}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})"/>`
+      : '';
+    const vectorHtml = shapeMarkup(`fill="${hasMaskImage ? 'transparent' : escapeHtml(shape.fillColor)}" stroke="${escapeHtml(shape.borderColor)}" stroke-width="${shape.borderWidth}"`);
+    const labelHtml = shape.label ? `<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold" pointer-events="none">${escapeHtml(shape.label)}</text>` : '';
     const alignClass = shape.align === 'center' ? 'margin: 16px auto;' : shape.align === 'right' ? 'margin: 16px 0 16px auto;' : 'margin: 16px auto 16px 0;';
 
     const shapeHtml = `
-      <div contenteditable="false" style="text-align: ${shape.align}; ${alignClass} width: ${shape.width}px; user-select: none; display: block;" class="my-3">
+      <div data-word-draggable="true" contenteditable="false" style="text-align: ${shape.align}; ${alignClass} width: ${shape.width}px; user-select: none; display: block; cursor: grab; touch-action: none;" title="Arraste para mover o vetor">
         <svg width="${shape.width}" height="${shape.height}" viewBox="0 0 ${shape.width} ${shape.height}" style="display: block;">
-          ${svgPath}
+          ${maskHtml}
+          ${vectorHtml}
           ${labelHtml}
         </svg>
       </div>

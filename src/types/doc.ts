@@ -8,6 +8,7 @@ export interface VectorShape {
   width: number;
   height: number;
   align: 'left' | 'center' | 'right';
+  maskImageSrc?: string;
 }
 
 export interface BitmapImage {

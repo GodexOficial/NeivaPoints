@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Square, Circle, Triangle, ArrowRight, ArrowLeft, Star, Heart, Minus } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Square, Circle, Triangle, ArrowRight, ArrowLeft, Star, Heart, Minus, Image as ImageIcon, Upload } from 'lucide-react';
 import type { VectorShape } from '../../../types/doc';
 
 interface InsertShapeModalProps {
@@ -17,6 +17,8 @@ export const InsertShapeModal: React.FC<InsertShapeModalProps> = ({ isOpen, onCl
   const [height, setHeight] = useState(100);
   const [align, setAlign] = useState<'left' | 'center' | 'right'>('center');
   const [label, setLabel] = useState('');
+  const [maskImageSrc, setMaskImageSrc] = useState('');
+  const maskImageInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -43,9 +45,21 @@ export const InsertShapeModal: React.FC<InsertShapeModalProps> = ({ isOpen, onCl
       width,
       height,
       align,
+      maskImageSrc: maskImageSrc.trim() || undefined,
     };
     onInsert(shape);
     onClose();
+  };
+
+  const handleMaskImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setMaskImageSrc(reader.result);
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -146,6 +160,26 @@ export const InsertShapeModal: React.FC<InsertShapeModalProps> = ({ isOpen, onCl
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Imagem Dentro da Forma (MÃ¡scara Opcional)</label>
+          <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">A imagem Ã© recortada automaticamente no formato do vetor.</p>
+          <input ref={maskImageInputRef} type="file" accept="image/*" onChange={handleMaskImageUpload} className="hidden" />
+          <div className="mt-2 flex gap-2">
+            <button type="button" onClick={() => maskImageInputRef.current?.click()} className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/50 cursor-pointer">
+              <Upload size={14} />
+              Enviar imagem
+            </button>
+            <input type="url" placeholder="ou cole a URL da imagem" value={maskImageSrc.startsWith('data:') ? '' : maskImageSrc} onChange={(e) => setMaskImageSrc(e.target.value)} className="flex-1 min-w-0 text-xs p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white" />
+          </div>
+          {maskImageSrc && (
+            <div className="mt-2 h-16 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 flex items-center gap-2 px-2">
+              <ImageIcon size={16} className="text-blue-600 shrink-0" />
+              <img src={maskImageSrc} alt="PrÃ©via da mÃ¡scara" className="h-full w-16 object-cover rounded-lg" />
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate">Imagem pronta para a mÃ¡scara</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
