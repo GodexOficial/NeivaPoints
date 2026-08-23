@@ -77,6 +77,36 @@
   animation: levelUpPulse 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* The editor uses contentEditable, so lists need explicit styles instead of
+   relying on the browser defaults reset by Tailwind's base layer. */
+.a4-page-content ul,
+.a4-page-content ol {
+  display: block;
+  margin: 0.75rem 0;
+  padding-left: 2rem;
+}
+
+.a4-page-content ul {
+  list-style-type: disc;
+}
+
+.a4-page-content ol {
+  list-style-type: decimal;
+}
+
+.a4-page-content li {
+  display: list-item;
+  padding-left: 0.25rem;
+}
+
+.a4-page-content ul ul {
+  list-style-type: circle;
+}
+
+.a4-page-content ol ol {
+  list-style-type: lower-alpha;
+}
+
 /* Print styles for Word Editor page breaks and A4 sheets */
 @media print {
   body {

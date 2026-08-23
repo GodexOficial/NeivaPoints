@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Pipette, X } from 'lucide-react';
 
 interface WordColorPickerProps {
@@ -60,17 +61,56 @@ export const WordColorPicker: React.FC<WordColorPickerProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [customColor, setCustomColor] = useState(value || '#2563eb');
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverPosition, setPopoverPosition] = useState({ top: 0, left: 0, maxHeight: 0 });
+
+  const updatePopoverPosition = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportPadding = 8;
+    const popoverWidth = 256;
+    const estimatedPopoverHeight = 340;
+    const availableBelow = window.innerHeight - rect.bottom - viewportPadding;
+    const availableAbove = rect.top - viewportPadding;
+    const openAbove = availableBelow < estimatedPopoverHeight && availableAbove > availableBelow;
+
+    setPopoverPosition({
+      top: openAbove
+        ? Math.max(viewportPadding, rect.top - Math.min(estimatedPopoverHeight, availableAbove))
+        : rect.bottom + 4,
+      left: Math.min(
+        Math.max(viewportPadding, rect.left),
+        window.innerWidth - popoverWidth - viewportPadding,
+      ),
+      maxHeight: Math.max(viewportPadding, openAbove ? availableAbove : availableBelow),
+    });
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        !popoverRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
     if (isOpen) {
+      updatePopoverPosition();
       window.addEventListener('mousedown', handleClickOutside);
+      window.addEventListener('resize', updatePopoverPosition);
+      window.addEventListener('scroll', updatePopoverPosition, true);
     }
-    return () => window.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('resize', updatePopoverPosition);
+      window.removeEventListener('scroll', updatePopoverPosition, true);
+    };
   }, [isOpen]);
 
   const handleSelectColor = (color: string) => {
@@ -82,8 +122,12 @@ export const WordColorPicker: React.FC<WordColorPickerProps> = ({
     <div ref={containerRef} className="relative inline-block">
       {/* Trigger Button */}
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen) updatePopoverPosition();
+          setIsOpen(!isOpen);
+        }}
         className="flex items-center gap-1 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
         title={title}
       >
@@ -100,9 +144,11 @@ export const WordColorPicker: React.FC<WordColorPickerProps> = ({
       </button>
 
       {/* Color Dropdown Popover */}
-      {isOpen && (
+      {isOpen && createPortal(
         <div
-          className="absolute left-0 top-full mt-1 z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-64 text-xs select-none animate-in fade-in zoom-in-95 duration-100"
+          ref={popoverRef}
+          className="fixed z-[1000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-64 overflow-y-auto text-xs select-none animate-in fade-in zoom-in-95 duration-100"
+          style={popoverPosition}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header & Clear option */}
@@ -194,7 +240,7 @@ export const WordColorPicker: React.FC<WordColorPickerProps> = ({
             </label>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 };

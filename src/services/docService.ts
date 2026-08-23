@@ -114,7 +114,7 @@ export const createNewDocument = (title = 'Novo Documento'): WordDocument => {
   const newDoc: WordDocument = {
     id: `doc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     title,
-    content: '<p>Comece a digitar seu texto aqui...</p>',
+    content: '<p><br></p>',
     shapes: [],
     images: [],
     createdAt: new Date().toISOString(),

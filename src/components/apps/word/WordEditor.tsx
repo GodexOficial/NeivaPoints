@@ -36,6 +36,23 @@ interface WordEditorProps {
   onBackToHub: () => void;
 }
 
+const EMPTY_PAGE_HTML = '<p><br></p>';
+const LEGACY_EDITOR_PROMPT_HTML = '<p>Comece a digitar seu texto aqui...</p>';
+
+const normalizePageHtml = (html?: string): string => {
+  const trimmedHtml = html?.trim() || '';
+  return trimmedHtml === LEGACY_EDITOR_PROMPT_HTML ? EMPTY_PAGE_HTML : trimmedHtml || EMPTY_PAGE_HTML;
+};
+
+const isPageEmpty = (html: string): boolean => {
+  const textOnly = html
+    .replace(/<br\s*\/?>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .trim();
+  return textOnly.length === 0;
+};
+
 // Convert rgb(r, g, b) to hex #rrggbb
 const rgbToHex = (rgbStr: string): string => {
   if (!rgbStr) return '';
@@ -57,17 +74,19 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   // Multi-Page A4 state
   const initializePages = (): string[] => {
     if (initialDocument.pages && initialDocument.pages.length > 0) {
-      return initialDocument.pages;
+      return initialDocument.pages.map(normalizePageHtml);
     }
     if (initialDocument.content && initialDocument.content.includes('a4-page-break')) {
       const parts = initialDocument.content.split(/<div[^>]*class="[^"]*a4-page-break[^"]*"[^>]*>[\s\S]*?<\/div>/gi);
-      return parts.map((p) => p.trim()).filter((p) => p.length > 0);
+      const validParts = parts.map((part) => part.trim()).filter((part) => part.length > 0);
+      return validParts.length > 0 ? validParts.map(normalizePageHtml) : [EMPTY_PAGE_HTML];
     }
-    return [initialDocument.content || '<p>Comece a digitar seu texto aqui...</p>'];
+    return [normalizePageHtml(initialDocument.content)];
   };
 
   const [pages, setPages] = useState<string[]>(initializePages);
   const [activePageIndex, setActivePageIndex] = useState<number>(0);
+  const [editingPageIndex, setEditingPageIndex] = useState<number | null>(null);
 
   // Modals state
   const [isShapeModalOpen, setIsShapeModalOpen] = useState(false);
@@ -102,7 +121,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     subscript: false,
     superscript: false,
     align: 'left',
-    fontFamily: 'Calibri',
+    fontFamily: 'Calibri, sans-serif',
     fontSize: '3',
     textColor: '#000000',
     bgColor: '#fef08a',
@@ -159,7 +178,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       }
       const el = node as HTMLElement | null;
 
-      let fontFamily = 'Calibri';
+      let fontFamily = 'Calibri, sans-serif';
       let fontSize = '3';
       let textColor = '#000000';
       let bgColor = '#fef08a';
@@ -179,14 +198,30 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
         // Font family
         const ff = (style.fontFamily || '').toLowerCase();
-        if (ff.includes('arial')) fontFamily = 'Arial';
-        else if (ff.includes('times')) fontFamily = 'Times New Roman';
-        else if (ff.includes('georgia')) fontFamily = 'Georgia';
-        else if (ff.includes('courier')) fontFamily = 'Courier New';
-        else if (ff.includes('trebuchet')) fontFamily = 'Trebuchet MS';
-        else if (ff.includes('comic')) fontFamily = 'Comic Sans MS';
-        else if (ff.includes('impact')) fontFamily = 'Impact';
-        else fontFamily = 'Calibri';
+        if (ff.includes('arial')) fontFamily = 'Arial, sans-serif';
+        else if (ff.includes('times')) fontFamily = 'Times New Roman, serif';
+        else if (ff.includes('georgia')) fontFamily = 'Georgia, serif';
+        else if (ff.includes('courier')) fontFamily = 'Courier New, monospace';
+        else if (ff.includes('trebuchet')) fontFamily = 'Trebuchet MS, sans-serif';
+        else if (ff.includes('comic')) fontFamily = 'Comic Sans MS, cursive';
+        else if (ff.includes('impact')) fontFamily = 'Impact, sans-serif';
+        else if (ff.includes('montserrat')) fontFamily = "'Montserrat', sans-serif";
+        else if (ff.includes('bebas neue')) fontFamily = "'Bebas Neue', sans-serif";
+        else if (ff.includes('playfair display')) fontFamily = "'Playfair Display', serif";
+        else if (ff.includes('pacifico')) fontFamily = "'Pacifico', cursive";
+        else if (ff.includes('dancing script')) fontFamily = "'Dancing Script', cursive";
+        else if (ff.includes('lobster')) fontFamily = "'Lobster', cursive";
+        else if (ff.includes('oswald')) fontFamily = "'Oswald', sans-serif";
+        else if (ff.includes('raleway')) fontFamily = "'Raleway', sans-serif";
+        else if (ff.includes('poppins')) fontFamily = "'Poppins', sans-serif";
+        else if (ff.includes('roboto slab')) fontFamily = "'Roboto Slab', serif";
+        else if (ff.includes('merriweather')) fontFamily = "'Merriweather', serif";
+        else if (ff.includes('abril fatface')) fontFamily = "'Abril Fatface', serif";
+        else if (ff.includes('caveat')) fontFamily = "'Caveat', cursive";
+        else if (ff.includes('space grotesk')) fontFamily = "'Space Grotesk', sans-serif";
+        else if (ff.includes('dm mono')) fontFamily = "'DM Mono', monospace";
+        else if (ff.includes('cinzel')) fontFamily = "'Cinzel', serif";
+        else if (ff.includes('lora')) fontFamily = "'Lora', serif";
 
         // Font size mapping (computed px to 1..7 standard values)
         const fsPx = parseFloat(style.fontSize) || 16;
@@ -365,7 +400,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
   // Add a new physical A4 Page
   const handleAddPage = () => {
-    setPages((prev) => [...prev, '<p><br></p>']);
+    setPages((prev) => [...prev, EMPTY_PAGE_HTML]);
     setHasUnsavedChanges(true);
     setSaveStatus('unsaved');
     setTimeout(() => {
@@ -780,7 +815,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     const newDoc = createNewDocument('Novo Documento Sem Título');
     setWordDoc(newDoc);
     setDocTitle(newDoc.title);
-    setPages(['<p>Comece a digitar seu texto aqui...</p>']);
+    setPages([EMPTY_PAGE_HTML]);
     setActivePageIndex(0);
     updateStats();
   };
@@ -793,7 +828,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-200 dark:bg-slate-950 rounded-3xl border border-slate-300 dark:border-slate-800 overflow-hidden relative">
+    <div className="flex h-full min-h-0 w-full flex-col bg-slate-200 dark:bg-slate-950 overflow-hidden relative">
       {/* Sticky Fixed Toolbar & Controls Block */}
       <div className="shrink-0 z-30 bg-white dark:bg-slate-900 shadow-md border-b border-slate-200/80 dark:border-slate-800">
         {/* Top Header Bar */}
@@ -1045,38 +1080,51 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                 )}
 
                 {/* Page ContentEditable Area */}
-                <div
-                  ref={(el) => {
-                    pageRefs.current[pageIndex] = el;
-                    if (el && !el.innerHTML && pageHtml) {
-                      el.innerHTML = pageHtml;
-                    }
-                  }}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onFocus={() => {
-                    setActivePageIndex(pageIndex);
-                    inspectActiveFormatting();
-                  }}
-                  onInput={handleContentInput}
-                  onKeyUp={analyzeSelection}
-                  onMouseUp={analyzeSelection}
-                  onSelect={analyzeSelection}
-                  onContextMenu={(e) => handleContextMenu(e, pageIndex)}
-                  onDoubleClick={(e) => {
-                    const table = (e.target as HTMLElement).closest('table');
-                    if (table) {
-                      setSelectedTable(table as HTMLTableElement);
-                      setIsTableEditOpen(true);
-                    }
-                  }}
-                  className="outline-hidden focus:outline-hidden min-h-[920px] prose dark:prose-invert max-w-none text-base leading-relaxed relative z-10 a4-page-content"
-                  style={{
-                    wordBreak: 'break-word',
-                    textIndent: `${firstLineIndentCm}cm`,
-                  }}
-                  dangerouslySetInnerHTML={{ __html: pageHtml }}
-                />
+                <div className="relative z-10">
+                  {isPageEmpty(pageHtml) && editingPageIndex !== pageIndex && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute left-0 top-0 pointer-events-none select-none text-base text-slate-400 dark:text-slate-500"
+                    >
+                      Clique aqui para começar a escrever...
+                    </span>
+                  )}
+                  <div
+                    ref={(el) => {
+                      pageRefs.current[pageIndex] = el;
+                      // Keep the editable DOM as the source while typing. Replacing its
+                      // contents on every React render resets the caret to the start.
+                      if (el && el.innerHTML !== pageHtml) {
+                        el.innerHTML = pageHtml;
+                      }
+                    }}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onFocus={() => {
+                      setActivePageIndex(pageIndex);
+                      setEditingPageIndex(pageIndex);
+                      inspectActiveFormatting();
+                    }}
+                    onBlur={() => setEditingPageIndex(null)}
+                    onInput={handleContentInput}
+                    onKeyUp={analyzeSelection}
+                    onMouseUp={analyzeSelection}
+                    onSelect={analyzeSelection}
+                    onContextMenu={(e) => handleContextMenu(e, pageIndex)}
+                    onDoubleClick={(e) => {
+                      const table = (e.target as HTMLElement).closest('table');
+                      if (table) {
+                        setSelectedTable(table as HTMLTableElement);
+                        setIsTableEditOpen(true);
+                      }
+                    }}
+                    className="outline-hidden focus:outline-hidden min-h-[920px] prose dark:prose-invert max-w-none text-base leading-relaxed a4-page-content"
+                    style={{
+                      wordBreak: 'break-word',
+                      textIndent: `${firstLineIndentCm}cm`,
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </div>

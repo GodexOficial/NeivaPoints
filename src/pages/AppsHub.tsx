@@ -24,7 +24,11 @@ import {
 import { WordEditor } from '../components/apps/word/WordEditor';
 import { exportToDocx } from '../utils/docxExporter';
 
-export const AppsHub: React.FC = () => {
+interface AppsHubProps {
+  onWordEditorChange: (isOpen: boolean) => void;
+}
+
+export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   const [activeApp, setActiveApp] = useState<'hub' | 'word'>('hub');
   const [documents, setDocuments] = useState<WordDocument[]>([]);
   const [selectedDocument, setSelectedDocument] = useState<WordDocument | null>(null);
@@ -48,6 +52,7 @@ export const AppsHub: React.FC = () => {
       refreshDocuments();
     }
     setActiveApp('word');
+    onWordEditorChange(true);
   };
 
   const handleDuplicateDoc = (doc: WordDocument, e: React.MouseEvent) => {
@@ -82,6 +87,7 @@ export const AppsHub: React.FC = () => {
         initialDocument={selectedDocument}
         onBackToHub={() => {
           setActiveApp('hub');
+          onWordEditorChange(false);
           refreshDocuments();
         }}
       />

@@ -79,8 +79,8 @@ export const WordRuler: React.FC<WordRulerProps> = ({
 
   return (
     <div className="w-full flex flex-col items-center bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-1 select-none">
-      {/* Scope Status Banner */}
-      <div className="w-full flex items-center justify-between px-4 max-w-[794px] mb-0.5 text-[11px]">
+      {/* Scope information is intentionally hidden; the ruler remains available. */}
+      <div className="hidden">
         <div className="flex items-center gap-1.5">
           {scopeMode === 'paragraph' ? (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950/70 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-bold">

@@ -110,7 +110,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
   const [textColor, setTextColor] = useState('#000000');
   const [bgColor, setBgColor] = useState('#fef08a');
   const [lineBgColor, setLineBgColor] = useState('#e2e8f0');
-  const [fontFamily, setFontFamily] = useState('Calibri');
+  const [fontFamily, setFontFamily] = useState('Calibri, sans-serif');
   const [fontSize, setFontSize] = useState('3');
 
   const fonts = [
@@ -122,6 +122,23 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
     { name: 'Trebuchet MS', val: 'Trebuchet MS, sans-serif' },
     { name: 'Comic Sans MS', val: 'Comic Sans MS, cursive' },
     { name: 'Impact', val: 'Impact, sans-serif' },
+    { name: 'Montserrat', val: "'Montserrat', sans-serif" },
+    { name: 'Bebas Neue', val: "'Bebas Neue', sans-serif" },
+    { name: 'Playfair Display', val: "'Playfair Display', serif" },
+    { name: 'Pacifico', val: "'Pacifico', cursive" },
+    { name: 'Dancing Script', val: "'Dancing Script', cursive" },
+    { name: 'Lobster', val: "'Lobster', cursive" },
+    { name: 'Oswald', val: "'Oswald', sans-serif" },
+    { name: 'Raleway', val: "'Raleway', sans-serif" },
+    { name: 'Poppins', val: "'Poppins', sans-serif" },
+    { name: 'Roboto Slab', val: "'Roboto Slab', serif" },
+    { name: 'Merriweather', val: "'Merriweather', serif" },
+    { name: 'Abril Fatface', val: "'Abril Fatface', serif" },
+    { name: 'Caveat', val: "'Caveat', cursive" },
+    { name: 'Space Grotesk', val: "'Space Grotesk', sans-serif" },
+    { name: 'DM Mono', val: "'DM Mono', monospace" },
+    { name: 'Cinzel', val: "'Cinzel', serif" },
+    { name: 'Lora', val: "'Lora', serif" },
   ];
 
   const fontSizes = [
@@ -135,18 +152,6 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
   ];
 
   const symbols = ['©', '®', '™', '★', '✦', '✔', '✖', '←', '→', '↑', '↓', '±', '∞', '∑', 'π', '√', '€', '£', '¥', '§'];
-
-  const handleTextColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setTextColor(val);
-    onExecCommand('foreColor', val);
-  };
-
-  const handleBgColorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setBgColor(val);
-    onExecCommand('hiliteColor', val);
-  };
 
   const handleFontFamilyChange = (val: string) => {
     setFontFamily(val);
@@ -409,6 +414,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
             <div className="flex items-center gap-0.5 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
               <button
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => onExecCommand('insertUnorderedList')}
                 className={getToolBtnClass(activeFormat?.unorderedList)}
                 title="Lista com Marcadores"
@@ -417,6 +423,7 @@ export const WordToolbar: React.FC<WordToolbarProps> = ({
               </button>
               <button
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => onExecCommand('insertOrderedList')}
                 className={getToolBtnClass(activeFormat?.orderedList)}
                 title="Lista Numerada"

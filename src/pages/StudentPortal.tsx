@@ -24,10 +24,11 @@ import { LanguageSwitcher } from "../components/common/LanguageSwitcher";
 import { formatDateTime } from "../utils/dateFormatter";
 
 export const StudentPortal: React.FC = () => {
-  const { currentStudent, logout, currentUser } = useAuth();
+  const { currentStudent, logout } = useAuth();
   const { getClassById, transactions } = useStudentContext();
   const { t, language, getClassName } = useLanguage();
   const [activeTab, setActiveTab] = useState<'portal' | 'apps'>('portal');
+  const [isWordEditorOpen, setIsWordEditorOpen] = useState(false);
 
   if (!currentStudent) {
     return (
@@ -64,9 +65,9 @@ export const StudentPortal: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200 selection:bg-blue-100 selection:text-blue-900 dark:selection:bg-blue-900 dark:selection:text-blue-100">
+    <div className={`${isWordEditorOpen ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200 selection:bg-blue-100 selection:text-blue-900 dark:selection:bg-blue-900 dark:selection:text-blue-100`}>
       {/* Student Top Header Navigation */}
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-30 shadow-2xs">
+      {!isWordEditorOpen && <header className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-30 shadow-2xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo & Student Portal Badge */}
@@ -134,12 +135,12 @@ export const StudentPortal: React.FC = () => {
             </div>
           </div>
         </div>
-      </header>
+      </header>}
 
       {/* Main Content View */}
       {activeTab === 'apps' ? (
-        <main className="max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
-          <AppsHub />
+        <main className={isWordEditorOpen ? 'flex-1 min-h-0 w-full' : 'max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1'}>
+          <AppsHub onWordEditorChange={setIsWordEditorOpen} />
         </main>
       ) : (
         <main className="max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6 flex-1">
@@ -323,17 +324,6 @@ export const StudentPortal: React.FC = () => {
       </main>
       )}
 
-      {/* Footer */}
-      <footer className="bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800 py-4 text-center text-xs text-slate-400 dark:text-slate-500">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>
-            {t("nav.brand")} • {t("auth.studentPortalTitle")}
-          </span>
-          <span className="text-[11px]">
-            {currentUser?.name} (@{currentStudent.username})
-          </span>
-        </div>
-      </footer>
     </div>
   );
 };
