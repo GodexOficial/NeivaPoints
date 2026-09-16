@@ -56,11 +56,11 @@ export class EngagementService {
   }
 
   /** Starts a server-side attendance session. The SQL migration defines this RPC. */
-  static async startSession(studentId: string): Promise<string> {
-    if (!isSupabaseConfigured) return `local_${studentId}`;
+  static async startSession(studentId: string): Promise<{ sessionId?: string; reason?: string }> {
+    if (!isSupabaseConfigured) return { sessionId: `local_${studentId}` };
     const { data, error } = await (supabase as any).rpc("start_login_xp_session", { p_student_id: studentId });
     if (error) throw error;
-    return data as string;
+    return data as { sessionId?: string; reason?: string };
   }
 
   /** Claims one minute of XP. The database, not the browser clock, decides whether it is valid. */
@@ -71,9 +71,10 @@ export class EngagementService {
     return data as { awarded: boolean; reason?: string };
   }
 
-  static async confirmActivity(sessionId: string): Promise<void> {
-    if (!isSupabaseConfigured) return;
-    const { error } = await (supabase as any).rpc("confirm_login_xp_activity", { p_session_id: sessionId });
+  static async confirmActivity(sessionId: string): Promise<{ allowed: boolean; reason?: string }> {
+    if (!isSupabaseConfigured) return { allowed: true };
+    const { data, error } = await (supabase as any).rpc("confirm_login_xp_activity", { p_session_id: sessionId });
     if (error) throw error;
+    return data as { allowed: boolean; reason?: string };
   }
 }

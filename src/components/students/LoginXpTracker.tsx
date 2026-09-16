@@ -17,8 +17,12 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
 
   useEffect(() => {
     let cancelled = false;
-    EngagementService.startSession(studentId).then((id) => {
+    EngagementService.startSession(studentId).then(({ sessionId: id, reason }) => {
       if (!cancelled) {
+        if (!id) {
+          setStatus(reason === "outside_schedule" ? "O XP por presença funciona somente das 13:00 às 18:15." : reason === "test_only" ? "O XP automático está liberado somente para o aluno Test durante os testes." : "Não foi possível iniciar o XP por presença.");
+          return;
+        }
         sessionId.current = id;
         setSessionReady(true);
         setStatus(`Ativo: +${settings.xpPerMinute} XP por minuto.`);
@@ -37,6 +41,8 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
           onPointsChanged();
         } else if (result.reason === "outside_schedule") {
           setStatus("O XP por presença funciona somente das 13:00 às 18:15.");
+        } else if (result.reason === "test_only") {
+          setStatus("O XP automático está liberado somente para o aluno Test durante os testes.");
         }
       } catch {
         setStatus("O XP por presença só pode ser iniciado das 13:00 às 18:15 (horário de Fortaleza).");
@@ -54,7 +60,12 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
   const confirm = async () => {
     if (!sessionId.current) return;
     try {
-      await EngagementService.confirmActivity(sessionId.current);
+      const result = await EngagementService.confirmActivity(sessionId.current);
+      if (!result.allowed) {
+        setAwaitingConfirmation(false);
+        setStatus(result.reason === "test_only" ? "O XP automático está liberado somente para o aluno Test durante os testes." : "O XP por presença funciona somente das 13:00 às 18:15.");
+        return;
+      }
       setAwaitingConfirmation(false);
       setStatus("Presença confirmada. Você continua ganhando XP.");
     } catch {
