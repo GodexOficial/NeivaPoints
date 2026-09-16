@@ -1,5 +1,22 @@
 # React + TypeScript + Vite
 
+## Aplicativos compartilhados (Supabase)
+
+Os atalhos da Central de Aplicativos usam a tabela `external_apps`. Para que os
+apps criados pelo professor apareçam para todos os alunos:
+
+1. No Supabase, abra **SQL Editor** e execute o conteúdo de
+   [`supabase/external_apps.sql`](./supabase/external_apps.sql).
+2. No desenvolvimento local, preencha `.env` com `VITE_SUPABASE_URL` e
+   `VITE_SUPABASE_ANON_KEY` (veja `.env.example`) e reinicie o Vite.
+3. No GitHub, crie os Secrets de Actions com os mesmos nomes:
+   `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`. O workflow de deploy já os
+   disponibiliza durante o build.
+
+Após o deploy, crie um atalho como professor e atualize a página de um aluno:
+o item e sua ordem devem ser os mesmos para todos. Sem a tabela ou as variáveis
+de ambiente, o sistema usa somente o armazenamento local do navegador.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:
