@@ -47,7 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, mobileM
 
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 shadow-2xs backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
-      <div className="mx-auto max-w-7xl px-3 sm:px-5 lg:px-8">
+      <div className="safe-area-x mx-auto max-w-7xl px-0 sm:px-5 lg:px-8">
         <div className="flex h-16 min-w-0 items-center gap-2 lg:gap-3">
           <button type="button" onClick={() => selectTab("dashboard")} className="group flex shrink-0 items-center gap-2.5 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={t("nav.dashboard")}>
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-lg font-extrabold text-white shadow-xs transition-transform group-hover:scale-105">P</span>
@@ -97,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, mobileM
       </div>
 
       {mobileMenuOpen && (
-        <div className="border-t border-slate-200 bg-white px-3 py-3 shadow-lg dark:border-slate-800 dark:bg-slate-900 lg:hidden">
+        <div className="safe-area-x border-t border-slate-200 bg-white px-0 py-3 shadow-lg dark:border-slate-800 dark:bg-slate-900 lg:hidden">
           <div className="mx-auto max-w-7xl space-y-1 sm:px-2">
             <div className="mb-2 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2.5 dark:bg-slate-800">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500 text-xs font-bold text-white">{currentUser?.name?.slice(0, 1).toUpperCase() || "P"}</span>

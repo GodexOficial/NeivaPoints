@@ -112,7 +112,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
     <div className="space-y-6 animate-in fade-in duration-150">
       {/* Class Selector Tabs & Register Class Button */}
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-1">
+        <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1">
           {classes.map((c) => {
             const isSelected = currentClassId === c.id;
             return (
@@ -145,13 +145,13 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
       {/* Class Overview Header Card */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-2xl shadow-sm">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="w-14 h-14 shrink-0 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-2xl shadow-sm">
               {activeClass?.shortName ? activeClass.shortName.substring(0, 2) : localizedClassName.charAt(0)}
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                <h1 className="break-words text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
                   {localizedClassName}
                 </h1>
                 <span className="text-xs font-semibold px-2.5 py-0.5 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-full border border-blue-200 dark:border-blue-800">
@@ -160,7 +160,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
                     : t('classes.studentsCount', { count: activeStats.totalStudents })}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              <p className="mt-1 break-words text-xs text-slate-500 dark:text-slate-400">
                 {activeClass?.description || t('classes.subtitle')}
               </p>
             </div>

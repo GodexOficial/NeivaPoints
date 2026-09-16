@@ -87,7 +87,7 @@ export const SettingsPage: React.FC = () => {
       {feedbackMessage && (
         <div className="p-4 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center gap-3 text-sm text-emerald-800 dark:text-emerald-300 font-semibold animate-in fade-in">
           <CheckCircle size={18} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
-          <span>{feedbackMessage}</span>
+          <span className="min-w-0 break-words">{feedbackMessage}</span>
         </div>
       )}
 

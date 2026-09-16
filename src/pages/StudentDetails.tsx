@@ -136,7 +136,7 @@ export const StudentDetails: React.FC<StudentDetailsProps> = ({ studentId, onBac
                 </span>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight uppercase">
+            <h1 className="break-words text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight uppercase">
               {student.name}
             </h1>
             <div className="flex items-center gap-2 mt-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap">

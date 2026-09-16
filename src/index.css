@@ -38,6 +38,12 @@
     text-align: left;
   }
 
+  /* Evita que controles encostem no notch ou nas bordas curvas de celulares. */
+  .safe-area-x {
+    padding-left: max(0.75rem, env(safe-area-inset-left)) !important;
+    padding-right: max(0.75rem, env(safe-area-inset-right)) !important;
+  }
+
   /* Tailwind normaliza o cursor dos controles; restabelece a indicação visual
      para todas as ações clicáveis, inclusive as que não usam cursor-pointer. */
   button:not(:disabled),
@@ -54,6 +60,20 @@
   input[type="reset"]:disabled,
   [role="button"][aria-disabled="true"] {
     cursor: not-allowed;
+  }
+}
+
+@media (min-width: 640px) {
+  .safe-area-x {
+    padding-left: max(1.25rem, env(safe-area-inset-left)) !important;
+    padding-right: max(1.25rem, env(safe-area-inset-right)) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .safe-area-x {
+    padding-left: max(2rem, env(safe-area-inset-left)) !important;
+    padding-right: max(2rem, env(safe-area-inset-right)) !important;
   }
 }
 
