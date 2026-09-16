@@ -48,6 +48,19 @@ export interface AuthUser {
   username?: string;
 }
 
+/** Um atalho externo exibido na Central de Aplicativos. */
+export interface ExternalApp {
+  id: string;
+  name: string;
+  url: string;
+  /** Imagem opcional enviada pelo professor, armazenada como URL ou data URL. */
+  coverUrl?: string;
+  /** Posição persistida dentro da grade de 36 espaços. */
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type TransactionType = "add" | "remove";
 
 export interface PointTransaction {

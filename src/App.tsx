@@ -101,14 +101,12 @@ const MainContent: React.FC = () => {
 
   return (
     <div className={`${isWordEditorOpen ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col selection:bg-blue-100 selection:text-blue-900 dark:selection:bg-blue-900/60 dark:selection:text-blue-100 transition-colors duration-200`}>
-      {!isWordEditorOpen && (
-        <Navbar
-          currentTab={selectedStudentId ? ('students' as NavTab) : activeTab}
-          onSelectTab={handleSelectTab}
-          mobileMenuOpen={mobileMenuOpen}
-          onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
-        />
-      )}
+      {!isWordEditorOpen && <Navbar
+        currentTab={selectedStudentId ? ('students' as NavTab) : activeTab}
+        onSelectTab={handleSelectTab}
+        mobileMenuOpen={mobileMenuOpen}
+        onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
+      />}
 
       <main className={isWordEditorOpen ? 'flex-1 min-h-0 w-full' : 'flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8'}>
         {selectedStudentId ? (

@@ -109,7 +109,7 @@ export const StudentPortal: React.FC = () => {
                 }`}
               >
                 <AppWindow size={15} />
-                <span>Aplicativos (Word)</span>
+                <span>Aplicativos</span>
               </button>
             </div>
 
