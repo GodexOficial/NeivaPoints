@@ -1,6 +1,6 @@
 -- XP por login/presença. Execute uma vez no Supabase SQL Editor.
 -- Esta migração pressupõe as tabelas existentes: students, point_transactions e app_settings.
--- MODO DE TESTE TEMPORÁRIO: somente o aluno com nome ou usuário exatamente "Test" recebe XP.
+-- MODO DE TESTE TEMPORÁRIO: somente o aluno com nome ou usuário iniciado por "Test" recebe XP.
 -- Ele também ignora o horário durante os testes. Ao encerrar, restaure o arquivo para a versão normal
 -- (remova os blocos 'test_only' e troque as três condições "if false and" por "if").
 -- Janela permitida: todos os dias, de 13:00 até 18:15 no horário de Fortaleza.
@@ -48,7 +48,7 @@ begin
   if not exists (
     select 1 from students
     where id = p_student_id
-      and (lower(name) = 'test' or lower(coalesce(username, '')) = 'test')
+      and (lower(trim(name)) like 'test%' or lower(trim(coalesce(username, ''))) like 'test%')
   ) then
     return jsonb_build_object('reason', 'test_only');
   end if;
@@ -79,7 +79,7 @@ begin
     select 1 from login_xp_sessions session
     join students student on student.id = session.student_id
     where session.session_id = p_session_id
-      and (lower(student.name) = 'test' or lower(coalesce(student.username, '')) = 'test')
+      and (lower(trim(student.name)) like 'test%' or lower(trim(coalesce(student.username, ''))) like 'test%')
   ) then
     return jsonb_build_object('allowed', false, 'reason', 'test_only');
   end if;
@@ -119,7 +119,7 @@ begin
   if not exists (
     select 1 from students
     where id = v_session.student_id
-      and (lower(name) = 'test' or lower(coalesce(username, '')) = 'test')
+      and (lower(trim(name)) like 'test%' or lower(trim(coalesce(username, ''))) like 'test%')
   ) then
     return jsonb_build_object('awarded', false, 'reason', 'test_only');
   end if;

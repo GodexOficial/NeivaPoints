@@ -11,8 +11,10 @@ interface Props {
 /** UI timer only. The SQL RPC validates all timing and awards XP atomically. */
 export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsChanged }) => {
   const sessionId = useRef<string | null>(null);
+  const minuteCycleStartedAt = useRef<number>(Date.now());
   const [sessionReady, setSessionReady] = useState(false);
   const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(60);
   const [status, setStatus] = useState("Iniciando acompanhamento de presença...");
 
   useEffect(() => {
@@ -25,9 +27,11 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
         }
         sessionId.current = id;
         setSessionReady(true);
+        minuteCycleStartedAt.current = Date.now();
+        setSecondsLeft(60);
         setStatus(`Ativo: +${settings.xpPerMinute} XP por minuto.`);
       }
-    }).catch(() => !cancelled && setStatus("Não foi possível iniciar o XP por presença."));
+    }).catch((error: unknown) => !cancelled && setStatus(`Não foi possível iniciar o XP: ${error instanceof Error ? error.message : "erro no Supabase"}`));
     return () => { cancelled = true; sessionId.current = null; setSessionReady(false); };
   }, [studentId, settings.xpPerMinute, settings.confirmationMinutes]);
 
@@ -38,27 +42,46 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
         const result = await EngagementService.claimMinute(sessionId.current);
         if (result.awarded) {
           setStatus(`XP recebido: +${settings.xpPerMinute} neste minuto.`);
+          minuteCycleStartedAt.current = Date.now();
+          setSecondsLeft(60);
           onPointsChanged();
         } else if (result.reason === "outside_schedule") {
           setStatus("O XP por presença funciona somente das 13:00 às 18:15.");
         } else if (result.reason === "test_only") {
           setStatus("O XP automático está liberado somente para o aluno Test durante os testes.");
         }
-      } catch {
-        setStatus("O XP por presença só pode ser iniciado das 13:00 às 18:15 (horário de Fortaleza).");
+      } catch (error: unknown) {
+        setStatus(`XP não creditado: ${error instanceof Error ? error.message : "erro no Supabase"}`);
       }
     }, 60_000);
     return () => window.clearInterval(interval);
   }, [awaitingConfirmation, onPointsChanged, settings.xpPerMinute]);
 
   useEffect(() => {
-    if (!sessionReady) return;
+    if (!sessionReady || awaitingConfirmation) return;
+    const updateCountdown = () => {
+      const elapsed = Date.now() - minuteCycleStartedAt.current;
+      setSecondsLeft(Math.max(0, Math.ceil((60_000 - elapsed) / 1_000)));
+    };
+    updateCountdown();
+    const interval = window.setInterval(updateCountdown, 1_000);
+    return () => window.clearInterval(interval);
+  }, [awaitingConfirmation, sessionReady]);
+
+  useEffect(() => {
+    // The presence prompt is a client-side reminder and must still appear if the
+    // database session cannot be created. XP itself remains server-validated.
+    if (awaitingConfirmation) return;
     const timeout = window.setTimeout(() => setAwaitingConfirmation(true), settings.confirmationMinutes * 60_000);
     return () => window.clearTimeout(timeout);
-  }, [awaitingConfirmation, sessionReady, settings.confirmationMinutes, studentId]);
+  }, [awaitingConfirmation, settings.confirmationMinutes, studentId]);
 
   const confirm = async () => {
-    if (!sessionId.current) return;
+    if (!sessionId.current) {
+      setAwaitingConfirmation(false);
+      setStatus("Presença registrada no aviso, mas a sessão de XP ainda não foi criada. Verifique a mensagem do Supabase.");
+      return;
+    }
     try {
       const result = await EngagementService.confirmActivity(sessionId.current);
       if (!result.allowed) {
@@ -68,15 +91,19 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
       }
       setAwaitingConfirmation(false);
       setStatus("Presença confirmada. Você continua ganhando XP.");
-    } catch {
-      setStatus("Não foi possível confirmar sua presença. Tente novamente.");
+    } catch (error: unknown) {
+      setStatus(`Não foi possível confirmar: ${error instanceof Error ? error.message : "erro no Supabase"}`);
     }
   };
 
+  const cycleProgress = sessionReady ? Math.min(100, Math.max(0, ((60 - secondsLeft) / 60) * 100)) : 0;
+
   return <>
-    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/70 dark:bg-emerald-950/30 flex gap-3">
-      <div className="rounded-xl bg-emerald-600 p-2 text-white h-fit"><Timer size={18} /></div>
-      <div><p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">XP por presença</p><p className="mt-0.5 text-xs text-emerald-800 dark:text-emerald-300">{status}</p><p className="mt-1 text-[11px] text-emerald-700/80 dark:text-emerald-400">Confirme sua atividade a cada {settings.confirmationMinutes} minutos para continuar.</p></div>
+    <div className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/70 dark:bg-emerald-950/30">
+      <div className="relative h-16 w-16 shrink-0 rounded-full p-1 shadow-sm transition-all duration-1000" style={{ background: `conic-gradient(#059669 ${cycleProgress * 3.6}deg, #bbf7d0 ${cycleProgress * 3.6}deg 360deg)` }} aria-label={sessionReady ? `${secondsLeft} segundos até o próximo XP` : "Aguardando sessão de XP"}>
+        <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-white text-emerald-700 dark:bg-slate-900 dark:text-emerald-300"><Timer size={15} /><span className="text-[11px] font-extrabold leading-none">{!sessionReady ? "--" : secondsLeft === 0 ? "..." : `0:${String(secondsLeft).padStart(2, "0")}`}</span></div>
+      </div>
+      <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">XP por presença</p><span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold text-white">+{settings.xpPerMinute} XP</span></div><p className="mt-0.5 text-xs text-emerald-800 dark:text-emerald-300">{status}</p><p className="mt-1 text-[11px] text-emerald-700/80 dark:text-emerald-400">O XP creditado atualiza sua barra de nível. Confirme sua atividade a cada {settings.confirmationMinutes} minutos.</p></div>
     </div>
     {awaitingConfirmation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl dark:bg-slate-900">

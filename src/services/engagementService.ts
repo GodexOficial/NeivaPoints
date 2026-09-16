@@ -60,6 +60,8 @@ export class EngagementService {
     if (!isSupabaseConfigured) return { sessionId: `local_${studentId}` };
     const { data, error } = await (supabase as any).rpc("start_login_xp_session", { p_student_id: studentId });
     if (error) throw error;
+    // Compatibility with the first SQL version, which returned the session UUID as text.
+    if (typeof data === "string") return { sessionId: data };
     return data as { sessionId?: string; reason?: string };
   }
 
