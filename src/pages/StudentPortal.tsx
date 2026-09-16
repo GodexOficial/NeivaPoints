@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Award,
   Sparkles,
@@ -24,14 +24,26 @@ import { HistoryList } from "../components/history/HistoryList";
 import { ThemeSwitcher } from "../components/common/ThemeSwitcher";
 import { LanguageSwitcher } from "../components/common/LanguageSwitcher";
 import { formatDateTime } from "../utils/dateFormatter";
+import { LoginXpTracker } from "../components/students/LoginXpTracker";
+import { DEFAULT_ENGAGEMENT_SETTINGS, EngagementService, type EngagementSettings } from "../services/engagementService";
 
 export const StudentPortal: React.FC = () => {
-  const { currentStudent, logout } = useAuth();
-  const { getClassById, transactions } = useStudentContext();
+  const { currentStudent, logout, refreshAuth } = useAuth();
+  const { getClassById, transactions, refreshData } = useStudentContext();
   const { t, language, getClassName } = useLanguage();
   const [activeTab, setActiveTab] = useState<'portal' | 'apps'>('portal');
   const [isWordEditorOpen, setIsWordEditorOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [engagementSettings, setEngagementSettings] = useState<EngagementSettings>(DEFAULT_ENGAGEMENT_SETTINGS);
+
+  useEffect(() => {
+    EngagementService.getSettings().then(setEngagementSettings).catch((error) => console.error("Could not load XP settings:", error));
+  }, []);
+
+  const refreshPoints = useCallback(() => {
+    void refreshData();
+    void refreshAuth();
+  }, [refreshAuth, refreshData]);
 
   if (!currentStudent) {
     return (
@@ -66,6 +78,13 @@ export const StudentPortal: React.FC = () => {
   const studentTransactions = transactions.filter(
     (tx) => tx.studentId === currentStudent.id,
   );
+  const monthlyXp = (() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    return studentTransactions.filter((transaction) => transaction.type === "add" && new Date(transaction.createdAt).getTime() >= monthStart).reduce((sum, transaction) => sum + transaction.amount, 0);
+  })();
+  const monthlyCycleProgress = monthlyXp % engagementSettings.monthlyGoal;
+  const monthlyProgressPercentage = Math.round((monthlyCycleProgress / engagementSettings.monthlyGoal) * 100);
 
   return (
     <div className={`${isWordEditorOpen ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200 selection:bg-blue-100 selection:text-blue-900 dark:selection:bg-blue-900 dark:selection:text-blue-100`}>
@@ -175,6 +194,14 @@ export const StudentPortal: React.FC = () => {
             />
             <span>{t("portal.securityNote")}</span>
           </div>
+        </div>
+
+        <LoginXpTracker studentId={currentStudent.id} settings={engagementSettings} onPointsChanged={refreshPoints} />
+
+        <div className="rounded-2xl border border-violet-200 bg-white p-5 shadow-xs dark:border-violet-900/70 dark:bg-slate-900">
+          <div className="mb-2 flex items-center justify-between gap-3"><div><p className="text-sm font-extrabold text-slate-900 dark:text-white">Recompensa mensal</p><p className="text-xs text-slate-500 dark:text-slate-400">A barra reinicia automaticamente ao completar cada meta.</p></div><span className="text-sm font-extrabold text-violet-600 dark:text-violet-400">{monthlyCycleProgress} / {engagementSettings.monthlyGoal} XP</span></div>
+          <ProgressBar progress={monthlyProgressPercentage} size="lg" showLabel={false} />
+          <p className="mt-2 text-right text-[11px] font-semibold text-slate-500 dark:text-slate-400">{monthlyXp >= engagementSettings.monthlyGoal ? `${Math.floor(monthlyXp / engagementSettings.monthlyGoal)} meta(s) concluída(s) neste mês` : "Continue acumulando XP neste mês"}</p>
         </div>
 
         {/* Hero Card: Points & Level Progress */}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Database,
   Trash2,
@@ -11,6 +11,7 @@ import {
   SunMoon,
   KeyRound,
   Lock,
+  Timer,
 } from "lucide-react";
 import { useStudentContext } from "../context/StudentContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -18,6 +19,7 @@ import { useAuth } from "../context/AuthContext";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { LanguageSwitcher } from "../components/common/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/common/ThemeSwitcher";
+import { DEFAULT_ENGAGEMENT_SETTINGS, EngagementService, type EngagementSettings } from "../services/engagementService";
 
 export const SettingsPage: React.FC = () => {
   const {
@@ -44,6 +46,14 @@ export const SettingsPage: React.FC = () => {
   const [clearSampleConfirmOpen, setClearSampleConfirmOpen] = useState(false);
   const [resetClassesConfirmOpen, setResetClassesConfirmOpen] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [engagementSettings, setEngagementSettings] = useState<EngagementSettings>(DEFAULT_ENGAGEMENT_SETTINGS);
+  const [savingEngagement, setSavingEngagement] = useState(false);
+
+  useEffect(() => {
+    EngagementService.getSettings().then(setEngagementSettings).catch((error) =>
+      console.error("Could not load engagement settings:", error),
+    );
+  }, []);
 
   const showFeedback = (msg: string) => {
     setFeedbackMessage(msg);
@@ -212,6 +222,24 @@ export const SettingsPage: React.FC = () => {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Login XP rules */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
+        <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
+          <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl"><Timer size={22} /></div>
+          <div><h2 className="text-base font-bold text-slate-900 dark:text-white">XP por presença</h2><p className="text-xs text-slate-500 dark:text-slate-400">Regras aplicadas aos alunos conectados e à meta mensal.</p></div>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-4">
+          {[
+            ["XP por minuto", "xpPerMinute", "Pontos concedidos a cada minuto ativo."],
+            ["Confirmação (min)", "confirmationMinutes", "Tempo até pedir a confirmação de atividade."],
+            ["Meta mensal de XP", "monthlyGoal", "A barra mensal reinicia ao atingir esta meta."],
+          ].map(([label, field, description]) => (
+            <label key={field} className="block"><span className="text-xs font-bold text-slate-700 dark:text-slate-300">{label}</span><input type="number" min="1" max="100000" value={engagementSettings[field as keyof EngagementSettings]} onChange={(event) => setEngagementSettings((current) => ({ ...current, [field]: Number(event.target.value) }))} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" /><span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">{description}</span></label>
+          ))}
+        </div>
+        <div className="flex justify-end"><button type="button" disabled={savingEngagement} onClick={async () => { setSavingEngagement(true); try { await EngagementService.saveSettings(engagementSettings); showFeedback("Configurações de XP salvas."); } catch (error) { console.error(error); showFeedback("Não foi possível salvar as configurações de XP."); } finally { setSavingEngagement(false); } }} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">{savingEngagement ? "Salvando..." : "Salvar regras de XP"}</button></div>
       </div>
 
       {/* Data Management Section */}
