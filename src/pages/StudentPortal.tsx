@@ -11,6 +11,8 @@ import {
   Info,
   AppWindow,
   LayoutDashboard,
+  Menu,
+  X,
 } from "lucide-react";
 import { AppsHub } from "./AppsHub";
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +31,7 @@ export const StudentPortal: React.FC = () => {
   const { t, language, getClassName } = useLanguage();
   const [activeTab, setActiveTab] = useState<'portal' | 'apps'>('portal');
   const [isWordEditorOpen, setIsWordEditorOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   if (!currentStudent) {
     return (
@@ -69,13 +72,13 @@ export const StudentPortal: React.FC = () => {
       {/* Student Top Header Navigation */}
       {!isWordEditorOpen && <header className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-30 shadow-2xs">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between gap-2 h-16">
             {/* Logo & Student Portal Badge */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-xs">
                 P
               </div>
-              <div className="hidden sm:block">
+              <div className="hidden lg:block">
                 <span className="font-extrabold text-slate-900 dark:text-white text-base leading-tight block tracking-tight">
                   {t("nav.brand")}
                 </span>
@@ -86,56 +89,61 @@ export const StudentPortal: React.FC = () => {
             </div>
 
             {/* Navigation Tabs for Student: Meu Painel / Apps */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <div className="flex shrink-0 items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700">
               <button
                 type="button"
-                onClick={() => setActiveTab('portal')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                onClick={() => { setActiveTab('portal'); setIsMenuOpen(false); }}
+                className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                   activeTab === 'portal'
                     ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 <LayoutDashboard size={15} />
-                <span>Meu Painel</span>
+                <span className="hidden sm:inline">Meu Painel</span>
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('apps')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                onClick={() => { setActiveTab('apps'); setIsMenuOpen(false); }}
+                className={`inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                   activeTab === 'apps'
                     ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
                     : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 <AppWindow size={15} />
-                <span>Aplicativos</span>
+                <span className="hidden sm:inline">Aplicativos</span>
               </button>
             </div>
 
             {/* Quick Actions: Theme, Language, Log Out */}
-            <div className="flex items-center gap-2.5">
-              <div className="sm:hidden">
-                <ThemeSwitcher variant="icon" />
-              </div>
-              <div className="hidden sm:block">
-                <ThemeSwitcher variant="pill" />
-              </div>
-              <LanguageSwitcher variant="pill" />
+            <div className="hidden sm:flex shrink-0 items-center gap-1.5">
+              <ThemeSwitcher variant="icon" />
+              <div className="hidden md:block"><LanguageSwitcher variant="pill" /></div>
 
               <button
                 type="button"
                 onClick={logout}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/60 transition-colors shadow-2xs cursor-pointer"
+                className="inline-flex h-10 items-center gap-1.5 px-2.5 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800/60 transition-colors shadow-2xs cursor-pointer"
                 title={t("auth.logout")}
               >
                 <LogOut size={14} />
-                <span className="hidden sm:inline">{t("auth.logout")}</span>
+                <span className="hidden xl:inline">{t("auth.logout")}</span>
               </button>
             </div>
+            <button type="button" onClick={() => setIsMenuOpen((current) => !current)} className="sm:hidden inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" aria-label={isMenuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={isMenuOpen}>
+              {isMenuOpen ? <X size={21} /> : <Menu size={21} />}
+            </button>
           </div>
         </div>
       </header>}
+      {!isWordEditorOpen && isMenuOpen && <div className="sm:hidden sticky top-16 z-20 border-b border-slate-200 bg-white px-4 py-3 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+        <div className="mx-auto flex max-w-6xl flex-col gap-2">
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800"><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t("settings.themeTitle")}</span><ThemeSwitcher variant="toggle" /></div>
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800"><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t("settings.langTitle")}</span><LanguageSwitcher variant="toggle" /></div>
+          <button type="button" onClick={logout} className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-bold text-red-600 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400"><LogOut size={16} />{t("auth.logout")}</button>
+        </div>
+      </div>}
 
       {/* Main Content View */}
       {activeTab === 'apps' ? (

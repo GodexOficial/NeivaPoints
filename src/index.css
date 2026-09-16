@@ -37,6 +37,24 @@
     border-inline: none;
     text-align: left;
   }
+
+  /* Tailwind normaliza o cursor dos controles; restabelece a indicação visual
+     para todas as ações clicáveis, inclusive as que não usam cursor-pointer. */
+  button:not(:disabled),
+  input[type="button"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  input[type="button"]:disabled,
+  input[type="submit"]:disabled,
+  input[type="reset"]:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 /* Custom scrollbar */
