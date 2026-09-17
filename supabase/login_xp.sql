@@ -1,8 +1,5 @@
 -- XP por login/presença. Execute uma vez no Supabase SQL Editor.
 -- Esta migração pressupõe as tabelas existentes: students, point_transactions e app_settings.
--- MODO DE TESTE TEMPORÁRIO: somente o aluno com nome ou usuário iniciado por "Test" recebe XP.
--- Ele também ignora o horário durante os testes. Ao encerrar, restaure o arquivo para a versão normal
--- (remova os blocos 'test_only' e troque as três condições "if false and" por "if").
 -- Janela permitida: todos os dias, de 13:00 até 18:15 no horário de Fortaleza.
 
 create extension if not exists pgcrypto;
@@ -13,6 +10,11 @@ values
   ('login_xp_confirmation_minutes', '5'),
   ('monthly_xp_goal', '100')
 on conflict (key) do nothing;
+
+-- Cada confirmação manual libera uma sessão de dez minutos.
+update public.app_settings
+set value = '10', updated_at = now()
+where key = 'login_xp_confirmation_minutes';
 
 create table if not exists public.login_xp_sessions (
   session_id uuid primary key default gen_random_uuid(),
@@ -45,16 +47,8 @@ declare
   v_session_id uuid;
   v_confirmation_minutes integer;
 begin
-  if not exists (
-    select 1 from students
-    where id = p_student_id
-      and (lower(trim(name)) like 'test%' or lower(trim(coalesce(username, ''))) like 'test%')
-  ) then
-    return jsonb_build_object('reason', 'test_only');
-  end if;
-  -- O aluno Test pode validar a funcionalidade fora da janela; os demais já foram bloqueados acima.
-  if false and ((now() at time zone 'America/Fortaleza')::time < time '13:00'
-     or (now() at time zone 'America/Fortaleza')::time >= time '18:15') then
+  if (now() at time zone 'America/Fortaleza')::time < time '13:00'
+     or (now() at time zone 'America/Fortaleza')::time >= time '18:15' then
     return jsonb_build_object('reason', 'outside_schedule');
   end if;
   select greatest(1, coalesce(value::integer, 5)) into v_confirmation_minutes
@@ -75,16 +69,8 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_confirmation_minutes integer;
 begin
-  if not exists (
-    select 1 from login_xp_sessions session
-    join students student on student.id = session.student_id
-    where session.session_id = p_session_id
-      and (lower(trim(student.name)) like 'test%' or lower(trim(coalesce(student.username, ''))) like 'test%')
-  ) then
-    return jsonb_build_object('allowed', false, 'reason', 'test_only');
-  end if;
-  if false and ((now() at time zone 'America/Fortaleza')::time < time '13:00'
-     or (now() at time zone 'America/Fortaleza')::time >= time '18:15') then
+  if (now() at time zone 'America/Fortaleza')::time < time '13:00'
+     or (now() at time zone 'America/Fortaleza')::time >= time '18:15' then
     return jsonb_build_object('allowed', false, 'reason', 'outside_schedule');
   end if;
   select greatest(1, coalesce(value::integer, 5)) into v_confirmation_minutes
@@ -108,20 +94,13 @@ declare
   v_previous_points integer;
   v_new_points integer;
 begin
-  if false and ((now() at time zone 'America/Fortaleza')::time < time '13:00'
-     or (now() at time zone 'America/Fortaleza')::time >= time '18:15') then
+  if (now() at time zone 'America/Fortaleza')::time < time '13:00'
+     or (now() at time zone 'America/Fortaleza')::time >= time '18:15' then
     return jsonb_build_object('awarded', false, 'reason', 'outside_schedule');
   end if;
   select * into v_session from login_xp_sessions where session_id = p_session_id for update;
   if not found or v_session.closed_at is not null then
     return jsonb_build_object('awarded', false, 'reason', 'invalid_session');
-  end if;
-  if not exists (
-    select 1 from students
-    where id = v_session.student_id
-      and (lower(trim(name)) like 'test%' or lower(trim(coalesce(username, ''))) like 'test%')
-  ) then
-    return jsonb_build_object('awarded', false, 'reason', 'test_only');
   end if;
   if now() >= v_session.active_until then
     update login_xp_sessions set closed_at = now() where session_id = p_session_id;
