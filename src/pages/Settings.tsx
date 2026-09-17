@@ -233,7 +233,7 @@ export const SettingsPage: React.FC = () => {
         <div className="grid sm:grid-cols-3 gap-4">
           {[
             ["XP por minuto", "xpPerMinute", "Pontos concedidos a cada minuto ativo."],
-            ["Confirmação (min)", "confirmationMinutes", "Tempo até pedir a confirmação de atividade."],
+            ["Duração da sessão (min)", "confirmationMinutes", "Tempo de XP liberado após o aluno confirmar que está logado."],
             ["Meta mensal de XP", "monthlyGoal", "A barra mensal reinicia ao atingir esta meta."],
           ].map(([label, field, description]) => (
             <label key={field} className="block"><span className="text-xs font-bold text-slate-700 dark:text-slate-300">{label}</span><input type="number" min="1" max="100000" value={engagementSettings[field as keyof EngagementSettings]} onChange={(event) => setEngagementSettings((current) => ({ ...current, [field]: Number(event.target.value) }))} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-900 outline-none focus:border-emerald-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white" /><span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">{description}</span></label>

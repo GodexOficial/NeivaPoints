@@ -8,7 +8,7 @@ export interface EngagementSettings {
 
 export const DEFAULT_ENGAGEMENT_SETTINGS: EngagementSettings = {
   xpPerMinute: 2,
-  confirmationMinutes: 5,
+  confirmationMinutes: 10,
   monthlyGoal: 100,
 };
 
