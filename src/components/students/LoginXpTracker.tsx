@@ -37,7 +37,7 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
 
   useEffect(() => {
     const interval = window.setInterval(async () => {
-      if (!sessionId.current || awaitingConfirmation || document.visibilityState !== "visible") return;
+      if (!sessionId.current || awaitingConfirmation) return;
       try {
         const result = await EngagementService.claimMinute(sessionId.current);
         if (result.awarded) {
