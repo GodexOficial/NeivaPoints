@@ -187,12 +187,15 @@ export const StudentPortal: React.FC = () => {
       </div>}
 
       {/* Main Content View */}
-      {activeTab === 'apps' ? (
-        <main className={isWordEditorOpen ? 'flex-1 min-h-0 w-full' : 'max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1'}>
-          <AppsHub onWordEditorChange={setIsWordEditorOpen} />
-        </main>
-      ) : (
-        <main className="max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6 flex-1">
+      <main className={isWordEditorOpen ? 'flex-1 min-h-0 w-full' : 'flex-1'}>
+        <div className={activeTab === 'apps' ? 'block' : 'hidden'}>
+          <div className={isWordEditorOpen ? 'flex-1 min-h-0 w-full' : 'max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8'}>
+            <AppsHub onWordEditorChange={setIsWordEditorOpen} />
+          </div>
+        </div>
+
+        <div className={activeTab === 'apps' ? 'hidden' : 'block'}>
+        <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Welcome & Privacy Banner */}
         <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 border border-blue-200/80 dark:border-blue-800/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -389,8 +392,9 @@ export const StudentPortal: React.FC = () => {
             </p>
           </div>
         </div>
+        </div>
+        </div>
       </main>
-      )}
 
     </div>
   );

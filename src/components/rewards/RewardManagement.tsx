@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Archive, Edit3, Gift, Plus, Power, RotateCcw, Save, X } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Archive, Edit3, Gift, Image as ImageIcon, Link as LinkIcon, Plus, Power, RotateCcw, Save, Upload, X } from 'lucide-react';
 import { RewardService, type Reward, type RewardInput } from '../../services/rewardService';
 import { useLanguage } from '../../context/LanguageContext';
 import { ConfirmDialog } from '../common/ConfirmDialog';
@@ -8,6 +8,7 @@ const EMPTY_FORM: RewardInput = {
   name: '', description: '', category: '', imageUrl: '', startDate: '', endDate: '', quantity: null,
   eligibilityRules: '', status: 'active', cycleType: 'monthly',
 };
+const MAX_REWARD_IMAGE_SIZE = 1_500_000;
 
 interface RewardManagementProps { onFeedback: (message: string) => void; }
 
@@ -20,6 +21,8 @@ export const RewardManagement: React.FC<RewardManagementProps> = ({ onFeedback }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [archiveId, setArchiveId] = useState<string | null>(null);
+  const [imageTab, setImageTab] = useState<'upload' | 'url'>('upload');
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,9 +34,19 @@ export const RewardManagement: React.FC<RewardManagementProps> = ({ onFeedback }
   const edit = (reward: Reward) => {
     setEditingId(reward.id);
     setForm({ name: reward.name, description: reward.description, category: reward.category, imageUrl: reward.imageUrl, startDate: reward.startDate, endDate: reward.endDate, quantity: reward.quantity, eligibilityRules: reward.eligibilityRules, status: reward.status, cycleType: reward.cycleType });
+    setImageTab(reward.imageUrl.startsWith('data:image/') ? 'upload' : 'url');
     setError(null);
   };
-  const reset = () => { setEditingId(null); setForm(EMPTY_FORM); setError(null); };
+  const reset = () => { setEditingId(null); setForm(EMPTY_FORM); setImageTab('upload'); setError(null); };
+  const handleImageFile = (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setError(t('rewards.imageInvalid')); return; }
+    if (file.size > MAX_REWARD_IMAGE_SIZE) { setError(t('rewards.imageTooLarge')); return; }
+    const reader = new FileReader();
+    reader.onload = () => setField('imageUrl', String(reader.result || ''));
+    reader.onerror = () => setError(t('rewards.imageReadError'));
+    reader.readAsDataURL(file);
+  };
   const save = async (event: React.FormEvent) => {
     event.preventDefault(); setSaving(true); setError(null);
     try { if (editingId) await RewardService.update(editingId, form); else await RewardService.create(form); await load(); reset(); onFeedback(t('rewards.saved')); }
@@ -48,7 +61,7 @@ export const RewardManagement: React.FC<RewardManagementProps> = ({ onFeedback }
     <form onSubmit={save} className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40 sm:grid-cols-2">
       <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">{t('rewards.name')}</span><input required value={form.name} onChange={(event) => setField('name', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white" placeholder={t('rewards.namePlaceholder')} /></label>
       <label><span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">{t('rewards.category')}</span><input value={form.category} onChange={(event) => setField('category', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white" placeholder={t('rewards.categoryPlaceholder')} /></label>
-      <label className="sm:col-span-2"><span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">{t('rewards.image')}</span><input type="text" value={form.imageUrl} onChange={(event) => setField('imageUrl', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white" placeholder={t('rewards.imagePlaceholder')} /><span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">{t('rewards.imageHelp')}</span></label>
+      <div className="sm:col-span-2"><span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">{t('rewards.image')}</span><div className="mb-3 flex rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800"><button type="button" onClick={() => setImageTab('upload')} className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-bold ${imageTab === 'upload' ? 'bg-white text-amber-700 shadow-xs dark:bg-slate-900 dark:text-amber-300' : 'text-slate-600 dark:text-slate-400'}`}><Upload size={14} />{t('rewards.imageUpload')}</button><button type="button" onClick={() => setImageTab('url')} className={`flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-xs font-bold ${imageTab === 'url' ? 'bg-white text-amber-700 shadow-xs dark:bg-slate-900 dark:text-amber-300' : 'text-slate-600 dark:text-slate-400'}`}><LinkIcon size={14} />{t('rewards.imageUrl')}</button></div>{imageTab === 'upload' ? <><input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => handleImageFile(event.target.files?.[0])} /><button type="button" onClick={() => imageInputRef.current?.click()} className="flex w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-white p-5 text-center text-xs font-bold text-slate-600 hover:border-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"><ImageIcon size={24} className="text-slate-400" />{t('rewards.imageChoose')}</button></> : <input type="text" value={form.imageUrl.startsWith('data:image/') ? '' : form.imageUrl} onChange={(event) => setField('imageUrl', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white" placeholder={t('rewards.imagePlaceholder')} />}{form.imageUrl && <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900"><img src={form.imageUrl} alt={t('rewards.imagePreview')} className="h-16 w-16 rounded-lg object-cover" /><span className="text-[11px] text-slate-500 dark:text-slate-400">{t('rewards.imagePreview')}</span></div>}<span className="mt-1 block text-[11px] text-slate-500 dark:text-slate-400">{t('rewards.imageHelp')}</span></div>
       <label><span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">{t('rewards.cycleType')}</span><select value={form.cycleType} onChange={(event) => setField('cycleType', event.target.value as RewardInput['cycleType'])} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white"><option value="monthly">{t('rewards.monthly')}</option><option value="special">{t('rewards.special')}</option></select></label>
       <label><span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">{t('rewards.startDate')}</span><input required type="date" value={form.startDate} onChange={(event) => setField('startDate', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white" /></label>
       <label><span className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-300">{t('rewards.endDate')}</span><input required type="date" value={form.endDate} onChange={(event) => setField('endDate', event.target.value)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-amber-500 dark:border-slate-700 dark:bg-slate-900 dark:text-white" /></label>
