@@ -20,6 +20,7 @@ import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { LanguageSwitcher } from "../components/common/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/common/ThemeSwitcher";
 import { DEFAULT_ENGAGEMENT_SETTINGS, EngagementService, type EngagementSettings } from "../services/engagementService";
+import { RewardManagement } from "../components/rewards/RewardManagement";
 
 export const SettingsPage: React.FC = () => {
   const {
@@ -241,6 +242,8 @@ export const SettingsPage: React.FC = () => {
         </div>
         <div className="flex justify-end"><button type="button" disabled={savingEngagement} onClick={async () => { setSavingEngagement(true); try { await EngagementService.saveSettings(engagementSettings); showFeedback("Configurações de XP salvas."); } catch (error) { console.error(error); showFeedback("Não foi possível salvar as configurações de XP."); } finally { setSavingEngagement(false); } }} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">{savingEngagement ? "Salvando..." : "Salvar regras de XP"}</button></div>
       </div>
+
+      <RewardManagement onFeedback={showFeedback} />
 
       {/* Data Management Section */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">

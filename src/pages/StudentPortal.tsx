@@ -28,6 +28,8 @@ import { LoginXpTracker } from "../components/students/LoginXpTracker";
 import { StudentLeaderboard } from "../components/students/StudentLeaderboard";
 import { DEFAULT_ENGAGEMENT_SETTINGS, EngagementService, type EngagementSettings } from "../services/engagementService";
 import { LeaderboardService, type LeaderboardStudent } from "../services/leaderboardService";
+import { RewardCalendar } from "../components/students/RewardCalendar";
+import { RewardService, type Reward } from "../services/rewardService";
 
 export const StudentPortal: React.FC = () => {
   const { currentStudent, logout, refreshAuth } = useAuth();
@@ -38,6 +40,7 @@ export const StudentPortal: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [engagementSettings, setEngagementSettings] = useState<EngagementSettings>(DEFAULT_ENGAGEMENT_SETTINGS);
   const [leaderboardStudents, setLeaderboardStudents] = useState<LeaderboardStudent[]>([]);
+  const [rewards, setRewards] = useState<Reward[]>([]);
 
   useEffect(() => {
     EngagementService.getSettings().then(setEngagementSettings).catch((error) => console.error("Could not load XP settings:", error));
@@ -52,6 +55,14 @@ export const StudentPortal: React.FC = () => {
       .catch((error) => console.error("Could not load leaderboard:", error));
     return () => { active = false; };
   }, [students]);
+
+  useEffect(() => {
+    let active = true;
+    RewardService.getAll().then((data) => {
+      if (active) setRewards(data);
+    }).catch((error) => console.error("Could not load rewards:", error));
+    return () => { active = false; };
+  }, []);
 
   const refreshPoints = useCallback(() => {
     void refreshData();
@@ -208,6 +219,8 @@ export const StudentPortal: React.FC = () => {
         </div>
 
         <LoginXpTracker studentId={currentStudent.id} settings={engagementSettings} onPointsChanged={refreshPoints} />
+
+        <RewardCalendar rewards={rewards} />
 
         <StudentLeaderboard
           students={leaderboardStudents.map((student) => ({
