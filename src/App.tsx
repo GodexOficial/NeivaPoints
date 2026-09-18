@@ -17,6 +17,7 @@ import { StudentPortal } from './pages/StudentPortal';
 import { StudentFormModal } from './components/modals/StudentFormModal';
 import { ClassFormModal } from './components/modals/ClassFormModal';
 import { PointsModal } from './components/modals/PointsModal';
+import { ClassPointsModal } from './components/modals/ClassPointsModal';
 import { LevelUpToast } from './components/common/LevelUpToast';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
@@ -38,6 +39,7 @@ const MainContent: React.FC = () => {
   const [addClassModalOpen, setAddClassModalOpen] = useState(false);
   const [pointsModalStudent, setPointsModalStudent] = useState<StudentWithStats | null>(null);
   const [pointsModalInitialMode, setPointsModalInitialMode] = useState<'add' | 'remove'>('add');
+  const [classPointsModal, setClassPointsModal] = useState<{ classId: ClassId; className: string; studentCount: number } | null>(null);
 
   // If not logged in, show login / registration screen
   if (!isAuthenticated) {
@@ -88,6 +90,10 @@ const MainContent: React.FC = () => {
     setPointsModalStudent(student);
   };
 
+  const handleOpenClassPointsModal = (classId: ClassId, className: string, studentCount: number) => {
+    setClassPointsModal({ classId, className, studentCount });
+  };
+
   // If in student "Join Your Class" standalone view
   if (activeTab === 'join-class') {
     return (
@@ -136,6 +142,7 @@ const MainContent: React.FC = () => {
             onViewProfile={handleViewProfile}
             onOpenAddModal={handleOpenAddStudentModal}
             onOpenPointsModal={(student) => handleOpenPointsModal(student, 'add')}
+            onOpenClassPointsModal={handleOpenClassPointsModal}
           />
         ) : activeTab === 'apps' ? (
           <AppsHub onWordEditorChange={setIsWordEditorOpen} />
@@ -165,6 +172,14 @@ const MainContent: React.FC = () => {
         student={pointsModalStudent}
         initialMode={pointsModalInitialMode}
         onClose={() => setPointsModalStudent(null)}
+      />
+
+      <ClassPointsModal
+        isOpen={!!classPointsModal}
+        classId={classPointsModal?.classId || null}
+        className={classPointsModal?.className || ''}
+        studentCount={classPointsModal?.studentCount || 0}
+        onClose={() => setClassPointsModal(null)}
       />
 
       {/* Level-Up Celebration Notification */}

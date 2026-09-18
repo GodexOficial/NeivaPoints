@@ -13,6 +13,11 @@ export interface PointActionResult {
   newLevel: number;
 }
 
+export interface ClassPointsActionResult {
+  studentCount: number;
+  amount: number;
+}
+
 export class PointsService {
   /**
    * Generates a unique transaction ID.
@@ -119,6 +124,42 @@ export class PointsService {
       oldLevel: levelCheck.oldLevel,
       newLevel: levelCheck.newLevel,
     };
+  }
+
+  static async addPointsToClass(params: {
+    classId: string;
+    amount: number;
+    reason?: string;
+  }): Promise<ClassPointsActionResult> {
+    const amount = Math.floor(params.amount);
+    if (isNaN(amount) || amount <= 0) {
+      throw new Error('Please enter a valid positive number.');
+    }
+
+    const students = await StudentService.getAllStudents();
+    const classStudents = students.filter((student) => student.classId === params.classId);
+    if (classStudents.length === 0) {
+      throw new Error('No students found in this class.');
+    }
+
+    if (isSupabaseConfigured) {
+      const result = await SupabaseService.addPointsToClass({
+        classId: params.classId,
+        amount,
+        reason: params.reason,
+      });
+      return { studentCount: result.studentCount, amount };
+    }
+
+    for (const student of classStudents) {
+      await this.addPoints({
+        studentId: student.id,
+        amount,
+        reason: params.reason,
+      });
+    }
+
+    return { studentCount: classStudents.length, amount };
   }
 
   /**

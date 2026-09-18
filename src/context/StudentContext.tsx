@@ -65,6 +65,7 @@ interface StudentContextType {
   ) => Promise<StudentWithStats>;
   deleteStudent: (id: string) => Promise<boolean>;
   addPoints: (studentId: string, amount: number, reason?: string) => Promise<PointActionResult>;
+  addPointsToClass: (classId: string, amount: number, reason?: string) => Promise<{ studentCount: number; amount: number }>;
   removePoints: (studentId: string, amount: number, reason?: string) => Promise<PointActionResult>;
   loadSampleData: () => Promise<void>;
   clearSampleData: () => Promise<void>;
@@ -344,6 +345,15 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     [refreshData]
   );
 
+  const addPointsToClass = useCallback(
+    async (classId: string, amount: number, reason?: string) => {
+      const result = await PointsService.addPointsToClass({ classId, amount, reason });
+      await refreshData();
+      return result;
+    },
+    [refreshData]
+  );
+
   const loadSampleData = useCallback(async () => {
     SampleDataService.loadSampleData();
     await refreshData();
@@ -382,6 +392,7 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updateStudent,
       deleteStudent,
       addPoints,
+      addPointsToClass,
       removePoints,
       loadSampleData,
       clearSampleData,
@@ -410,6 +421,7 @@ export const StudentProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updateStudent,
       deleteStudent,
       addPoints,
+      addPointsToClass,
       removePoints,
       loadSampleData,
       clearSampleData,

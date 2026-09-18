@@ -3,6 +3,7 @@ import {
   GraduationCap,
   Users,
   UserPlus,
+  Sparkles,
   Trophy,
   Plus,
   Edit3,
@@ -22,6 +23,7 @@ interface ClassesPageProps {
   onViewProfile: (studentId: string) => void;
   onOpenAddModal: (classId: ClassId) => void;
   onOpenPointsModal: (student: StudentWithStats) => void;
+  onOpenClassPointsModal: (classId: ClassId, className: string, studentCount: number) => void;
 }
 
 export const ClassesPage: React.FC<ClassesPageProps> = ({
@@ -29,6 +31,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
   onViewProfile,
   onOpenAddModal,
   onOpenPointsModal,
+  onOpenClassPointsModal,
 }) => {
   const { classes, getClassStats, getStudentsByClass, deleteClass } = useStudentContext();
   const { t, getClassName } = useLanguage();
@@ -194,6 +197,16 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
             >
               <UserPlus size={16} />
               <span>{t('classes.addStudentTo', { className: localizedClassName })}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenClassPointsModal(currentClassId, localizedClassName, classStudents.length)}
+              disabled={classStudents.length === 0}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm rounded-xl shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+            >
+              <Sparkles size={16} />
+              <span>{t('classes.addPointsToAll')}</span>
             </button>
           </div>
         </div>
