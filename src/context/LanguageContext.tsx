@@ -17,7 +17,7 @@ const STORAGE_KEY = 'sistema_pontos_language_v1';
 export const translations = {
   en: {
     // Navbar
-    'nav.brand': 'PointsTracker',
+    'nav.brand': 'Neiva Points',
     'nav.subtitle': 'Classroom System',
     'nav.dashboard': 'Dashboard',
     'nav.students': 'Students',
@@ -87,6 +87,18 @@ export const translations = {
     'portal.infoDesc': 'This portal displays strictly your personal level, points, and achievements.',
     'portal.securityNote': 'Personal & Private view • Only your information is shown.',
     'portal.levelProgress': 'Level {level} Progress ({progress}%)',
+
+    // Student Leaderboard
+    'leaderboard.title': 'Leaderboard',
+    'leaderboard.subtitle': 'See who is standing out with the most XP.',
+    'leaderboard.yourClass': 'Your class',
+    'leaderboard.yourClassTitle': 'Your class: {className}',
+    'leaderboard.otherClassTitle': '{className}',
+    'leaderboard.noOtherClasses': 'There are no other classes yet.',
+    'leaderboard.empty': 'No students in this class yet.',
+    'leaderboard.you': 'you',
+    'leaderboard.position': 'Position {position}',
+    'leaderboard.yourPosition': 'Your position: {position}',
 
     // Classes
     'class.6th-grade': '6th Grade',
@@ -370,7 +382,7 @@ export const translations = {
   },
   pt: {
     // Navbar
-    'nav.brand': 'PointsTracker',
+    'nav.brand': 'Neiva Points',
     'nav.subtitle': 'Sistema de Pontos',
     'nav.dashboard': 'Painel',
     'nav.students': 'Alunos',
@@ -440,6 +452,18 @@ export const translations = {
     'portal.infoDesc': 'Este portal exibe exclusivamente os seus pontos, nível e conquistas individuais.',
     'portal.securityNote': 'Visualização Individual e Privada • Apenas suas informações são exibidas.',
     'portal.levelProgress': 'Progresso do Nível {level} ({progress}%)',
+
+    // Student Leaderboard
+    'leaderboard.title': 'Ranking',
+    'leaderboard.subtitle': 'Veja quem está se destacando com mais XP.',
+    'leaderboard.yourClass': 'Sua turma',
+    'leaderboard.yourClassTitle': 'Sua turma: {className}',
+    'leaderboard.otherClassTitle': '{className}',
+    'leaderboard.noOtherClasses': 'Ainda não existem outras turmas.',
+    'leaderboard.empty': 'Ainda não há alunos nesta turma.',
+    'leaderboard.you': 'você',
+    'leaderboard.position': 'Posição {position}',
+    'leaderboard.yourPosition': 'Sua posição: {position}',
 
     // Classes
     'class.6th-grade': '6º Ano',

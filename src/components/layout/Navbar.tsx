@@ -50,7 +50,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, mobileM
       <div className="safe-area-x mx-auto max-w-7xl px-0 sm:px-5 lg:px-8">
         <div className="flex h-16 min-w-0 items-center gap-2 lg:gap-3">
           <button type="button" onClick={() => selectTab("dashboard")} className="group flex shrink-0 items-center gap-2.5 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label={t("nav.dashboard")}>
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-lg font-extrabold text-white shadow-xs transition-transform group-hover:scale-105">P</span>
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-lg font-extrabold text-white shadow-xs transition-transform group-hover:scale-105"><img src={`${import.meta.env.BASE_URL}Logo MD.webp`} alt="NeivaPoints" className="h-10 w-10 rounded-full object-cover" /></span>
             <span className="hidden min-w-0 sm:block xl:max-w-[170px]">
               <span className="block truncate text-base font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white">{t("nav.brand")}</span>
               <span className="block truncate text-[10px] font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">{t("nav.subtitle")}</span>

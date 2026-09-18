@@ -70,11 +70,9 @@ export const JoinClassPage: React.FC<JoinClassProps> = ({
       {/* Top Bar with Discrete Teacher Return, Theme Switcher & Language Switcher */}
       <div className="max-w-xl mx-auto w-full flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center font-extrabold text-sm shadow-xs">
-            P
-          </div>
+          <img src={`${import.meta.env.BASE_URL}Logo MD.webp`} alt="NeivaPoints" className="w-8 h-8 rounded-full object-cover shadow-xs" />
           <span className="hidden sm:inline font-bold text-slate-800 dark:text-white text-sm tracking-tight">
-            PointsTracker
+            {t("nav.brand")}
           </span>
         </div>
 

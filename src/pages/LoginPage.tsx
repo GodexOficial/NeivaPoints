@@ -162,9 +162,7 @@ export const LoginPage: React.FC = () => {
       {/* Top Bar with Language and Theme switchers */}
       <header className="max-w-5xl mx-auto w-full flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-xl shadow-md">
-            P
-          </div>
+          <img src={`${import.meta.env.BASE_URL}Logo MD.webp`} alt="NeivaPoints" className="w-10 h-10 rounded-full object-cover shadow-md" />
           <div className="hidden sm:block">
             <span className="font-extrabold text-slate-900 dark:text-white text-base leading-tight block tracking-tight">
               {t("nav.brand")}

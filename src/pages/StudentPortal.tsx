@@ -25,20 +25,33 @@ import { ThemeSwitcher } from "../components/common/ThemeSwitcher";
 import { LanguageSwitcher } from "../components/common/LanguageSwitcher";
 import { formatDateTime } from "../utils/dateFormatter";
 import { LoginXpTracker } from "../components/students/LoginXpTracker";
+import { StudentLeaderboard } from "../components/students/StudentLeaderboard";
 import { DEFAULT_ENGAGEMENT_SETTINGS, EngagementService, type EngagementSettings } from "../services/engagementService";
+import { LeaderboardService, type LeaderboardStudent } from "../services/leaderboardService";
 
 export const StudentPortal: React.FC = () => {
   const { currentStudent, logout, refreshAuth } = useAuth();
-  const { getClassById, transactions, refreshData } = useStudentContext();
+  const { getClassById, transactions, students, refreshData } = useStudentContext();
   const { t, language, getClassName } = useLanguage();
   const [activeTab, setActiveTab] = useState<'portal' | 'apps'>('portal');
   const [isWordEditorOpen, setIsWordEditorOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [engagementSettings, setEngagementSettings] = useState<EngagementSettings>(DEFAULT_ENGAGEMENT_SETTINGS);
+  const [leaderboardStudents, setLeaderboardStudents] = useState<LeaderboardStudent[]>([]);
 
   useEffect(() => {
     EngagementService.getSettings().then(setEngagementSettings).catch((error) => console.error("Could not load XP settings:", error));
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    LeaderboardService.getStudents(students)
+      .then((data) => {
+        if (active) setLeaderboardStudents(data);
+      })
+      .catch((error) => console.error("Could not load leaderboard:", error));
+    return () => { active = false; };
+  }, [students]);
 
   const refreshPoints = useCallback(() => {
     void refreshData();
@@ -94,9 +107,7 @@ export const StudentPortal: React.FC = () => {
           <div className="flex items-center justify-between gap-2 h-16">
             {/* Logo & Student Portal Badge */}
             <div className="flex shrink-0 items-center gap-3">
-              <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-lg shadow-xs">
-                P
-              </div>
+              <img src={`${import.meta.env.BASE_URL}Logo MD.webp`} alt="NeivaPoints" className="w-10 h-10 shrink-0 rounded-full object-cover shadow-xs" />
               <div className="hidden lg:block">
                 <span className="font-extrabold text-slate-900 dark:text-white text-base leading-tight block tracking-tight">
                   {t("nav.brand")}
@@ -197,6 +208,15 @@ export const StudentPortal: React.FC = () => {
         </div>
 
         <LoginXpTracker studentId={currentStudent.id} settings={engagementSettings} onPointsChanged={refreshPoints} />
+
+        <StudentLeaderboard
+          students={leaderboardStudents.map((student) => ({
+            ...student,
+            className: getClassName(student.classId, student.className),
+          }))}
+          currentStudentId={currentStudent.id}
+          currentClassId={currentStudent.classId}
+        />
 
         <div className="rounded-2xl border border-violet-200 bg-white p-5 shadow-xs dark:border-violet-900/70 dark:bg-slate-900">
           <div className="mb-2 flex items-center justify-between gap-3"><div><p className="text-sm font-extrabold text-slate-900 dark:text-white">Recompensa mensal</p><p className="text-xs text-slate-500 dark:text-slate-400">A barra reinicia automaticamente ao completar cada meta.</p></div><span className="text-sm font-extrabold text-violet-600 dark:text-violet-400">{monthlyCycleProgress} / {engagementSettings.monthlyGoal} XP</span></div>
