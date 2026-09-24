@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CircleCheck, LockKeyhole, Timer } from "lucide-react";
 import { EngagementService, type EngagementSettings } from "../../services/engagementService";
 
@@ -11,6 +11,7 @@ interface Props {
 /** The visual timer is informational; all XP awards are validated by the database. */
 export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsChanged }) => {
   const sessionId = useRef<string | null>(null);
+  const claimInFlight = useRef(false);
   const minuteCycleStartedAt = useRef(Date.now());
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
@@ -41,27 +42,44 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
     }
   };
 
+  const claimCurrentMinute = useCallback(async () => {
+    if (!sessionId.current || claimInFlight.current) return;
+    const elapsed = Date.now() - minuteCycleStartedAt.current;
+    if (elapsed < 60_000) return;
+
+    claimInFlight.current = true;
+    try {
+      const result = await EngagementService.claimMinute(sessionId.current);
+      if (result.awarded) {
+        minuteCycleStartedAt.current = Date.now();
+        setSecondsLeft(60);
+        setStatus(`XP recebido: +${settings.xpPerMinute} neste minuto.`);
+        onPointsChanged();
+      } else if (result.reason === "outside_schedule" || result.reason === "confirmation_required") {
+        setSessionReady(false);
+        setStatus("A sessão foi encerrada: é necessário confirmar novamente para continuar.");
+      }
+    } catch (error: unknown) {
+      setStatus(`XP não creditado: ${error instanceof Error ? error.message : "erro no Supabase"}`);
+    } finally {
+      claimInFlight.current = false;
+    }
+  }, [onPointsChanged, settings.xpPerMinute]);
+
   useEffect(() => {
     if (!sessionReady) return;
     const interval = window.setInterval(async () => {
-      if (!sessionId.current) return;
-      try {
-        const result = await EngagementService.claimMinute(sessionId.current);
-        if (result.awarded) {
-          minuteCycleStartedAt.current = Date.now();
-          setSecondsLeft(60);
-          setStatus(`XP recebido: +${settings.xpPerMinute} neste minuto.`);
-          onPointsChanged();
-        } else if (result.reason === "outside_schedule") {
-          setSessionReady(false);
-          setStatus("A sessão foi encerrada: XP disponível somente das 13:00 às 18:15.");
-        }
-      } catch (error: unknown) {
-        setStatus(`XP não creditado: ${error instanceof Error ? error.message : "erro no Supabase"}`);
-      }
+      await claimCurrentMinute();
     }, 60_000);
-    return () => window.clearInterval(interval);
-  }, [onPointsChanged, sessionReady, settings.xpPerMinute]);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void claimCurrentMinute();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [claimCurrentMinute, sessionReady]);
 
   useEffect(() => {
     if (!sessionReady) return;
@@ -97,7 +115,7 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
 
   return <div className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/70 dark:bg-emerald-950/30">
     <div className="relative h-16 w-16 shrink-0 rounded-full p-1 shadow-sm transition-all duration-1000" style={{ background: `conic-gradient(#059669 ${cycleProgress * 3.6}deg, #bbf7d0 ${cycleProgress * 3.6}deg 360deg)` }} aria-label={`${secondsLeft} segundos até o próximo XP`}>
-      <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-white text-emerald-700 dark:bg-slate-900 dark:text-emerald-300"><Timer size={15} /><span className="text-[11px] font-extrabold leading-none">{secondsLeft === 0 ? "..." : `0:${String(secondsLeft).padStart(2, "0")}`}</span></div>
+      <div className="flex h-full w-full flex-col items-center justify-center rounded-full bg-white text-emerald-700 dark:bg-slate-900 dark:text-emerald-300"><Timer size={15} /><span className="text-[11px] font-extrabold leading-none">{secondsLeft === 0 ? "aguarde" : `0:${String(secondsLeft).padStart(2, "0")}`}</span></div>
     </div>
     <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">XP por presença</p><span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-extrabold text-white">+{settings.xpPerMinute} XP</span></div><p className="mt-0.5 text-xs text-emerald-800 dark:text-emerald-300">{status}</p><p className="mt-1 text-[11px] text-emerald-700/80 dark:text-emerald-400">A sessão termina após {settings.confirmationMinutes} minutos e o XP recebido atualiza sua barra de nível.</p></div>
   </div>;

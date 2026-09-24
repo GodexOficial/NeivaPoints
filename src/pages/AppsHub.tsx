@@ -1,13 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AppWindow, Check, ExternalLink, FileText, GripVertical, ImagePlus, Link as LinkIcon, LoaderCircle, Pencil, Plus, Presentation, Table as TableIcon, Trash2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { AppsService } from '../services/appsService';
+import { AppsService, type AppsGridSettings } from '../services/appsService';
 import type { ExternalApp } from '../types';
 import type { WordDocument } from '../types/doc';
 import { createNewDocument } from '../services/docService';
 import { WordEditor } from '../components/apps/word/WordEditor';
 
-const GRID_SIZE = 36;
 const STANDARD_APPS_COUNT = 3;
 const MAX_COVER_SIZE = 1_500_000;
 const APP_COLORS = ['from-blue-500 to-indigo-600', 'from-violet-500 to-purple-600', 'from-emerald-500 to-teal-600', 'from-orange-500 to-rose-500', 'from-cyan-500 to-blue-600', 'from-fuchsia-500 to-pink-600'];
@@ -44,6 +43,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   const [apps, setApps] = useState<ExternalApp[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isManaging, setIsManaging] = useState(false);
+  const [gridSettings, setGridSettings] = useState<AppsGridSettings>(() => AppsService.getGridSettings());
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingApp, setEditingApp] = useState<ExternalApp | null | undefined>(undefined);
@@ -52,14 +52,23 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<WordDocument | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const gridSize = gridSettings.columns * gridSettings.rows;
+  const customCapacity = gridSize - STANDARD_APPS_COUNT;
 
   const loadApps = async () => {
     setIsLoading(true);
-    setApps(sortedApps(await AppsService.getAll()).slice(0, GRID_SIZE - STANDARD_APPS_COUNT));
+    setApps(sortedApps(await AppsService.getAll()).slice(0, customCapacity));
     setIsLoading(false);
   };
 
   useEffect(() => { void loadApps(); }, []);
+
+  const updateGridSettings = (patch: Partial<AppsGridSettings>) => {
+    const next = { ...gridSettings, ...patch } as AppsGridSettings;
+    if (apps.length > next.columns * next.rows - STANDARD_APPS_COUNT) return;
+    setGridSettings(next);
+    AppsService.saveGridSettings(next);
+  };
 
   const saveOrder = async (next: ExternalApp[]) => {
     const ordered = sortedApps(next).map((app, position) => ({ ...app, position }));
@@ -103,7 +112,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
         const updated = await AppsService.update({ ...editingApp, name, url, coverUrl: form.coverUrl || undefined });
         setApps((current) => current.map((app) => app.id === updated.id ? updated : app));
       } else {
-        if (apps.length >= GRID_SIZE - STANDARD_APPS_COUNT) { setFormError('A grade já possui os 36 aplicativos permitidos.'); return; }
+        if (apps.length >= customCapacity) { setFormError(`A grade já possui os ${gridSize} espaços configurados.`); return; }
         const created = await AppsService.create({ name, url, coverUrl: form.coverUrl || undefined, position: apps.length });
         setApps((current) => sortedApps([...current, created]));
       }
@@ -129,7 +138,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
     ...STANDARD_APPS,
     ...sortedApps(apps).map((app) => ({ ...app, source: 'custom' as const, displayPosition: app.position + STANDARD_APPS_COUNT })),
   ];
-  const slots = Array.from({ length: GRID_SIZE }, (_, index) => ({ index, app: displayedApps.find((app) => app.displayPosition === index) }));
+  const slots = Array.from({ length: gridSize }, (_, index) => ({ index, app: displayedApps.find((app) => app.displayPosition === index) }));
 
   const openStandardApp = (app: StandardApp) => {
     if (app.id !== 'word') return;
@@ -158,13 +167,13 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
 
       {isTeacher && isManaging && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100 sm:flex sm:items-center sm:justify-between">
         <div className="text-sm"><strong>Modo de edição:</strong> arraste um ícone para outro espaço ou clique em um ícone e depois no destino.</div>
-        <button type="button" onClick={openCreate} disabled={apps.length >= GRID_SIZE - STANDARD_APPS_COUNT} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-extrabold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 cursor-pointer"><Plus size={16} />Adicionar aplicativo</button>
+        <button type="button" onClick={openCreate} disabled={apps.length >= customCapacity} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-extrabold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 cursor-pointer"><Plus size={16} />Adicionar aplicativo</button>
       </section>}
 
       <section aria-label="Grade de aplicativos" className="rounded-3xl border border-slate-200 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-        <div className="mb-4 flex items-center justify-between px-1"><h2 className="text-base font-extrabold text-slate-900 dark:text-white">Aplicativos</h2><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{displayedApps.length} de {GRID_SIZE}</span></div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1"><div><h2 className="text-base font-extrabold text-slate-900 dark:text-white">Aplicativos</h2><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{displayedApps.length} de {gridSize}</span></div>{isTeacher && isManaging && <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300"><label>Colunas<select value={gridSettings.columns} onChange={(event) => updateGridSettings({ columns: Number(event.target.value) as AppsGridSettings['columns'] })} className="ml-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option></select></label><label>Linhas<select value={gridSettings.rows} onChange={(event) => updateGridSettings({ rows: Number(event.target.value) as AppsGridSettings['rows'] })} className="ml-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option></select></label></div>}</div>
         {isLoading ? <div className="flex min-h-72 items-center justify-center text-sm font-semibold text-slate-500"><LoaderCircle className="mr-2 animate-spin" size={18} /> Carregando aplicativos…</div> : <>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-6">
+          <div className="grid gap-2 sm:gap-3" style={{ gridTemplateColumns: `repeat(${gridSettings.columns}, minmax(0, 1fr))` }}>
             {slots.map(({ index, app }) => <div key={index} onDragOver={(event) => { if (isManaging && isTeacher && index >= STANDARD_APPS_COUNT) event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); const appId = event.dataTransfer.getData('text/neivapoints-app') || draggedId; if (isManaging && appId && index >= STANDARD_APPS_COUNT) void moveApp(appId, index - STANDARD_APPS_COUNT); setDraggedId(null); }} onClick={() => !app && handleSlotClick(index)} className={`relative flex aspect-square min-w-0 items-center justify-center rounded-2xl transition-colors ${app ? '' : isManaging ? 'cursor-pointer border-2 border-dashed border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-blue-700 dark:hover:bg-blue-950/30' : 'border border-slate-100/70 bg-slate-50/45 dark:border-slate-800/70 dark:bg-slate-800/20'}`} aria-label={app ? undefined : `Espaço ${index + 1} da grade`}>
               {app && <AppTile app={app} colorIndex={index} editable={isTeacher && isManaging && app.source === 'custom'} selected={app.source === 'custom' && selectedId === app.id} onOpenStandard={() => app.source === 'standard' && openStandardApp(app)} onEdit={() => { if (app.source === 'custom') openEdit(app); }} onDelete={() => { if (app.source === 'custom') void handleDelete(app); }} onManageClick={() => { if (app.source === 'custom') handleAppManageClick(app); }} onDragStart={(event) => { if (app.source !== 'custom') return; setDraggedId(app.id); event.dataTransfer.setData('text/neivapoints-app', app.id); event.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => setDraggedId(null)} />}
             </div>)}

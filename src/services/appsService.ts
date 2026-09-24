@@ -3,6 +3,14 @@ import type { ExternalApp } from '../types';
 import { StorageService } from './storage';
 
 const APPS_STORAGE_KEY = 'neivapoints_external_apps_v1';
+const GRID_SETTINGS_STORAGE_KEY = 'neivapoints_apps_grid_settings_v1';
+
+export interface AppsGridSettings {
+  columns: 2 | 3 | 4 | 6;
+  rows: 2 | 3 | 4 | 6;
+}
+
+export const DEFAULT_APPS_GRID_SETTINGS: AppsGridSettings = { columns: 6, rows: 6 };
 
 const sortApps = (apps: ExternalApp[]) =>
   [...apps].sort((a, b) => a.position - b.position || a.createdAt.localeCompare(b.createdAt));
@@ -12,6 +20,12 @@ const saveLocal = (apps: ExternalApp[]) => {
 };
 
 const getLocal = () => StorageService.getItem<ExternalApp[]>(APPS_STORAGE_KEY, []);
+
+const isGridSettings = (value: unknown): value is AppsGridSettings => {
+  if (!value || typeof value !== 'object') return false;
+  const settings = value as Partial<AppsGridSettings>;
+  return [2, 3, 4, 6].includes(settings.columns as number) && [2, 3, 4, 6].includes(settings.rows as number);
+};
 
 const toApp = (row: any): ExternalApp => ({
   id: row.id,
@@ -29,6 +43,15 @@ const toApp = (row: any): ExternalApp => ({
  * Os três primeiros espaços da grade são reservados para apps padrão.
  */
 export class AppsService {
+  static getGridSettings(): AppsGridSettings {
+    const saved = StorageService.getItem<unknown>(GRID_SETTINGS_STORAGE_KEY, DEFAULT_APPS_GRID_SETTINGS);
+    return isGridSettings(saved) ? saved : DEFAULT_APPS_GRID_SETTINGS;
+  }
+
+  static saveGridSettings(settings: AppsGridSettings): void {
+    StorageService.setItem(GRID_SETTINGS_STORAGE_KEY, settings);
+  }
+
   static async getAll(): Promise<ExternalApp[]> {
     if (!isSupabaseConfigured) return sortApps(getLocal());
 
