@@ -91,7 +91,7 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
           }
           setStatus("Você já tem uma sessão de XP ativa. Aguarde o término do período configurado.");
         } else {
-          setStatus(reason === "outside_schedule" ? "O XP por presença funciona somente das 13:00 às 18:15." : "Não foi possível iniciar o XP automático.");
+          setStatus(reason === "outside_schedule" ? `O XP por presença funciona das ${settings.startTime} às ${settings.endTime}.` : "Não foi possível iniciar o XP automático.");
         }
         return;
       }

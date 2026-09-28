@@ -7,14 +7,13 @@ create extension if not exists pgcrypto;
 insert into public.app_settings (key, value)
 values
   ('login_xp_per_minute', '2'),
-  ('login_xp_confirmation_minutes', '5'),
-  ('monthly_xp_goal', '100')
+  ('login_xp_confirmation_minutes', '10'),
+  ('monthly_xp_goal', '100'),
+  ('login_xp_start_time', '13:00'),
+  ('login_xp_end_time', '18:15')
 on conflict (key) do nothing;
 
--- Cada confirmação manual libera uma sessão de dez minutos.
-update public.app_settings
-set value = '10', updated_at = now()
-where key = 'login_xp_confirmation_minutes';
+-- O valor de dez minutos é aplicado somente na instalação inicial; valores salvos são preservados.
 
 create table if not exists public.login_xp_sessions (
   session_id uuid primary key default gen_random_uuid(),
@@ -48,13 +47,21 @@ declare
   v_session_id uuid;
   v_active_until timestamptz;
   v_confirmation_minutes integer;
+  v_start_time time;
+  v_end_time time;
 begin
   if p_student_id is null or btrim(p_student_id) = '' then
     raise exception 'Student ID is required';
   end if;
 
-  if (now() at time zone 'America/Fortaleza')::time < time '13:00'
-     or (now() at time zone 'America/Fortaleza')::time >= time '18:15' then
+    select coalesce(max(value) filter (where key = 'login_xp_start_time'), '13:00')::time,
+        coalesce(max(value) filter (where key = 'login_xp_end_time'), '18:15')::time
+    into v_start_time, v_end_time
+    from app_settings
+    where key in ('login_xp_start_time', 'login_xp_end_time');
+
+    if (now() at time zone 'America/Fortaleza')::time < v_start_time
+      or (now() at time zone 'America/Fortaleza')::time >= v_end_time then
     return jsonb_build_object('reason', 'outside_schedule');
   end if;
 
@@ -106,10 +113,19 @@ create function public.confirm_login_xp_activity(p_session_id uuid)
 returns jsonb
 language plpgsql security definer set search_path = public
 as $$
-declare v_confirmation_minutes integer;
+declare
+  v_confirmation_minutes integer;
+  v_start_time time;
+  v_end_time time;
 begin
-  if (now() at time zone 'America/Fortaleza')::time < time '13:00'
-     or (now() at time zone 'America/Fortaleza')::time >= time '18:15' then
+  select coalesce(max(value) filter (where key = 'login_xp_start_time'), '13:00')::time,
+         coalesce(max(value) filter (where key = 'login_xp_end_time'), '18:15')::time
+  into v_start_time, v_end_time
+  from app_settings
+  where key in ('login_xp_start_time', 'login_xp_end_time');
+
+  if (now() at time zone 'America/Fortaleza')::time < v_start_time
+     or (now() at time zone 'America/Fortaleza')::time >= v_end_time then
     return jsonb_build_object('allowed', false, 'reason', 'outside_schedule');
   end if;
   select greatest(1, coalesce(value::integer, 5)) into v_confirmation_minutes
@@ -132,9 +148,17 @@ declare
   v_xp integer;
   v_previous_points integer;
   v_new_points integer;
+  v_start_time time;
+  v_end_time time;
 begin
-  if (now() at time zone 'America/Fortaleza')::time < time '13:00'
-     or (now() at time zone 'America/Fortaleza')::time >= time '18:15' then
+  select coalesce(max(value) filter (where key = 'login_xp_start_time'), '13:00')::time,
+         coalesce(max(value) filter (where key = 'login_xp_end_time'), '18:15')::time
+  into v_start_time, v_end_time
+  from app_settings
+  where key in ('login_xp_start_time', 'login_xp_end_time');
+
+  if (now() at time zone 'America/Fortaleza')::time < v_start_time
+     or (now() at time zone 'America/Fortaleza')::time >= v_end_time then
     return jsonb_build_object('awarded', false, 'reason', 'outside_schedule');
   end if;
   select * into v_session from login_xp_sessions where session_id = p_session_id for update;
