@@ -506,6 +506,26 @@ export class SupabaseService {
     };
   }
 
+  static async removePointsFromClass(params: {
+    classId: string;
+    amount: number;
+    reason?: string;
+  }): Promise<{ studentCount: number }> {
+    if (!this.isConfigured) throw new Error('Supabase is not configured');
+
+    const { data, error } = await supabase.rpc('remove_points_from_class', {
+      p_class_id: params.classId,
+      p_amount: params.amount,
+      p_reason: params.reason?.trim() || null,
+    });
+
+    if (error) throw error;
+
+    return {
+      studentCount: Number((data as { studentCount?: number } | null)?.studentCount || 0),
+    };
+  }
+
   /**
    * Helper Methods
    */

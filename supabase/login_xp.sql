@@ -35,30 +35,69 @@ alter table public.login_xp_sessions enable row level security;
 revoke all on public.login_xp_sessions from anon, authenticated;
 
 -- Cria uma sessão cujo primeiro crédito só fica disponível após um minuto.
--- Os drops permitem atualizar o tipo de retorno em instalações que já executaram uma versão anterior.
+-- A trava consultiva serializa inícios simultâneos do mesmo aluno, mesmo em abas diferentes.
+-- Remova a versão anterior para permitir instalações antigas com retorno text.
 drop function if exists public.start_login_xp_session(text);
 drop function if exists public.confirm_login_xp_activity(uuid);
 
-create function public.start_login_xp_session(p_student_id text)
+create or replace function public.start_login_xp_session(p_student_id text)
 returns jsonb
 language plpgsql security definer set search_path = public
 as $$
 declare
   v_session_id uuid;
+  v_active_until timestamptz;
   v_confirmation_minutes integer;
 begin
+  if p_student_id is null or btrim(p_student_id) = '' then
+    raise exception 'Student ID is required';
+  end if;
+
   if (now() at time zone 'America/Fortaleza')::time < time '13:00'
      or (now() at time zone 'America/Fortaleza')::time >= time '18:15' then
     return jsonb_build_object('reason', 'outside_schedule');
   end if;
+
+  perform pg_advisory_xact_lock(hashtext(p_student_id));
+  select active_until into v_active_until
+  from login_xp_sessions
+  where student_id = p_student_id and closed_at is null and active_until > now()
+  order by active_until desc
+  limit 1
+  for update;
+
+  if found then
+    return jsonb_build_object('reason', 'session_active', 'activeUntil', v_active_until);
+  end if;
+
   select greatest(1, coalesce(value::integer, 5)) into v_confirmation_minutes
   from app_settings where key = 'login_xp_confirmation_minutes';
   v_confirmation_minutes := coalesce(v_confirmation_minutes, 5);
 
   insert into login_xp_sessions (student_id, active_until)
   values (p_student_id, now() + make_interval(mins => v_confirmation_minutes))
-  returning session_id into v_session_id;
-  return jsonb_build_object('sessionId', v_session_id::text);
+  returning session_id, active_until into v_session_id, v_active_until;
+  return jsonb_build_object('sessionId', v_session_id::text, 'activeUntil', v_active_until);
+end;
+$$;
+
+create or replace function public.get_login_xp_session_status(p_student_id text)
+returns jsonb
+language plpgsql security definer set search_path = public
+as $$
+declare
+  v_active_until timestamptz;
+begin
+  select active_until into v_active_until
+  from login_xp_sessions
+  where student_id = p_student_id and closed_at is null and active_until > now()
+  order by active_until desc
+  limit 1;
+
+  return jsonb_build_object(
+    'locked', v_active_until is not null,
+    'activeUntil', v_active_until
+  );
 end;
 $$;
 
@@ -128,5 +167,6 @@ end;
 $$;
 
 grant execute on function public.start_login_xp_session(text) to anon, authenticated;
+grant execute on function public.get_login_xp_session_status(text) to anon, authenticated;
 grant execute on function public.confirm_login_xp_activity(uuid) to anon, authenticated;
 grant execute on function public.claim_login_xp(uuid) to anon, authenticated;

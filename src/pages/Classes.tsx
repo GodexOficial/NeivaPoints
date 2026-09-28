@@ -24,6 +24,7 @@ interface ClassesPageProps {
   onOpenAddModal: (classId: ClassId) => void;
   onOpenPointsModal: (student: StudentWithStats) => void;
   onOpenClassPointsModal: (classId: ClassId, className: string, studentCount: number) => void;
+  onOpenClassRemovePointsModal: (classId: ClassId, className: string, studentCount: number) => void;
 }
 
 export const ClassesPage: React.FC<ClassesPageProps> = ({
@@ -32,6 +33,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
   onOpenAddModal,
   onOpenPointsModal,
   onOpenClassPointsModal,
+  onOpenClassRemovePointsModal,
 }) => {
   const { classes, getClassStats, getStudentsByClass, deleteClass } = useStudentContext();
   const { t, getClassName } = useLanguage();
@@ -207,6 +209,16 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
             >
               <Sparkles size={16} />
               <span>{t('classes.addPointsToAll')}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenClassRemovePointsModal(currentClassId, localizedClassName, classStudents.length)}
+              disabled={classStudents.length === 0}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold text-sm rounded-xl shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+            >
+              <Trash2 size={16} />
+              <span>{t('classes.removePointsFromAll')}</span>
             </button>
           </div>
         </div>

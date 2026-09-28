@@ -14,23 +14,91 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
   const claimInFlight = useRef(false);
   const minuteCycleStartedAt = useRef(Date.now());
   const [sessionReady, setSessionReady] = useState(false);
-  const [sessionEnded, setSessionEnded] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
+  const [clockNow, setClockNow] = useState(Date.now());
   const [secondsLeft, setSecondsLeft] = useState(60);
   const [status, setStatus] = useState("Confirme que você está logado para iniciar o XP automático.");
+  const lockStorageKey = `login_xp_lock:${studentId}`;
 
-  useEffect(() => () => { sessionId.current = null; }, [studentId]);
+  useEffect(() => {
+    let mounted = true;
+    const syncSessionStatus = async () => {
+      try {
+        const result = await EngagementService.getSessionStatus(studentId);
+        if (!mounted) return;
+        const until = result.activeUntil ? Date.parse(result.activeUntil) : NaN;
+        if (result.locked && Number.isFinite(until) && until > Date.now()) {
+          setLockedUntil(until);
+          setStatus("Você já tem uma sessão de XP ativa. Aguarde o término do período configurado.");
+          window.localStorage.setItem(lockStorageKey, String(until));
+        } else {
+          setLockedUntil(null);
+          window.localStorage.removeItem(lockStorageKey);
+        }
+      } catch {
+        if (mounted) setStatus("Não foi possível verificar se há uma sessão de XP ativa.");
+      } finally {
+        if (mounted) setStatusLoading(false);
+      }
+    };
+
+    const storedUntil = Number(window.localStorage.getItem(lockStorageKey));
+    if (storedUntil > Date.now()) setLockedUntil(storedUntil);
+    void syncSessionStatus();
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== lockStorageKey || !event.newValue) return;
+      const until = Number(event.newValue);
+      if (until > Date.now()) {
+        setLockedUntil(until);
+        setSessionReady(false);
+        sessionId.current = null;
+        setStatus("Outra aba iniciou sua sessão de XP. Aguarde o término do período configurado.");
+      }
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") void syncSessionStatus();
+    };
+    window.addEventListener("storage", handleStorage);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      mounted = false;
+      sessionId.current = null;
+      window.removeEventListener("storage", handleStorage);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [studentId, lockStorageKey]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setClockNow(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   const startXpSession = async () => {
-    if (starting || sessionEnded) return;
+    if (starting || sessionReady || statusLoading || (lockedUntil !== null && lockedUntil > Date.now())) return;
     setStarting(true);
     try {
-      const { sessionId: id, reason } = await EngagementService.startSession(studentId);
+      const { sessionId: id, reason, activeUntil } = await EngagementService.startSession(studentId);
       if (!id) {
-        setStatus(reason === "outside_schedule" ? "O XP por presença funciona somente das 13:00 às 18:15." : "Não foi possível iniciar o XP automático.");
+        if (reason === "session_active" && activeUntil) {
+          const until = Date.parse(activeUntil);
+          if (Number.isFinite(until) && until > Date.now()) {
+            setLockedUntil(until);
+            window.localStorage.setItem(lockStorageKey, String(until));
+          }
+          setStatus("Você já tem uma sessão de XP ativa. Aguarde o término do período configurado.");
+        } else {
+          setStatus(reason === "outside_schedule" ? "O XP por presença funciona somente das 13:00 às 18:15." : "Não foi possível iniciar o XP automático.");
+        }
         return;
       }
       sessionId.current = id;
+      const until = activeUntil ? Date.parse(activeUntil) : Date.now() + settings.confirmationMinutes * 60_000;
+      setLockedUntil(until);
+      window.localStorage.setItem(lockStorageKey, String(until));
       minuteCycleStartedAt.current = Date.now();
       setSecondsLeft(60);
       setSessionReady(true);
@@ -82,14 +150,14 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
   }, [claimCurrentMinute, sessionReady]);
 
   useEffect(() => {
-    if (!sessionReady) return;
+    if (!sessionReady || lockedUntil === null) return;
     const timeout = window.setTimeout(() => {
       setSessionReady(false);
-      setSessionEnded(true);
       setStatus("Sua sessão de XP de 10 minutos foi encerrada.");
-    }, settings.confirmationMinutes * 60_000);
+      sessionId.current = null;
+    }, Math.max(0, lockedUntil - Date.now()));
     return () => window.clearTimeout(timeout);
-  }, [sessionReady, settings.confirmationMinutes]);
+  }, [sessionReady, lockedUntil]);
 
   useEffect(() => {
     if (!sessionReady) return;
@@ -103,13 +171,15 @@ export const LoginXpTracker: React.FC<Props> = ({ studentId, settings, onPointsC
   }, [sessionReady]);
 
   const cycleProgress = Math.min(100, Math.max(0, ((60 - secondsLeft) / 60) * 100));
+  const isLocked = lockedUntil !== null && lockedUntil > clockNow;
+  const cooldownSeconds = isLocked ? Math.ceil((lockedUntil - clockNow) / 1_000) : 0;
 
   if (!sessionReady) {
     return <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-center dark:border-emerald-900/70 dark:bg-emerald-950/30">
       <LockKeyhole size={22} className="mx-auto text-emerald-600 dark:text-emerald-400" />
       <h3 className="mt-2 text-sm font-extrabold text-emerald-950 dark:text-emerald-100">XP automático</h3>
       <p className="mt-1 text-xs text-emerald-800 dark:text-emerald-300">{status}</p>
-      {!sessionEnded && <button type="button" onClick={startXpSession} disabled={starting} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white transition-colors hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"><CircleCheck size={18} />{starting ? "Confirmando..." : "Estou logado"}</button>}
+      <button type="button" onClick={startXpSession} disabled={starting || statusLoading || isLocked} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-extrabold text-white transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"><CircleCheck size={18} />{starting ? "Confirmando..." : statusLoading ? "Verificando sessão..." : isLocked ? `Disponível em ${Math.floor(cooldownSeconds / 60)}:${String(cooldownSeconds % 60).padStart(2, "0")}` : "Estou logado"}</button>
     </div>;
   }
 

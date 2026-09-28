@@ -9,6 +9,7 @@ interface ClassPointsModalProps {
   classId: string | null;
   className: string;
   studentCount: number;
+  mode?: 'add' | 'remove';
   onClose: () => void;
   onSuccess?: (studentCount: number) => void;
 }
@@ -18,11 +19,12 @@ export const ClassPointsModal: React.FC<ClassPointsModalProps> = ({
   classId,
   className,
   studentCount,
+  mode = 'add',
   onClose,
   onSuccess,
 }) => {
   const { t, getReasonLabel } = useLanguage();
-  const { addPointsToClass } = useStudentContext();
+  const { addPointsToClass, removePointsFromClass } = useStudentContext();
   const [amount, setAmount] = useState<number | ''>(10);
   const [selectedQuick, setSelectedQuick] = useState<number | null>(10);
   const [reason, setReason] = useState('');
@@ -62,11 +64,13 @@ export const ClassPointsModal: React.FC<ClassPointsModalProps> = ({
     setSaving(true);
     setError(null);
     try {
-      const result = await addPointsToClass(classId, numericAmount, effectiveReason || undefined);
+      const result = mode === 'remove'
+        ? await removePointsFromClass(classId, numericAmount, effectiveReason || undefined)
+        : await addPointsToClass(classId, numericAmount, effectiveReason || undefined);
       onSuccess?.(result.studentCount);
       onClose();
     } catch (caughtError: unknown) {
-      setError(caughtError instanceof Error ? caughtError.message : t('classes.bulkPointsError'));
+      setError(caughtError instanceof Error ? caughtError.message : t(mode === 'remove' ? 'classes.bulkRemovePointsError' : 'classes.bulkPointsError'));
     } finally {
       setSaving(false);
     }
@@ -77,20 +81,20 @@ export const ClassPointsModal: React.FC<ClassPointsModalProps> = ({
       <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
           <div>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t('classes.bulkPointsTitle')}</h3>
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t(mode === 'remove' ? 'classes.bulkRemovePointsTitle' : 'classes.bulkPointsTitle')}</h3>
             <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400"><Users size={13} />{className} · {studentCount} {t('classes.bulkPointsStudents')}</p>
           </div>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" aria-label={t('modal.cancel')}><X size={18} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          <p className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-xs font-medium text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">{t('classes.bulkPointsDesc', { count: studentCount })}</p>
+          <p className={`rounded-xl border p-3 text-xs font-medium ${mode === 'remove' ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200' : 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200'}`}>{t(mode === 'remove' ? 'classes.bulkRemovePointsDesc' : 'classes.bulkPointsDesc', { count: studentCount })}</p>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-2">{t('modal.quickSelect')}</label>
             <div className="grid grid-cols-5 gap-2">
               {QUICK_POINT_OPTIONS.map((value) => (
-                <button key={value} type="button" onClick={() => { setSelectedQuick(value); setAmount(value); setError(null); }} className={`py-2 px-3 text-sm font-semibold rounded-xl border transition-all cursor-pointer ${selectedQuick === value && amount === value ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-600 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>+{value}</button>
+                <button key={value} type="button" onClick={() => { setSelectedQuick(value); setAmount(value); setError(null); }} className={`py-2 px-3 text-sm font-semibold rounded-xl border transition-all cursor-pointer ${selectedQuick === value && amount === value ? (mode === 'remove' ? 'bg-red-50 dark:bg-red-950/60 border-red-600 text-red-700 dark:text-red-300 ring-2 ring-red-500/20' : 'bg-blue-50 dark:bg-blue-950/60 border-blue-600 text-blue-700 dark:text-blue-300 ring-2 ring-blue-500/20') : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>{mode === 'remove' ? '-' : '+'}{value}</button>
               ))}
             </div>
           </div>
@@ -112,7 +116,7 @@ export const ClassPointsModal: React.FC<ClassPointsModalProps> = ({
 
           <div className="flex items-center justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">{t('modal.cancel')}</button>
-            <button type="submit" disabled={saving || !numericAmount || studentCount === 0} className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"><Check size={16} />{saving ? t('classes.bulkPointsSaving') : t('classes.bulkPointsSubmit', { amount: numericAmount, count: studentCount })}</button>
+            <button type="submit" disabled={saving || !numericAmount || studentCount === 0} className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl text-white transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${mode === 'remove' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}><Check size={16} />{saving ? t(mode === 'remove' ? 'classes.bulkRemovePointsSaving' : 'classes.bulkPointsSaving') : t(mode === 'remove' ? 'classes.bulkRemovePointsSubmit' : 'classes.bulkPointsSubmit', { amount: numericAmount, count: studentCount })}</button>
           </div>
         </form>
       </div>

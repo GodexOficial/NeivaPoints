@@ -39,7 +39,7 @@ const MainContent: React.FC = () => {
   const [addClassModalOpen, setAddClassModalOpen] = useState(false);
   const [pointsModalStudent, setPointsModalStudent] = useState<StudentWithStats | null>(null);
   const [pointsModalInitialMode, setPointsModalInitialMode] = useState<'add' | 'remove'>('add');
-  const [classPointsModal, setClassPointsModal] = useState<{ classId: ClassId; className: string; studentCount: number } | null>(null);
+  const [classPointsModal, setClassPointsModal] = useState<{ classId: ClassId; className: string; studentCount: number; mode: 'add' | 'remove' } | null>(null);
 
   // If not logged in, show login / registration screen
   if (!isAuthenticated) {
@@ -91,7 +91,11 @@ const MainContent: React.FC = () => {
   };
 
   const handleOpenClassPointsModal = (classId: ClassId, className: string, studentCount: number) => {
-    setClassPointsModal({ classId, className, studentCount });
+    setClassPointsModal({ classId, className, studentCount, mode: 'add' });
+  };
+
+  const handleOpenClassRemovePointsModal = (classId: ClassId, className: string, studentCount: number) => {
+    setClassPointsModal({ classId, className, studentCount, mode: 'remove' });
   };
 
   // If in student "Join Your Class" standalone view
@@ -143,6 +147,7 @@ const MainContent: React.FC = () => {
             onOpenAddModal={handleOpenAddStudentModal}
             onOpenPointsModal={(student) => handleOpenPointsModal(student, 'add')}
             onOpenClassPointsModal={handleOpenClassPointsModal}
+            onOpenClassRemovePointsModal={handleOpenClassRemovePointsModal}
           />
         ) : activeTab === 'apps' ? (
           <AppsHub onWordEditorChange={setIsWordEditorOpen} />
@@ -179,6 +184,7 @@ const MainContent: React.FC = () => {
         classId={classPointsModal?.classId || null}
         className={classPointsModal?.className || ''}
         studentCount={classPointsModal?.studentCount || 0}
+        mode={classPointsModal?.mode || 'add'}
         onClose={() => setClassPointsModal(null)}
       />
 

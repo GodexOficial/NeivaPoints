@@ -56,13 +56,20 @@ export class EngagementService {
   }
 
   /** Starts a server-side attendance session. The SQL migration defines this RPC. */
-  static async startSession(studentId: string): Promise<{ sessionId?: string; reason?: string }> {
+  static async startSession(studentId: string): Promise<{ sessionId?: string; reason?: string; activeUntil?: string }> {
     if (!isSupabaseConfigured) return { sessionId: `local_${studentId}` };
     const { data, error } = await (supabase as any).rpc("start_login_xp_session", { p_student_id: studentId });
     if (error) throw error;
     // Compatibility with the first SQL version, which returned the session UUID as text.
     if (typeof data === "string") return { sessionId: data };
-    return data as { sessionId?: string; reason?: string };
+    return data as { sessionId?: string; reason?: string; activeUntil?: string };
+  }
+
+  static async getSessionStatus(studentId: string): Promise<{ locked: boolean; activeUntil?: string }> {
+    if (!isSupabaseConfigured) return { locked: false };
+    const { data, error } = await (supabase as any).rpc("get_login_xp_session_status", { p_student_id: studentId });
+    if (error) throw error;
+    return data as { locked: boolean; activeUntil?: string };
   }
 
   /** Claims one minute of XP. The database, not the browser clock, decides whether it is valid. */
