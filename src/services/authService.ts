@@ -3,6 +3,7 @@ import { StudentService } from "./studentService";
 import { SupabaseService } from "./supabaseService";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import type { AuthUser, ClassId, Student } from "../types";
+import { normalizePersonName } from "../utils/personName";
 
 export interface TeacherAccount {
   id: string;
@@ -68,14 +69,32 @@ export class AuthService {
     if (isSupabaseConfigured) {
       try {
         const supabaseTeachers = await SupabaseService.getAllTeachers();
-        StorageService.setItem(TEACHERS_KEY, supabaseTeachers);
-        return supabaseTeachers;
+        const normalizedTeachers = await Promise.all(supabaseTeachers.map(async (teacher) => {
+          const name = normalizePersonName(teacher.name);
+          if (name === teacher.name) return teacher;
+
+          try {
+            await SupabaseService.updateTeacherName(teacher.id, name);
+          } catch (error) {
+            console.warn(`Could not normalize teacher name for ${teacher.id}:`, error);
+          }
+          return { ...teacher, name };
+        }));
+        StorageService.setItem(TEACHERS_KEY, normalizedTeachers);
+        return normalizedTeachers;
       } catch (error) {
         console.warn('Supabase error loading teachers, falling back to localStorage:', error);
       }
     }
 
-    const teachers = StorageService.getItem<TeacherAccount[]>(TEACHERS_KEY, []);
+    const storedTeachers = StorageService.getItem<TeacherAccount[]>(TEACHERS_KEY, []);
+    const teachers = storedTeachers.map((teacher) => ({
+      ...teacher,
+      name: normalizePersonName(teacher.name),
+    }));
+    if (teachers.some((teacher, index) => teacher.name !== storedTeachers[index]?.name)) {
+      StorageService.setItem(TEACHERS_KEY, teachers);
+    }
     if (!teachers || teachers.length === 0) {
       StorageService.setItem(TEACHERS_KEY, []);
       return [];
@@ -133,7 +152,7 @@ export class AuthService {
     password: string;
     securityKey: string;
   }): Promise<{ success: boolean; teacher?: TeacherAccount; error?: string }> {
-    const trimmedName = params.name.trim();
+    const trimmedName = normalizePersonName(params.name);
     const trimmedUser = params.emailOrUsername.trim().toLowerCase();
     const trimmedPass = params.password.trim();
     const trimmedKey = params.securityKey.trim();
@@ -333,7 +352,14 @@ export class AuthService {
    * Get active auth session from localStorage.
    */
   static getSession(): AuthUser | null {
-    return StorageService.getItem<AuthUser | null>(AUTH_SESSION_KEY, null);
+    const session = StorageService.getItem<AuthUser | null>(AUTH_SESSION_KEY, null);
+    if (!session) return null;
+
+    const normalizedSession = { ...session, name: normalizePersonName(session.name) };
+    if (normalizedSession.name !== session.name) {
+      StorageService.setItem(AUTH_SESSION_KEY, normalizedSession);
+    }
+    return normalizedSession;
   }
 
   /**

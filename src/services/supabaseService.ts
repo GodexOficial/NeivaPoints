@@ -1,6 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import type { ClassInfo, Student, PointTransaction } from '../types';
 import type { TeacherAccount } from './authService';
+import { normalizePersonName } from '../utils/personName';
 
 /**
  * Supabase Database Service
@@ -71,6 +72,17 @@ export class SupabaseService {
       console.error('Error in createTeacher:', err);
       throw err;
     }
+  }
+
+  static async updateTeacherName(id: string, name: string): Promise<void> {
+    if (!this.isConfigured) throw new Error('Supabase is not configured');
+
+    const { error } = await supabase
+      .from('teachers')
+      .update({ name: normalizePersonName(name) })
+      .eq('id', id);
+
+    if (error) throw error;
   }
 
 

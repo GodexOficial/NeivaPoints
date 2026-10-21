@@ -3,6 +3,7 @@ import { StorageService } from './storage';
 import { enrichStudentWithStats } from '../utils/levelCalculator';
 import { SupabaseService } from './supabaseService';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { normalizePersonName } from '../utils/personName';
 
 export class StudentService {
   /**
@@ -38,10 +39,21 @@ export class StudentService {
     if (isSupabaseConfigured) {
       try {
         const supabaseStudents = await SupabaseService.getAllStudents();
+        const normalizedStudents = await Promise.all(supabaseStudents.map(async (student) => {
+          const name = normalizePersonName(student.name);
+          if (name === student.name) return student;
+
+          try {
+            return await SupabaseService.updateStudent(student.id, { name });
+          } catch (error) {
+            console.warn(`Could not normalize student name for ${student.id}:`, error);
+            return { ...student, name };
+          }
+        }));
         // The cloud is the single source of truth when configured.
         // Update local cache with cloud state (even if empty).
-        StorageService.setStudents(supabaseStudents);
-        return supabaseStudents;
+        StorageService.setStudents(normalizedStudents);
+        return normalizedStudents;
       } catch (error) {
         console.warn('Supabase error loading students, falling back to localStorage:', error);
         return StorageService.getStudents<Student[]>([]);
@@ -55,6 +67,12 @@ export class StudentService {
     const students = rawStudents.map((s) => {
       let updated = false;
       const studentCopy = { ...s };
+
+      const normalizedName = normalizePersonName(studentCopy.name);
+      if (normalizedName !== studentCopy.name) {
+        studentCopy.name = normalizedName;
+        updated = true;
+      }
 
       if (!studentCopy.username) {
         studentCopy.username = this.generateUsername(studentCopy.name, studentCopy.id);
@@ -141,7 +159,7 @@ export class StudentService {
     isSample?: boolean;
     initialPoints?: number;
   }): Promise<Student> {
-    const trimmedName = params.name.trim();
+    const trimmedName = normalizePersonName(params.name);
     if (!trimmedName) {
       throw new Error("Please enter the student's name.");
     }
@@ -213,7 +231,7 @@ export class StudentService {
     const student = students[index];
     const updatedStudent: Student = {
       ...student,
-      ...(updates.name ? { name: updates.name.trim() } : {}),
+      ...(updates.name ? { name: normalizePersonName(updates.name) } : {}),
       ...(updates.classId ? { classId: updates.classId } : {}),
       ...(updates.username ? { username: updates.username.trim().toLowerCase() } : {}),
       ...(updates.password ? { password: updates.password.trim() } : {}),
@@ -226,7 +244,10 @@ export class StudentService {
     // Sync to Supabase
     if (isSupabaseConfigured) {
       try {
-        await SupabaseService.updateStudent(id, updates);
+        await SupabaseService.updateStudent(id, {
+          ...updates,
+          ...(updates.name ? { name: normalizePersonName(updates.name) } : {}),
+        });
       } catch (error) {
         console.error('Error updating student in Supabase:', error);
       }
