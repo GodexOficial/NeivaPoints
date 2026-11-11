@@ -23,6 +23,8 @@ interface WordToolbarProps {
   rulerVisible: boolean; marksVisible: boolean; focusMode: boolean; readOnly: boolean;
   zoom: number; orientation: 'portrait' | 'landscape'; pageSize: 'a4' | 'letter';
   dictating: boolean; canDictate: boolean;
+  tableActive: boolean; tableTabRequest: number;
+  renderTableTools: (view: 'layout' | 'design') => React.ReactNode;
 }
 
 function Tool({ icon: Icon, label, onClick, active, large, disabled }: { icon: LucideIcon; label: string; onClick: () => void; active?: boolean; large?: boolean; disabled?: boolean }) {
@@ -37,14 +39,16 @@ const fonts = ['Aptos', 'Calibri', 'Arial', 'Times New Roman', 'Georgia', 'Couri
 export const WordToolbar: React.FC<WordToolbarProps> = p => {
   const [tab, setTab] = useState('Início');
   const [fontSize, setFontSize] = useState('12');
+  useEffect(() => { setTab(current => p.tableActive ? 'Layout da tabela' : current.endsWith('da tabela') ? 'Início' : current); }, [p.tableActive, p.tableTabRequest]);
   const f = p.activeFormat;
   useEffect(() => { setFontSize(String(Math.round(f?.fontSizePt || 12))); }, [f?.fontSizePt]);
   const cmd = (command: string, value?: string) => p.onExecCommand(command, value);
   const action = (name: string, value?: string) => p.onAction(name, value);
   const small = (icon: LucideIcon, label: string, command: string, active?: boolean, value?: string) => <Tool icon={icon} label={label} active={active} onClick={() => cmd(command, value)} />;
   return <div className="word-ribbon">
-    <div className="word-tabs" role="tablist" aria-label="Faixa de opções do documento">{tabs.map(name => <button type="button" role="tab" key={name} aria-selected={tab === name} aria-controls="word-ribbon-panel" id={`word-tab-${name}`} onMouseDown={e => e.preventDefault()} onClick={() => setTab(name)}>{name}</button>)}</div>
+    <div className="word-tabs" role="tablist" aria-label="Faixa de opções do documento">{[...tabs, ...(p.tableActive ? ['Design da tabela', 'Layout da tabela'] : [])].map(name => <button type="button" role="tab" key={name} aria-selected={tab === name} aria-controls="word-ribbon-panel" id={`word-tab-${name}`} className={name.endsWith('da tabela') ? 'word-contextual-tab' : ''} onMouseDown={e => e.preventDefault()} onClick={() => setTab(name)}>{name}</button>)}</div>
     <div className="word-ribbon-panel" id="word-ribbon-panel" role="tabpanel" aria-labelledby={`word-tab-${tab}`}>
+      {p.tableActive && (tab === 'Layout da tabela' || tab === 'Design da tabela') && p.renderTableTools(tab === 'Layout da tabela' ? 'layout' : 'design')}
       {tab === 'Arquivo' && <>
         <Group label="Documento"><Tool icon={FilePlus} label="Novo documento" large onClick={() => action('new')} /><Tool icon={FolderOpen} label="Abrir documentos" large onClick={() => action('open')} /><Tool icon={FolderOpen} label="Importar arquivo" large onClick={() => action('import')} /><Tool icon={Save} label="Salvar documento" large onClick={() => action('save')} /></Group>
         <Group label="Exportar"><Tool icon={FileDown} label="Baixar DOCX" large onClick={() => action('docx')} /><Tool icon={FileDown} label="Baixar HTML" large onClick={() => action('html')} /><Tool icon={FileDown} label="Baixar texto" large onClick={() => action('txt')} /><Tool icon={Printer} label="Imprimir / PDF" large onClick={() => action('print')} /></Group>

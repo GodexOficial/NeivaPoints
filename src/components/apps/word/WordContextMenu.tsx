@@ -1,378 +1,42 @@
-import React, { useRef, useState, useLayoutEffect } from 'react';
-import {
-  Scissors,
-  Copy,
-  Clipboard,
-  Bold,
-  Italic,
-  Underline,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  AlignJustify,
-  Table,
-  Plus,
-  Trash2,
-  Search,
-  Highlighter,
-  Eraser,
-  Bookmark,
-  PaintBucket,
-  Minus,
-} from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, Bold, Clipboard, Copy, Highlighter, Italic, Link, MessageSquare, Scissors, Table, Trash2, Type, Underline } from 'lucide-react';
+import type { ActiveFormatting } from '../../../types/doc';
+import type { LucideIcon } from 'lucide-react';
 
-interface WordContextMenuProps {
-  x: number;
-  y: number;
-  onClose: () => void;
+interface Props {
+  x: number; y: number; onClose: () => void;
   onExecCommand: (command: string, value?: string) => void;
-  onApplyLineBackground?: (color: string) => void;
-  onRemovePageBreak?: (targetBreak?: HTMLElement | null) => void;
-  onRemoveAllPageBreaks?: () => void;
-  hasPageBreaks?: boolean;
-  targetElement: HTMLElement | null;
+  onAction: (action: string, value?: string) => void;
   onOpenTableModal: () => void;
-  onOpenFindReplace: () => void;
-  onInsertFootnote: () => void;
-  onChangeCellBg: (color: string) => void;
   onModifyTable: (action: 'addRowAbove' | 'addRowBelow' | 'addColLeft' | 'addColRight' | 'deleteRow' | 'deleteCol' | 'deleteTable') => void;
+  onClearCells: () => void;
+  targetElement: HTMLElement | null; activeFormat: ActiveFormatting; readOnly: boolean;
 }
-
-export const WordContextMenu: React.FC<WordContextMenuProps> = ({
-  x,
-  y,
-  onClose,
-  onExecCommand,
-  onApplyLineBackground,
-  onRemovePageBreak,
-  onRemoveAllPageBreaks: _onRemoveAllPageBreaks,
-  hasPageBreaks = false,
-  targetElement,
-  onOpenFindReplace,
-  onInsertFootnote,
-  onChangeCellBg,
-  onModifyTable,
-  onOpenTableModal,
-}) => {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<{ top: number; left: number }>({ top: y, left: x });
-
+export function WordContextMenu(p: Props) {
+  const { onClose } = p;
+  const ref = useRef<HTMLDivElement>(null);
+  const [position,setPosition] = useState({ left: p.x,top: p.y }), [size,setSize] = useState(String(Math.round(p.activeFormat.fontSizePt || 12)));
   useLayoutEffect(() => {
-    if (menuRef.current) {
-      const rect = menuRef.current.getBoundingClientRect();
-      const menuWidth = rect.width || 224;
-      const menuHeight = rect.height || 360;
-
-      let top = y;
-      let left = x;
-
-      // Detect if context menu exceeds bottom of screen -> display above cursor
-      if (y + menuHeight > window.innerHeight - 12) {
-        top = Math.max(12, y - menuHeight);
-      }
-
-      // Detect if context menu exceeds right of screen -> display to the left of cursor
-      if (x + menuWidth > window.innerWidth - 12) {
-        left = Math.max(12, x - menuWidth);
-      }
-
-      setPosition({ top, left });
-    }
-  }, [x, y]);
-
-  // Check if click was inside a table or on a page break
-  const isInsideTable = targetElement ? !!targetElement.closest('td, th, table') : false;
-  const isPageBreak = targetElement ? !!targetElement.closest('.a4-page-break') : false;
-
-  const handleAction = (action: () => void) => {
-    action();
-    onClose();
-  };
-
-  return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 w-56 text-xs font-semibold text-slate-700 dark:text-slate-200 divide-y divide-slate-100 dark:divide-slate-800 selection:bg-none animate-in fade-in zoom-in-95 duration-300"
-      style={{ top: `${position.top}px`, left: `${position.left}px` }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {/* Page Break Options */}
-      {isPageBreak && onRemovePageBreak && (
-        <div className="py-1 bg-amber-50/70 dark:bg-amber-950/40">
-          <div className="px-3 py-1 text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
-            <Minus size={12} />
-            <span>Quebra de Página</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onRemovePageBreak(targetElement?.closest('.a4-page-break') as HTMLElement))}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 cursor-pointer text-left font-bold"
-          >
-            <Trash2 size={13} />
-            <span>Remover Esta Quebra</span>
-          </button>
-        </div>
-      )}
-
-      {/* Clipboard / Edit */}
-      <div className="py-1">
-        <button
-          type="button"
-          onClick={() => handleAction(() => onExecCommand('cut'))}
-          className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer text-left"
-        >
-          <Scissors size={14} className="text-slate-400" />
-          <span>Recortar</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => handleAction(() => onExecCommand('copy'))}
-          className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer text-left"
-        >
-          <Copy size={14} className="text-slate-400" />
-          <span>Copiar</span>
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            handleAction(async () => {
-              try {
-                const text = await navigator.clipboard.readText();
-                onExecCommand('insertText', text);
-              } catch {
-                onExecCommand('paste');
-              }
-            })
-          }
-          className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer text-left"
-        >
-          <Clipboard size={14} className="text-slate-400" />
-          <span>Colar</span>
-        </button>
-      </div>
-
-      {/* Formatting Quick Access */}
-      <div className="py-1">
-        <div className="flex items-center justify-around px-2 py-1">
-          <button
-            type="button"
-            onClick={() => handleAction(() => onExecCommand('bold'))}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
-            title="Negrito"
-          >
-            <Bold size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onExecCommand('italic'))}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
-            title="Itálico"
-          >
-            <Italic size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onExecCommand('underline'))}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
-            title="Sublinhado"
-          >
-            <Underline size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onExecCommand('hiliteColor', '#fef08a'))}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer text-amber-500"
-            title="Destaque Amarelo"
-          >
-            <Highlighter size={15} />
-          </button>
-        </div>
-
-        <div className="flex items-center justify-around px-2 py-1">
-          <button
-            type="button"
-            onClick={() => handleAction(() => onExecCommand('justifyLeft'))}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
-            title="Esquerda"
-          >
-            <AlignLeft size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onExecCommand('justifyCenter'))}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
-            title="Centralizar"
-          >
-            <AlignCenter size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onExecCommand('justifyRight'))}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
-            title="Direita"
-          >
-            <AlignRight size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onExecCommand('justifyFull'))}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
-            title="Justificar"
-          >
-            <AlignJustify size={15} />
-          </button>
-        </div>
-
-        {onApplyLineBackground && (
-          <div className="px-3 py-1.5 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 text-[11px]">
-            <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
-              <PaintBucket size={13} className="text-blue-500" />
-              <span>Fundo da Linha:</span>
-            </span>
-            <div className="flex items-center gap-1">
-              <input
-                type="color"
-                defaultValue="#e2e8f0"
-                onChange={(e) => {
-                  onApplyLineBackground(e.target.value);
-                  onClose();
-                }}
-                className="w-5 h-5 rounded cursor-pointer border-0"
-                title="Escolher cor de fundo da linha"
-              />
-              <button
-                type="button"
-                onClick={() => handleAction(() => onApplyLineBackground(''))}
-                className="text-[10px] text-slate-400 hover:text-red-500 font-medium px-1 cursor-pointer"
-                title="Remover cor de fundo"
-              >
-                Limpar
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Table Context Options */}
-      {isInsideTable && (
-        <div className="py-1 bg-blue-50/50 dark:bg-blue-950/30">
-          <div className="px-3 py-1 text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider flex items-center gap-1">
-            <Table size={12} />
-            <span>Opções da Tabela</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => handleAction(() => onModifyTable('addRowAbove'))}
-            className="w-full flex items-center gap-2.5 px-3 py-1 hover:bg-blue-100 dark:hover:bg-slate-800 cursor-pointer text-left"
-          >
-            <Plus size={13} className="text-blue-600" />
-            <span>Inserir Linha Acima</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onModifyTable('addRowBelow'))}
-            className="w-full flex items-center gap-2.5 px-3 py-1 hover:bg-blue-100 dark:hover:bg-slate-800 cursor-pointer text-left"
-          >
-            <Plus size={13} className="text-blue-600" />
-            <span>Inserir Linha Abaixo</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onModifyTable('addColLeft'))}
-            className="w-full flex items-center gap-2.5 px-3 py-1 hover:bg-blue-100 dark:hover:bg-slate-800 cursor-pointer text-left"
-          >
-            <Plus size={13} className="text-indigo-600" />
-            <span>Inserir Coluna à Esquerda</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onModifyTable('addColRight'))}
-            className="w-full flex items-center gap-2.5 px-3 py-1 hover:bg-blue-100 dark:hover:bg-slate-800 cursor-pointer text-left"
-          >
-            <Plus size={13} className="text-indigo-600" />
-            <span>Inserir Coluna à Direita</span>
-          </button>
-
-          <div className="px-3 py-1 flex items-center justify-between gap-2 border-t border-slate-200/50 dark:border-slate-800 mt-1">
-            <span className="text-[11px] text-slate-500">Cor da Célula:</span>
-            <input
-              type="color"
-              onChange={(e) => {
-                onChangeCellBg(e.target.value);
-                onClose();
-              }}
-              className="w-5 h-5 rounded cursor-pointer border-0"
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => handleAction(() => onModifyTable('deleteRow'))}
-            className="w-full flex items-center gap-2.5 px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer text-left"
-          >
-            <Trash2 size={13} />
-            <span>Excluir Linha</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onModifyTable('deleteCol'))}
-            className="w-full flex items-center gap-2.5 px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer text-left"
-          >
-            <Trash2 size={13} /><span>Excluir Coluna</span>
-          </button>
-          <button type="button" onClick={() => handleAction(onOpenTableModal)} className="w-full flex items-center gap-2.5 px-3 py-1 hover:bg-blue-100 dark:hover:bg-slate-800 text-left"><Table size={13} /><span>Ferramentas de Tabela</span></button>
-          <button
-            type="button"
-            onClick={() => handleAction(() => onModifyTable('deleteTable'))}
-            className="w-full flex items-center gap-2.5 px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer text-left font-bold"
-          >
-            <Trash2 size={13} />
-            <span>Excluir Tabela Inteira</span>
-          </button>
-        </div>
-      )}
-
-      {/* Utilities */}
-      <div className="py-1">
-        <button
-          type="button"
-          onClick={() => handleAction(onOpenFindReplace)}
-          className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer text-left"
-        >
-          <Search size={14} className="text-slate-400" />
-          <span>Localizar e Substituir</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleAction(onInsertFootnote)}
-          className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer text-left"
-        >
-          <Bookmark size={14} className="text-slate-400" />
-          <span>Inserir Nota de Rodapé</span>
-        </button>
-
-        {hasPageBreaks && !isPageBreak && onRemovePageBreak && (
-          <button
-            type="button"
-            onClick={() => handleAction(() => onRemovePageBreak())}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/40 text-slate-700 dark:text-slate-300 hover:text-red-600 cursor-pointer text-left"
-          >
-            <Minus size={14} className="text-slate-400" />
-            <span>Remover Quebra de Página</span>
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={() => handleAction(() => onExecCommand('removeFormat'))}
-          className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-blue-50 dark:hover:bg-slate-800 cursor-pointer text-left text-slate-500"
-        >
-          <Eraser size={14} />
-          <span>Limpar Formatação</span>
-        </button>
-      </div>
+    const place = () => {
+      if (!ref.current) return;
+      const v = window.visualViewport, x = v?.offsetLeft || 0, y = v?.offsetTop || 0, width = v?.width || innerWidth, height = v?.height || innerHeight;
+      ref.current.style.maxHeight = `${Math.max(80,height-16)}px`; ref.current.style.maxWidth = `${Math.max(80,width-16)}px`;
+      const rect = ref.current.getBoundingClientRect();
+      setPosition({ left: Math.max(x+8,Math.min(p.x,x+width-rect.width-8)), top: Math.max(y+8,Math.min(p.y,y+height-rect.height-8)) });
+    };
+    place(); const observer = new ResizeObserver(place); if (ref.current) observer.observe(ref.current);
+    window.addEventListener('resize',place); window.visualViewport?.addEventListener('resize',place);
+    return () => { observer.disconnect(); window.removeEventListener('resize',place); window.visualViewport?.removeEventListener('resize',place); };
+  }, [p.x,p.y]);
+  useEffect(() => { const outside = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) onClose(); }; document.addEventListener('pointerdown',outside); return () => document.removeEventListener('pointerdown',outside); }, [onClose]);
+  const command = (cmd: string,value?: string) => p.onExecCommand(cmd,value);
+  const item = (label: string,icon: LucideIcon, action: () => void,shortcut?: string,editing = true) => { const Icon = icon; return <button type="button" disabled={editing && p.readOnly} className="word-context-item" onMouseDown={e => e.preventDefault()} onClick={() => { action(); p.onClose(); }}><Icon size={16} /><span>{label}</span>{shortcut && <kbd>{shortcut}</kbd>}</button>; };
+  const tool = (label: string,icon: LucideIcon,cmd: string, active?: boolean) => { const Icon = icon; return <button type="button" aria-label={label} title={label} aria-pressed={active} disabled={p.readOnly} onMouseDown={e => e.preventDefault()} onClick={() => command(cmd)}><Icon size={16} /></button>; };
+  const inTable = Boolean(p.targetElement?.closest('table'));
+  return <div ref={ref} className="word-context-menu" style={position} role="dialog" aria-label="Menu de edição" data-motion="off" onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); p.onClose(); } }}>
+    <div className="word-context-format" role="toolbar" aria-label="Formatação rápida"><div className="word-context-font-row"><select aria-label="Fonte no menu" value={['Aptos','Calibri','Arial','Times New Roman','Georgia','Verdana','Courier New'].find(f => p.activeFormat.fontFamily.includes(f)) || 'Calibri'} disabled={p.readOnly} onChange={e => command('fontName',e.target.value)}>{['Aptos','Calibri','Arial','Times New Roman','Georgia','Verdana','Courier New'].map(font => <option key={font}>{font}</option>)}</select><input aria-label="Tamanho da fonte no menu" type="number" min={6} max={96} value={size} disabled={p.readOnly} onChange={e => setSize(e.target.value)} onBlur={() => p.onAction('font-size',size)} onKeyDown={e => { if (e.key === 'Enter') { p.onAction('font-size',size); e.currentTarget.blur(); } }} /></div><div className="word-context-tools">{tool('Negrito',Bold,'bold',p.activeFormat.bold)}{tool('Itálico',Italic,'italic',p.activeFormat.italic)}{tool('Sublinhado',Underline,'underline',p.activeFormat.underline)}<label title="Realce"><Highlighter size={16} /><input type="color" aria-label="Realce no menu" defaultValue="#fef08a" disabled={p.readOnly} onChange={e => command('hiliteColor',e.target.value)} /></label><label title="Cor do texto"><Type size={16} /><input type="color" aria-label="Cor do texto no menu" defaultValue="#111827" disabled={p.readOnly} onChange={e => command('foreColor',e.target.value)} /></label>{tool('Alinhar à esquerda',AlignLeft,'justifyLeft')}{tool('Centralizar',AlignCenter,'justifyCenter')}{tool('Alinhar à direita',AlignRight,'justifyRight')}{tool('Justificar',AlignJustify,'justifyFull')}</div></div>
+    <div className="word-context-list">{item('Recortar',Scissors,() => p.onAction('cut'),'Ctrl+X')}{item('Copiar',Copy,() => p.onAction('copy'),'Ctrl+C',false)}{item('Colar',Clipboard,() => p.onAction('paste'),'Ctrl+V')}{item('Colar somente o texto',Clipboard,() => p.onAction('paste'),'Ctrl+Shift+V')}{item('Copiar formatação',Type,() => p.onAction('paint-format'))}<hr />{item('Link…',Link,() => p.onAction('link'))}{item('Novo comentário',MessageSquare,() => p.onAction('comment'),'Ctrl+Alt+M')}
+      {inTable && <><hr />{item('Layout da tabela',Table,p.onOpenTableModal,undefined,false)}{item('Limpar conteúdo das células',Trash2,p.onClearCells)}{item('Inserir linha acima',Table,() => p.onModifyTable('addRowAbove'))}{item('Inserir linha abaixo',Table,() => p.onModifyTable('addRowBelow'))}{item('Inserir coluna à esquerda',Table,() => p.onModifyTable('addColLeft'))}{item('Inserir coluna à direita',Table,() => p.onModifyTable('addColRight'))}{item('Excluir linha',Trash2,() => p.onModifyTable('deleteRow'))}{item('Excluir coluna',Trash2,() => p.onModifyTable('deleteCol'))}{item('Excluir tabela',Trash2,() => p.onModifyTable('deleteTable'))}</>}
     </div>
-  );
-};
+  </div>;
+}

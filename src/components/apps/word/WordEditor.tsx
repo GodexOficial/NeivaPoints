@@ -24,13 +24,15 @@ import { WordToolbar } from './WordToolbar';
 import { InsertShapeModal } from './InsertShapeModal';
 import { InsertImageModal } from './InsertImageModal';
 import { InsertTableModal } from './InsertTableModal';
-import { TableEditModal } from './TableEditModal';
+import { WordTableRibbon, type TableDrawMode } from './WordTableRibbon';
+import { WordTableSelection } from './WordTableSelection';
+import { runTableCommand, type TableCommand } from '../../../utils/wordTableCommands';
 import { FindReplaceModal } from './FindReplaceModal';
 import { WordContextMenu } from './WordContextMenu';
 import { WordViewportRulers } from './WordViewportRulers';
 import { WordInkPad, WordPanels, type WordPanel } from './WordPanels';
 import { cleanWordHtml, escapeWordText, importWordFile } from '../../../utils/wordImport';
-import { deleteTableColumn, deleteTableContent, deleteTableRow, fitTable, insertTableColumn, insertTableRow, tableMap, type TableCell } from '../../../utils/wordTable';
+import { deleteTableContent, insertTableRow, rectangularCells, tableMap, type TableCell } from '../../../utils/wordTable';
 import { useWordTableResize } from '../../../hooks/useWordTableResize';
 
 interface WordEditorProps {
@@ -101,8 +103,13 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const [isShapeModalOpen, setIsShapeModalOpen] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
-  const [isTableEditOpen, setIsTableEditOpen] = useState(false);
-  const tableDialogOpen = useRef(false); tableDialogOpen.current = isTableEditOpen;
+  const [tableTabRequest, setTableTabRequest] = useState(0);
+  const [tableCells, setTableCells] = useState<TableCell[]>([]);
+  const [tableGrid, setTableGrid] = useState(false);
+  const [extendTableSelection, setExtendTableSelection] = useState(false);
+  const [tableDrawMode, setTableDrawMode] = useState<TableDrawMode>('none');
+  const tableDrawStart = useRef<{ cell: TableCell; x: number; y: number } | null>(null);
+  const tableHistory = useRef<{ undo: { before: string[]; after: string[] }[]; redo: { before: string[]; after: string[] }[] }>({ undo: [], redo: [] });
   const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<HTMLTableElement | null>(null);
   const [activeTableCell, setActiveTableCell] = useState<TableCell | null>(null);
@@ -386,17 +393,22 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   // Keep a selection bookmark when focus moves into ribbon controls or dialogs.
   useEffect(() => {
     const capture = () => {
-      if (tableDialogOpen.current) return;
+      if (document.activeElement?.closest('.word-ribbon, .word-popover, .word-context-menu')) return;
       const selection = window.getSelection();
       if (!selection?.rangeCount) return;
       const range = selection.getRangeAt(0);
       if (pageRefs.current.some(page => page?.contains(range.commonAncestorContainer))) {
         selectionRef.current = range.cloneRange();
-        const node = selection.anchorNode;
+        const node = range.startContainer;
         const element = node instanceof Element ? node : node?.parentElement;
         const cell = element?.closest<HTMLTableCellElement>('td,th') || null;
         setActiveTableCell(cell);
-        if (cell) setSelectedTable(cell.closest('table'));
+        if (cell) {
+          const table = cell.closest('table')!;
+          const end = (range.endContainer instanceof Element ? range.endContainer : range.endContainer.parentElement)?.closest<HTMLTableCellElement>('td,th');
+          const cells = end?.closest('table') === table ? rectangularCells(table, cell, end) : [cell];
+          setSelectedTable(table); setTableCells(previous => previous.length === cells.length && previous.every((c,i) => c === cells[i]) ? previous : cells);
+        } else { setTableCells([]); setTableDrawMode('none'); }
       }
     };
     document.addEventListener('selectionchange', capture);
@@ -437,7 +449,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     const recovered = hasNewerDraft(input, draft);
     const doc = recovered && draft ? draft.document || { ...input, title: draft.title, content: draft.content, pages: undefined } : input;
     initializedSave.current = recovered; selectionRef.current = null;
-    setNotice(''); setShowDraftRestoredBanner(recovered); setScopeMode('all'); setSelectedBlockElements([]); setSelectedTable(null); setActiveTableCell(null);
+    setNotice(''); setShowDraftRestoredBanner(recovered); setScopeMode('all'); setSelectedBlockElements([]); setSelectedTable(null); setActiveTableCell(null); setTableCells([]); setTableDrawMode('none');
+    tableHistory.current = { undo: [], redo: [] };
     setWordDoc(doc); setDocTitle(doc.title);
     const importedPages = doc.pages?.length ? doc.pages : doc.content.split(/<div[^>]*class="[^"]*a4-page-break[^"]*"[^>]*>[\s\S]*?<\/div>/gi);
     setPages(importedPages.map(normalizePageHtml)); setActivePageIndex(0);
@@ -545,7 +558,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
   // Handle Context Menu Right-Click
   const handleContextMenu = (e: React.MouseEvent, pageIdx: number) => {
-    if (!(e.target as HTMLElement).closest('table,img,svg,[data-word-draggable]') && !e.altKey) return;
+    if (e.shiftKey) return;
     e.preventDefault();
     setActivePageIndex(pageIdx);
     const target = e.target as HTMLElement;
@@ -555,6 +568,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     const table = target.closest('table');
     if (table) {
       setSelectedTable(table as HTMLTableElement);
+      const cell = target.closest<HTMLTableCellElement>('td,th');
+      if (cell && !tableCells.includes(cell)) { setActiveTableCell(cell); setTableCells([cell]); }
     }
   };
 
@@ -600,27 +615,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     const cell = contextTarget?.closest<HTMLTableCellElement>('td,th') || activeTableCell;
     const table = cell?.closest('table') || selectedTable;
     if (!table?.isConnected) return;
-    const p = tableMap(table).positions.find(p => p.cell === cell);
-    if (action === 'deleteTable') table.remove();
-    else if (p) {
-      if (action === 'addRowAbove') insertTableRow(table, p.row);
-      if (action === 'addRowBelow') insertTableRow(table, p.row + p.rows);
-      if (action === 'addColLeft') insertTableColumn(table, p.col);
-      if (action === 'addColRight') insertTableColumn(table, p.col + p.cols);
-      if (action === 'deleteRow') deleteTableRow(table, p.row);
-      if (action === 'deleteCol') deleteTableColumn(table, p.col);
-    }
-    setActiveTableCell(null); handleContentInput();
-  };
-
-  // Change Cell Background
-  const handleChangeCellBg = (color: string) => {
-    if (readOnly || !contextTarget) return;
-    const cell = contextTarget.closest('td, th') as HTMLElement | null;
-    if (cell) {
-      cell.style.backgroundColor = color;
-      handleContentInput();
-    }
+    const actions = { addRowAbove: 'row-above', addRowBelow: 'row-below', addColLeft: 'col-left', addColRight: 'col-right', deleteRow: 'delete-row', deleteCol: 'delete-col', deleteTable: 'delete-table' };
+    handleTableCommand({ action: actions[action] }, table, cell ? [cell] : tableCells);
   };
 
   useEffect(() => {
@@ -637,6 +633,15 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   // Execute formatting command
   const handleExecCommand = (command: string, value?: string) => {
     if (readOnly && !['copy', 'selectAll'].includes(command)) { setNotice('Desative o modo de leitura para editar.'); return; }
+    if (command === 'undo' || command === 'redo') {
+      const history = tableHistory.current, from = command === 'undo' ? history.undo : history.redo, to = command === 'undo' ? history.redo : history.undo;
+      const item = from.at(-1), current = pages.map((html,index) => pageRefs.current[index]?.innerHTML || html);
+      if (item && JSON.stringify(current) === JSON.stringify(command === 'undo' ? item.after : item.before)) {
+        from.pop(); to.push(item); const next = command === 'undo' ? item.before : item.after;
+        next.forEach((html,index) => { if (pageRefs.current[index]) pageRefs.current[index]!.innerHTML = html; });
+        selectionRef.current = null; setPages([...next]); setTableCells([]); setActiveTableCell(null); setSelectedTable(null); setHasUnsavedChanges(true); setSaveStatus('unsaved'); return;
+      }
+    }
     const activeRef = pageRefs.current[activePageIndex];
     if (activeRef) {
       restoreSelection();
@@ -745,6 +750,54 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     restoreSelection();
     window.document.execCommand('insertHTML', false, tableHtml);
     handleContentInput();
+  };
+
+  const selectTableCells = (cells: TableCell[]) => {
+    if (!cells.length) return;
+    setTableCells(cells); setActiveTableCell(cells[0]); setSelectedTable(cells[0].closest('table'));
+    const range = document.createRange(); range.setStart(cells[0],0); range.setEnd(cells[cells.length-1],cells[cells.length-1].childNodes.length);
+    const selection = getSelection(); selection?.removeAllRanges(); selection?.addRange(range); selectionRef.current = range.cloneRange();
+  };
+  const handleTableCommand = (command: TableCommand, table = selectedTable, selected = tableCells) => {
+    if (readOnly || !table?.isConnected) return;
+    try {
+      const before = pages.map((html,index) => pageRefs.current[index]?.innerHTML || html);
+      const cells = runTableCommand(table, selected.filter(c => c.isConnected), command);
+      const after = pages.map((html,index) => pageRefs.current[index]?.innerHTML || html);
+      if (JSON.stringify(before) !== JSON.stringify(after)) { tableHistory.current.undo.push({ before, after }); tableHistory.current.undo = tableHistory.current.undo.slice(-30); tableHistory.current.redo = []; }
+      setSelectedTable(table.isConnected ? table : null);
+      setTableCells(cells); setActiveTableCell(cells[0] || null);
+      if (!cells.length) { setSelectedTable(null); setTableDrawMode('none'); }
+      if (cells.length) { const range = document.createRange(); range.selectNodeContents(cells[0]); range.collapse(true); selectionRef.current = range; }
+      handleContentInput(); setNotice('');
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Não foi possível alterar a tabela.'); }
+  };
+  const handleSelectTable = (what: 'cell' | 'row' | 'col' | 'table' | 'extend') => {
+    if (!selectedTable || !activeTableCell) return;
+    if (what === 'extend') { setExtendTableSelection(v => !v); return; }
+    const map = tableMap(selectedTable), p = map.positions.find(p => p.cell === activeTableCell); if (!p) return;
+    selectTableCells(what === 'table' ? map.positions.map(p => p.cell) : what === 'row' ? [...new Set(map.grid[p.row])] : what === 'col' ? [...new Set(map.grid.map(row => row[p.col]).filter(Boolean))] : [activeTableCell]);
+  };
+  const handleTablePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const cell = (e.target as HTMLElement).closest<HTMLTableCellElement>('td,th'), table = cell?.closest('table');
+    if (!readOnly && cell && table && (e.shiftKey || extendTableSelection) && activeTableCell?.closest('table') === table && tableDrawMode === 'none') {
+      e.preventDefault(); selectTableCells(rectangularCells(table, activeTableCell, cell)); return;
+    }
+    if (readOnly || !cell || !table || tableDrawMode === 'none') { tableResize.onPointerDown(e); return; }
+    e.preventDefault();
+    if (tableDrawMode === 'draw') { tableDrawStart.current = { cell, x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); return; }
+    const map = tableMap(table), p = map.positions.find(p => p.cell === cell)!, box = cell.getBoundingClientRect();
+    const edges = [{ distance: Math.abs(e.clientX-box.right), row: p.row, col: p.col+p.cols }, { distance: Math.abs(e.clientY-box.bottom), row: p.row+p.rows, col: p.col }, { distance: Math.abs(e.clientX-box.left), row: p.row, col: p.col-1 }, { distance: Math.abs(e.clientY-box.top), row: p.row-1, col: p.col }].sort((a,b) => a.distance-b.distance);
+    const edge = edges.find(edge => edge.distance <= 12 && map.grid[edge.row]?.[edge.col] && map.grid[edge.row][edge.col] !== cell);
+    if (!edge) { setNotice('Clique em uma divisória interna para mesclar as células com a borracha.'); return; }
+    handleTableCommand({ action: 'merge' },table,rectangularCells(table,cell,map.grid[edge.row][edge.col]));
+  };
+  const handleTablePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const start = tableDrawStart.current; if (!start) return;
+    tableDrawStart.current = null; if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+    const dx = Math.abs(e.clientX-start.x), dy = Math.abs(e.clientY-start.y);
+    if (Math.max(dx,dy) < 12) { setNotice('Arraste dentro da célula: na vertical para criar colunas ou na horizontal para criar linhas. Pressione Esc para sair.'); return; }
+    handleTableCommand({ action: 'split', value: dx >= dy ? 2 : 1, extra: dx >= dy ? 1 : 2 },start.cell.closest('table'),[start.cell]);
   };
 
   // Ruler margin / indent change handlers
@@ -1027,7 +1080,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
   return createPortal(
     <div data-motion="off" className={`word-workspace ${rulerVisible ? 'word-rulers-visible' : ''} ${focusMode ? 'word-focus' : ''} ${marksVisible ? 'word-show-marks' : ''}`} onKeyDown={event => {
-      if (event.key === 'Escape') { setFocusMode(false); setPanel(null); }
+      if (event.key === 'Escape') { setFocusMode(false); setPanel(null); setTableDrawMode('none'); setExtendTableSelection(false); }
+      if ((event.ctrlKey || event.metaKey) && ['z','y'].includes(event.key.toLowerCase()) && !(event.target as HTMLElement).closest('input,textarea,select')) { event.preventDefault(); handleExecCommand(event.key.toLowerCase() === 'y' || event.shiftKey ? 'redo' : 'undo'); return; }
       if (event.ctrlKey || event.metaKey) { const key = event.key.toLowerCase(); if (['s','f','h','b','i','u'].includes(key) || event.key === 'Enter') { event.preventDefault(); if (key === 's') handleSaveToBackend(); else if (['f','h'].includes(key)) setIsFindReplaceOpen(true); else if (event.key === 'Enter') handlePageBreak(); else handleExecCommand(key === 'b' ? 'bold' : key === 'i' ? 'italic' : 'underline'); } }
     }}><div className="flex h-full min-h-0 w-full flex-col bg-slate-200 dark:bg-slate-950 overflow-hidden relative">
       {/* Sticky Fixed Toolbar & Controls Block */}
@@ -1043,6 +1097,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
         {/* Ribbon Formatting Toolbar */}
         <WordToolbar
+          tableActive={Boolean(activeTableCell?.isConnected && selectedTable?.isConnected)} tableTabRequest={tableTabRequest}
+          renderTableTools={view => selectedTable?.isConnected && <WordTableRibbon view={view} table={selectedTable} cells={tableCells.filter(c => c.isConnected)} readOnly={readOnly} onCommand={handleTableCommand} onSelect={handleSelectTable} grid={tableGrid} toggleGrid={() => setTableGrid(v => !v)} drawMode={tableDrawMode} setDrawMode={setTableDrawMode} extend={extendTableSelection} />}
           onAction={handleAction} rulerVisible={rulerVisible} marksVisible={marksVisible} focusMode={focusMode} readOnly={readOnly} zoom={zoom} orientation={orientation} pageSize={pageSize} dictating={dictating} canDictate={canDictate}
           onExecCommand={handleExecCommand}
           onApplyLineBackground={handleApplyLineBackground}
@@ -1078,11 +1134,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
           activeFormat={activeFormat}
         />
 
-        {activeTableCell?.isConnected && !readOnly && <div className="word-table-context" role="toolbar" aria-label="Tabela selecionada">
-          <strong>Tabela</strong><button onMouseDown={e => e.preventDefault()} onClick={() => { setSelectedTable(activeTableCell.closest('table')); setIsTableEditOpen(true); }}>Ferramentas de tabela</button>
-          <button onMouseDown={e => e.preventDefault()} onClick={() => { const table = activeTableCell.closest('table'); if (table) { fitTable(table, 'content'); handleContentInput(); } }}>Ajustar ao conteúdo</button>
-          <span>Tab: próxima célula · arraste a borda para redimensionar</span>
-        </div>}
+        {tableDrawMode !== 'none' && <div className="word-table-mode-status" role="status">{tableDrawMode === 'draw' ? 'Desenhar: arraste uma linha dentro da célula para dividi-la.' : 'Borracha: clique em uma divisória interna para mesclar as células.'}<button onClick={() => setTableDrawMode('none')}>Concluir (Esc)</button></div>}
 
         {/* Restored Draft Banner Notice */}
         {showDraftRestoredBanner && (
@@ -1105,16 +1157,17 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       </div>
 
       {rulerVisible && <WordViewportRulers canvasRef={editorContainerRef} pageIndex={activePageIndex} zoom={zoom} pageWidthCm={pageWidthCm} pageHeightCm={pageHeightCm}
-        left={scopeMode === 'paragraph' ? paragraphLeftMarginCm : leftMarginCm}
-        right={scopeMode === 'paragraph' ? paragraphRightMarginCm : rightMarginCm}
+        left={leftMarginCm + (scopeMode === 'paragraph' ? paragraphLeftMarginCm : 0)}
+        right={rightMarginCm + (scopeMode === 'paragraph' ? paragraphRightMarginCm : 0)}
         indent={scopeMode === 'paragraph' ? paragraphIndentCm : firstLineIndentCm}
         top={topMarginCm} bottom={bottomMarginCm} readOnly={readOnly}
-        changeLeft={handleRulerLeftMargin} changeRight={handleRulerRightMargin} changeIndent={handleRulerFirstLineIndent} changeTop={setTopMarginCm} changeBottom={setBottomMarginCm} />}
+        changeLeft={value => handleRulerLeftMargin(scopeMode === 'paragraph' ? Math.max(0,value-leftMarginCm) : value)} changeRight={value => handleRulerRightMargin(scopeMode === 'paragraph' ? Math.max(0,value-rightMarginCm) : value)} changeIndent={handleRulerFirstLineIndent} changeTop={setTopMarginCm} changeBottom={setBottomMarginCm} />}
 
       {/* Main Canvas Container (Multi-Page A4 Physical View) */}
+      <WordTableSelection cells={tableCells} canvasRef={editorContainerRef} />
       <main
         ref={editorContainerRef}
-        className="word-canvas"
+        className={`word-canvas ${tableGrid ? 'word-gridlines-visible' : ''}`}
       >
         <div className="word-page-stack" style={{ zoom: zoom / 100 }}>
         {pages.map((pageHtml, pageIndex) => (
@@ -1212,14 +1265,17 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                     }}
                     onBlur={() => setEditingPageIndex(null)}
                     onInput={handleContentInput}
-                    onPointerDown={tableResize.onPointerDown}
-                    onPointerMove={tableResize.onPointerMove}
+                    onPointerDown={handleTablePointerDown}
+                    onPointerMove={e => { if (tableDrawMode !== 'none') e.currentTarget.style.cursor = 'crosshair'; else tableResize.onPointerMove(e); }}
+                    onPointerUp={handleTablePointerUp}
+                    onPointerCancel={() => { tableDrawStart.current = null; }}
                     onBeforeInput={e => {
                       if (readOnly) return;
                       const type = (e.nativeEvent as InputEvent).inputType;
                       if (type?.startsWith('delete') && deleteTableContent(e.currentTarget, type.includes('Backward'))) { e.preventDefault(); handleContentInput(); }
                     }}
                     onKeyDown={e => {
+                      if (!readOnly && tableCells.length > 1 && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); handleTableCommand({ action: 'clear' }); return; }
                       if (!readOnly && (e.key === 'Delete' || e.key === 'Backspace') && deleteTableContent(e.currentTarget, e.key === 'Backspace')) { e.preventDefault(); handleContentInput(); return; }
                       if (readOnly || e.key !== 'Tab') return;
                       const cell = (e.target as HTMLElement).closest<HTMLTableCellElement>('td,th') || (getSelection()?.anchorNode?.parentElement?.closest<HTMLTableCellElement>('td,th'));
@@ -1234,14 +1290,6 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                     onMouseUp={analyzeSelection}
                     onSelect={analyzeSelection}
                     onContextMenu={(e) => handleContextMenu(e, pageIndex)}
-                    onDoubleClick={(e) => {
-                      const table = (e.target as HTMLElement).closest('table');
-                      if (table && !readOnly) {
-                        setActiveTableCell((e.target as HTMLElement).closest<HTMLTableCellElement>('td,th'));
-                        setSelectedTable(table as HTMLTableElement);
-                        setIsTableEditOpen(true);
-                      }
-                    }}
                     className="outline-hidden focus:outline-hidden word-editable prose dark:prose-invert max-w-none text-base leading-relaxed a4-page-content"
                     style={{
                       wordBreak: 'break-word',
@@ -1296,27 +1344,13 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           onExecCommand={handleExecCommand}
-          onApplyLineBackground={handleApplyLineBackground}
-          onRemovePageBreak={() => handleDeletePage(activePageIndex)}
-          onRemoveAllPageBreaks={() => { setPages(pages.map((html, i) => pageRefs.current[i]?.innerHTML || html).join('') ? [pages.map((html, i) => pageRefs.current[i]?.innerHTML || html).join('')] : [EMPTY_PAGE_HTML]); setHasUnsavedChanges(true); }}
-          hasPageBreaks={pages.length > 1}
+          onAction={handleAction} activeFormat={activeFormat} readOnly={readOnly}
+          onClearCells={() => handleTableCommand({ action: 'clear' })}
           targetElement={contextTarget}
-          onOpenTableModal={() => setIsTableEditOpen(true)}
-          onOpenFindReplace={() => setIsFindReplaceOpen(true)}
-          onInsertFootnote={handleInsertFootnote}
-          onChangeCellBg={handleChangeCellBg}
+          onOpenTableModal={() => setTableTabRequest(v => v + 1)}
           onModifyTable={handleModifyTable}
         />
       )}
-
-      {/* Advanced Table Editor Modal */}
-      <TableEditModal
-        isOpen={isTableEditOpen}
-        onClose={() => setIsTableEditOpen(false)}
-        targetTable={selectedTable}
-        activeCell={activeTableCell} readOnly={readOnly}
-        onContentChange={handleContentInput}
-      />
 
       {/* Find & Replace Modal */}
       <FindReplaceModal
