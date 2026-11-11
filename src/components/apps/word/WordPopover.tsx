@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 /** A menu is measured at its rendered size, including when its fields change. */
-export function WordPopover({ label, icon, children, large = false }: { label: string; icon?: ReactNode; large?: boolean; children: (close: () => void) => ReactNode }) {
+export function WordPopover({ label, caption, icon, children, large = false }: { label: string; caption?: string; icon?: ReactNode; large?: boolean; children: (close: () => void) => ReactNode }) {
   const [open, setOpen] = useState(false), [position, setPosition] = useState({ left: 8, top: 8 });
   const trigger = useRef<HTMLButtonElement>(null), menu = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -24,11 +24,11 @@ export function WordPopover({ label, icon, children, large = false }: { label: s
   }, [open]);
   useEffect(() => {
     if (!open) return;
-    const outside = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node) && !trigger.current?.contains(event.target as Node)) setOpen(false); };
+    const outside = (event: PointerEvent) => { if (!menu.current?.contains(event.target as Node) && !trigger.current?.contains(event.target as Node) && !(event.target as Element).closest('.word-popover')) setOpen(false); };
     document.addEventListener('pointerdown', outside);
     return () => document.removeEventListener('pointerdown', outside);
   }, [open]);
-  return <><button type="button" ref={trigger} className={`word-tool ${large ? 'word-tool-large' : ''} word-popover-trigger`} aria-label={label} aria-haspopup="dialog" aria-expanded={open} onMouseDown={e => e.preventDefault()} onClick={() => setOpen(v => !v)}>{icon}<span>{label}</span><ChevronDown size={12} /></button>
+  return <><button type="button" ref={trigger} className={`word-tool ${large ? 'word-tool-large' : ''} word-popover-trigger`} aria-label={label} title={label} aria-haspopup="dialog" aria-expanded={open} onMouseDown={e => e.preventDefault()} onClick={() => setOpen(v => !v)}>{icon}<span>{caption || label}</span><ChevronDown size={12} /></button>
     {open && createPortal(<div ref={menu} className="word-popover" role="dialog" aria-label={label} data-motion="off" style={position} onClick={e => e.stopPropagation()} onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setOpen(false); trigger.current?.focus(); } }}>{children(() => { setOpen(false); })}</div>, trigger.current?.closest('.word-workspace') || document.body)}
   </>;
 }

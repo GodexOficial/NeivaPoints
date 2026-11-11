@@ -4,6 +4,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ArrowDownAZ, BetweenHorizont
 import { WordPopover } from './WordPopover';
 import { tableMap, type TableCell } from '../../../utils/wordTable';
 import type { TableCommand } from '../../../utils/wordTableCommands';
+import { WordRibbonGroup as Group } from './WordRibbonGroup';
 
 export type TableDrawMode = 'none' | 'draw' | 'erase';
 interface Props {
@@ -12,7 +13,6 @@ interface Props {
   grid: boolean; toggleGrid: () => void; drawMode: TableDrawMode; setDrawMode: (mode: TableDrawMode) => void;
   extend: boolean;
 }
-function Group({ label, children }: { label: string; children: ReactNode }) { return <section className="word-ribbon-group" aria-label={label}><div className="word-group-tools">{children}</div><span className="word-group-label">{label}</span></section>; }
 export function WordTableRibbon(p: Props) {
   const [height, setHeight] = useState('0.55'), [width, setWidth] = useState('2.5'), [padding, setPadding] = useState('0.2'), [tableWidth, setTableWidth] = useState('100');
   const [splitRows, setSplitRows] = useState(1), [splitCols, setSplitCols] = useState(2);

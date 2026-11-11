@@ -52,7 +52,10 @@ const hasNewerDraft = (doc: WordDocument, draft: ReturnType<typeof getAutoSaveDr
 
 const normalizePageHtml = (html?: string): string => {
   const trimmedHtml = html?.trim() || '';
-  return trimmedHtml === LEGACY_EDITOR_PROMPT_HTML ? EMPTY_PAGE_HTML : trimmedHtml || EMPTY_PAGE_HTML;
+  if (!trimmedHtml || trimmedHtml === LEGACY_EDITOR_PROMPT_HTML) return EMPTY_PAGE_HTML;
+  // Match the browser's HTML (for example its implicit <tbody>) before comparing
+  // against the editable DOM, otherwise a focus render can replace the selection.
+  return new DOMParser().parseFromString(trimmedHtml, 'text/html').body.innerHTML || EMPTY_PAGE_HTML;
 };
 
 const isPageEmpty = (html: string): boolean => {
