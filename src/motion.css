@@ -1,0 +1,113 @@
+/* Motion vocabulary: press, lift, deal, glide, reveal, sweep and settle.
+   Decorative layers never receive pointer events or cover interface text. */
+:root {
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-spring: cubic-bezier(.22, 1.25, .36, 1);
+}
+.glass-theme :where(button, a[href], [role=button], [role=tab], summary) {
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease,
+    box-shadow 220ms ease, opacity 280ms ease, translate 260ms var(--ease-out), scale 300ms var(--ease-out);
+}
+.glass-theme :where(input, select, textarea) {
+  transition: border-color 180ms ease, box-shadow 220ms ease, background-color 180ms ease;
+}
+.glass-theme .lucide, .glass-theme .student-card-level {
+  transition: color 180ms ease, translate 220ms var(--ease-out), rotate 260ms var(--ease-out), scale 220ms var(--ease-spring);
+}
+/* Chromium/WebKit's native clear icon otherwise duplicates our accessible button. */
+.glass-theme input[type=search]::-webkit-search-cancel-button,
+.glass-theme input[type=search]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; }
+.glass-theme .student-card {
+  position: relative;
+  min-width: 0;
+  isolation: isolate;
+  border-radius: 1.5rem;
+  border-top: 3px solid #818cf8;
+  transform: none;
+  transition: transform 180ms var(--ease-out), scale 220ms var(--ease-out), translate 220ms var(--ease-out), border-color 180ms ease;
+  box-shadow: 0 8px 20px -14px #1e3a8a50, inset 0 1px 0 #ffffff70;
+}
+.glass-theme .student-card-level { box-shadow: 0 3px 8px -5px #6366f180; white-space: nowrap; }
+.glass-theme .student-card-actions { position: relative; }
+.glass-theme .student-card h3 button { white-space: normal; overflow-wrap: anywhere; line-height: 1.45; }
+.glass-theme .student-card:focus-within { border-color: #6366f1; box-shadow: 0 0 0 3px #818cf830, var(--glass-shadow); }
+@media all {
+  :where(html[data-motion="full"]) .glass-theme :where(button, a[href], [role=button], [role=tab], summary):not(:disabled):not([aria-disabled=true]):not([draggable=true]):active { scale: .975; }
+  :where(html[data-motion="full"]) .glass-theme .motion-page { animation: motion-page-reveal 380ms var(--ease-out) both; }
+  :where(html[data-motion="full"]) .glass-theme [role=dialog].fixed { animation: motion-fade 180ms ease both; }
+  :where(html[data-motion="full"]) .glass-theme [role=dialog].fixed > :is(div, form) { animation: motion-dialog-reveal 320ms var(--ease-spring) both; }
+  :where(html[data-motion="full"]) .glass-theme .mobile-navigation { animation: motion-menu-reveal 280ms var(--ease-out) both; }
+  :where(html[data-motion="full"]) .glass-theme .motion-disclosure { transition: grid-template-rows 300ms var(--ease-out), opacity 220ms ease; }
+  :where(html[data-motion="full"]) .glass-theme :is([role=menu], [role=listbox]) { animation: motion-menu-reveal 180ms var(--ease-out) both; }
+  :where(html[data-motion="full"]) .glass-theme .student-card-points { display: inline-block; }
+  :where(html[data-motion="full"]) .glass-theme [role=progressbar][data-xp-active=true][data-in-view] > .xp-fill { transform-origin: left; animation: motion-progress-reveal 360ms var(--ease-out) both; transition: width 360ms var(--ease-out); }
+  :where(html[data-motion="full"]) .glass-theme :is([aria-pressed=true], [aria-current=page]) { animation: motion-selection 240ms var(--ease-out); }
+  :where(html[data-motion="full"]) .glass-theme .animate-level-up { animation: motion-toast-reveal 420ms var(--ease-spring) both; }
+  :where(html[data-motion="full"]) .glass-theme :where(input, select, textarea):focus-visible { box-shadow: 0 0 0 4px #818cf82b; }
+}
+@media all {
+  :where(html[data-motion="full"][data-pointer="mouse"]) .glass-theme :where(button, a[href], [role=button], [role=tab], summary):not(:disabled):not([aria-disabled=true]):not([draggable=true]):hover { translate: 0 -1px; }
+  :where(html[data-motion="full"][data-pointer="mouse"]) .glass-theme [data-motion-surface]:not(:disabled):not([aria-disabled=true]):not([draggable=true]):hover { scale: 1.025; opacity: .94; }
+  :where(html[data-motion="full"][data-pointer="mouse"]) .glass-theme .glass-panel[data-motion-surface]:hover { scale: 1.008; opacity: 1; }
+  :where(html[data-motion="full"][data-pointer="mouse"]) .glass-theme .student-card:not(:disabled):not([aria-disabled=true]):not([draggable=true]):hover { transform: perspective(1000px) rotateX(var(--card-rx, 0deg)) rotateY(var(--card-ry, 0deg)) rotateZ(var(--card-rz, 0deg)); scale: 1.015; opacity: 1; translate: 0 -2px; border-color: #818cf8; }
+  :where(html[data-motion="full"][data-pointer="mouse"]) .glass-theme .student-card:hover .student-card-level { translate: 0 -2px; }
+  :where(html[data-motion="full"][data-pointer="mouse"]) .glass-theme :where(button, a[href], [role=button]):hover > :is(.lucide-arrow-right, .lucide-chevron-right, .lucide-external-link) { translate: 3px 0; }
+  :where(html[data-motion="full"][data-pointer="mouse"]) .glass-theme :where(button, a[href]):hover > :is(.lucide-settings, .lucide-sun) { rotate: 20deg; }
+  :where(html[data-motion="full"][data-pointer="mouse"]) .glass-theme :where(button, a[href]):hover > :is(.lucide-plus, .lucide-user-plus) { scale: 1.1; }
+}
+@keyframes motion-page-reveal { from { opacity: 0; translate: 0 10px; } to { opacity: 1; translate: 0; } }
+@keyframes motion-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes motion-dialog-reveal { from { opacity: 0; translate: 0 16px; scale: .97; } to { opacity: 1; translate: 0; scale: 1; } }
+@keyframes motion-menu-reveal { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0; } }
+@keyframes motion-number-settle { from { opacity: .5; translate: 0 5px; } to { opacity: 1; translate: 0; } }
+@keyframes motion-progress-reveal { from { scale: 0 1; } to { scale: 1; } }
+@keyframes motion-selection { from { box-shadow: 0 0 0 4px #818cf830; } to { box-shadow: 0 0 0 0 transparent; } }
+@keyframes motion-toast-reveal { from { opacity: 0; translate: 16px 12px; scale: .97; } to { opacity: 1; translate: 0; scale: 1; } }
+@media all {
+  :where(html[data-motion="reduced"]) .glass-theme .student-card { transform: none; }
+}
+@media all {
+  :where(html:not([data-pointer="mouse"])) .glass-theme .student-card { transform: none; }
+}
+@media print {
+  .glass-theme .student-card { transform: none; translate: none; box-shadow: none; }
+  .glass-theme .student-card::after { display: none; }
+}
+
+/* The measured rounded SVG draws one uninterrupted 0–100% path at any size. */
+.glass-theme [data-motion-surface] { isolation: isolate; }
+.glass-theme .motion-outline {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  overflow: visible; pointer-events: none; border-radius: inherit;
+  color: #818cf8; opacity: 0;
+  transition: opacity 220ms ease;
+}
+.glass-theme .motion-outline rect {
+  fill: none; stroke: currentColor; stroke-width: 1.5;
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  vector-effect: non-scaling-stroke;
+  transition: stroke-dashoffset 650ms cubic-bezier(.4, 0, .2, 1);
+}
+.glass-theme .xp-fill { overflow: hidden; }
+.glass-theme .xp-neon {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, var(--xp-mid), #ffffffaa, var(--xp-end), transparent);
+  opacity: .55; translate: -110% 0;
+  pointer-events: none;
+}
+@media all {
+  :where(html[data-motion="full"][data-pointer="mouse"]) .glass-theme [data-motion-surface]:not(:disabled):not([aria-disabled=true]):hover > .motion-outline { opacity: 1; }
+  :where(html[data-motion="full"][data-pointer="mouse"]) .glass-theme [data-motion-surface]:not(:disabled):not([aria-disabled=true]):hover > .motion-outline[data-ready="true"] rect { stroke-dashoffset: 0; }
+}
+@media all {
+  :where(html[data-motion="full"]) .glass-theme [data-xp-active=true] .xp-neon { animation: xp-neon-travel 3.2s linear infinite; animation-play-state: paused; }
+  :where(html[data-motion="full"][data-page-visible="true"]) .glass-theme [data-xp-active=true][data-in-view] .xp-neon { animation-play-state: running; }
+  :where(html[data-motion="full"]) .glass-theme [data-motion-surface]:not(:disabled):not([aria-disabled=true]):not([draggable=true]):active { scale: .975; }
+}
+@keyframes xp-neon-travel { from { translate: -110% 0; } to { translate: 110% 0; } }
+@media all {
+  :where(html[data-motion="reduced"]) .glass-theme .xp-neon, :where(html[data-motion="reduced"]) .glass-theme .motion-outline { display: none; }
+}
+@media print {
+  .glass-theme .motion-outline, .glass-theme .xp-neon { display: none; }
+}

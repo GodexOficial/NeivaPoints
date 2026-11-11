@@ -1,173 +1,82 @@
-import React, { useState } from 'react';
-import { X, Table as TableIcon, Trash2, Plus } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
+import { useDialogFocus } from '../../../hooks/useDialogFocus';
+import { deleteTableColumn, deleteTableRow, fitTable, insertTableColumn, insertTableRow, mergeTableCells, rectangularCells, sortTable, splitTableCell, subdivideTableCell, tableMap, type TableCell, type TableFit } from '../../../utils/wordTable';
 
-interface TableEditModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  targetTable: HTMLTableElement | null;
-  onContentChange: () => void;
-}
-
-export const TableEditModal: React.FC<TableEditModalProps> = ({
-  isOpen,
-  onClose,
-  targetTable,
-  onContentChange,
-}) => {
-  const [cellBgColor, setCellBgColor] = useState('#2563eb');
-  const [borderColor, setBorderColor] = useState('#cbd5e1');
-  const [borderWidth, setBorderWidth] = useState(1);
-  const [borderStyle, setBorderStyle] = useState<'solid' | 'dashed' | 'dotted' | 'none'>('solid');
-
-  if (!isOpen || !targetTable) return null;
-
-  // Apply cell background to currently selected or all cells
-  const handleApplyCellBg = () => {
-    const cells = targetTable.querySelectorAll('td, th');
-    cells.forEach((c) => {
-      (c as HTMLElement).style.backgroundColor = cellBgColor;
-    });
-    onContentChange();
+interface Props { isOpen: boolean; onClose: () => void; targetTable: HTMLTableElement | null; activeCell?: TableCell | null; onContentChange: () => void; readOnly?: boolean }
+export function TableEditModal({ isOpen, onClose, targetTable: table, activeCell, onContentChange, readOnly }: Props) {
+  const [selected, setSelected] = useState<TableCell[]>([]), [error, setError] = useState('');
+  const [revision, update] = useState(0), [bg, setBg] = useState('#dbeafe'), [border, setBorder] = useState('#64748b');
+  const [borderWidth, setBorderWidth] = useState(1), [borderStyle, setBorderStyle] = useState('solid');
+  const [width, setWidth] = useState(120), [height, setHeight] = useState(32), [padding, setPadding] = useState(8);
+  const [sortCol, setSortCol] = useState(0), [descending, setDescending] = useState(false), [numeric, setNumeric] = useState(false), [header, setHeader] = useState(true);
+  const [formula, setFormula] = useState('SUM'), [direction, setDirection] = useState('ABOVE');
+  const [splitRows, setSplitRows] = useState(1), [splitCols, setSplitCols] = useState(2), [extendSelection, setExtendSelection] = useState(false);
+  const history = useRef<string[]>([]), future = useRef<string[]>([]), anchor = useRef<TableCell | null>(null);
+  const openingCell = useRef(activeCell); openingCell.current = activeCell;
+  const ref = useDialogFocus(isOpen);
+  useEffect(() => { if (isOpen && table) { const cell = openingCell.current?.closest('table') === table ? openingCell.current : table.rows[0]?.cells[0]; setSelected(cell ? [cell] : []); anchor.current = cell || null; history.current = []; future.current = []; setError(''); setSortCol(0); } }, [isOpen, table]);
+  if (!isOpen || !table) return null;
+  const map = tableMap(table), cells = selected.filter(cell => cell.isConnected && cell.closest('table') === table);
+  const current = cells[0] || table.rows[0]?.cells[0], position = map.positions.find(p => p.cell === current);
+  const snapshot = () => JSON.stringify({ html: table.innerHTML, style: table.style.cssText, fit: table.dataset.wordFit });
+  const restore = (value: string) => { const data = JSON.parse(value); table.innerHTML = data.html; table.style.cssText = data.style; if (data.fit) table.dataset.wordFit = data.fit; else delete table.dataset.wordFit; setSelected([]); anchor.current = null; onContentChange(); update(v => v + 1); };
+  const mutate = (fn: () => void) => {
+    if (readOnly) return;
+    const before = snapshot();
+    try { fn(); if (table.isConnected) { history.current.push(before); future.current = []; } setError(''); onContentChange(); update(v => v + 1); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Não foi possível alterar a tabela.'); }
   };
-
-  // Apply table border style
-  const handleApplyBorders = () => {
-    targetTable.style.border = `${borderWidth}px ${borderStyle} ${borderColor}`;
-    const cells = targetTable.querySelectorAll('td, th');
-    cells.forEach((c) => {
-      (c as HTMLElement).style.border = `${borderWidth}px ${borderStyle} ${borderColor}`;
-    });
-    onContentChange();
-  };
-
-  // Insert Row
-  const handleAddRow = (below = true) => {
-    const newRow = targetTable.insertRow(below ? -1 : 0);
-    const colCount = targetTable.rows[0]?.cells.length || 2;
-    for (let i = 0; i < colCount; i++) {
-      const cell = newRow.insertCell(i);
-      cell.innerHTML = 'Nova Célula';
-      cell.style.padding = '8px';
-      cell.style.border = `${borderWidth}px ${borderStyle} ${borderColor}`;
-    }
-    onContentChange();
-  };
-
-  // Insert Column
-  const handleAddCol = () => {
-    for (let r = 0; r < targetTable.rows.length; r++) {
-      const cell = targetTable.rows[r].insertCell(-1);
-      cell.innerHTML = 'Nova Célula';
-      cell.style.padding = '8px';
-      cell.style.border = `${borderWidth}px ${borderStyle} ${borderColor}`;
-    }
-    onContentChange();
-  };
-
-  // Delete Table
-  const handleDeleteTable = () => {
-    targetTable.remove();
-    onContentChange();
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-5">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 rounded-xl">
-              <TableIcon size={18} />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Edição Avançada da Tabela</h3>
-              <p className="text-xs text-slate-500">Configure cores, bordas, linhas e colunas</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer">
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Cell Shading / Background */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Cor de Fundo das Células</label>
-          <div className="flex items-center gap-2">
-            <input type="color" value={cellBgColor} onChange={(e) => setCellBgColor(e.target.value)} className="w-8 h-8 rounded-lg cursor-pointer border border-slate-300 dark:border-slate-700" />
-            <input type="text" value={cellBgColor} onChange={(e) => setCellBgColor(e.target.value)} className="flex-1 text-xs font-mono p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white" />
-            <button
-              type="button"
-              onClick={handleApplyCellBg}
-              className="px-3 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl cursor-pointer"
-            >
-              Aplicar Fundo
-            </button>
-          </div>
-        </div>
-
-        {/* Borders */}
-        <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Estilo das Bordas</label>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="text-[11px] text-slate-500">Cor Borda</label>
-              <input type="color" value={borderColor} onChange={(e) => setBorderColor(e.target.value)} className="w-full h-8 rounded-lg cursor-pointer mt-1" />
-            </div>
-
-            <div>
-              <label className="text-[11px] text-slate-500">Espessura (px)</label>
-              <input type="number" min={0} max={10} value={borderWidth} onChange={(e) => setBorderWidth(Number(e.target.value))} className="w-full text-xs p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white mt-1" />
-            </div>
-
-            <div>
-              <label className="text-[11px] text-slate-500">Estilo</label>
-              <select value={borderStyle} onChange={(e) => setBorderStyle(e.target.value as any)} className="w-full text-xs p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white mt-1">
-                <option value="solid">Sólida</option>
-                <option value="dashed">Tracejada</option>
-                <option value="dotted">Pontilhada</option>
-                <option value="none">Sem Borda</option>
-              </select>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleApplyBorders}
-            className="w-full py-2 text-xs font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl cursor-pointer"
-          >
-            Aplicar Estilo de Bordas na Tabela
-          </button>
-        </div>
-
-        {/* Structure actions */}
-        <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-          <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">Ações na Estrutura</label>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => handleAddRow(true)} className="py-2 px-3 text-xs font-semibold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-xl cursor-pointer text-left flex items-center gap-1.5">
-              <Plus size={14} /> + Linha
-            </button>
-            <button type="button" onClick={handleAddCol} className="py-2 px-3 text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 rounded-xl cursor-pointer text-left flex items-center gap-1.5">
-              <Plus size={14} /> + Coluna
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleDeleteTable}
-            className="w-full py-2 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 mt-2"
-          >
-            <Trash2 size={14} />
-            <span>Excluir Tabela</span>
-          </button>
-        </div>
-
-        <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
-          <button type="button" onClick={onClose} className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-xs cursor-pointer">
-            Concluído
-          </button>
-        </div>
-      </div>
+  const apply = (fn: (cell: TableCell) => void) => mutate(() => cells.forEach(fn));
+  const pick = (cell: TableCell, extend: boolean) => { if (extend && anchor.current) setSelected(rectangularCells(table, anchor.current, cell)); else { anchor.current = cell; setSelected([cell]); } };
+  const act = (label: string, fn: () => void, disabled = false) => <button type="button" disabled={readOnly || disabled} onClick={() => mutate(fn)}>{label}</button>;
+  const structural = (fn: () => void) => { fn(); setSelected([]); anchor.current = null; };
+  return <div className="word-dialog-backdrop"><div ref={ref} className="word-dialog word-table-editor" role="dialog" aria-modal="true" aria-labelledby="table-edit-title" onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } if (e.key === 'Delete' && !(e.target as HTMLElement).closest('input,textarea,select,[contenteditable=true]')) { e.preventDefault(); e.stopPropagation(); apply(cell => { cell.innerHTML = '<p><br></p>'; }); } }}>
+    <header><h2 id="table-edit-title">Ferramentas de tabela</h2><button aria-label="Fechar ferramentas de tabela" onClick={onClose}><X size={18} /></button></header>
+    <p>{map.width} colunas × {map.height} linhas · {cells.length} células selecionadas. Clique para selecionar; Shift + clique amplia o retângulo.</p>
+    <div className="word-table-selection" role="group" aria-label="Selecionar células" style={{ gridTemplateColumns: `repeat(${map.width}, minmax(48px, 1fr))` }}>
+      {map.positions.map(p => <button key={`${revision}-${p.row}-${p.col}`} aria-label={`Linha ${p.row + 1}, coluna ${p.col + 1}`} aria-pressed={cells.includes(p.cell)} style={{ gridRow: `${p.row + 1} / span ${p.rows}`, gridColumn: `${p.col + 1} / span ${p.cols}` }} onClick={e => pick(p.cell, e.shiftKey || extendSelection)}>{p.cell.textContent?.slice(0, 70) || `${p.row + 1}:${p.col + 1}`}</button>)}
     </div>
-  );
-};
+    <label><input type="checkbox" checked={extendSelection} onChange={e => setExtendSelection(e.target.checked)} />Ampliar seleção ao tocar em outra célula (celular e tablet)</label>
+    <div className="word-table-actions"><button onClick={() => setSelected(map.positions.map(p => p.cell))}>Selecionar tabela</button><button disabled={!position} onClick={() => position && setSelected([...new Set(map.grid[position.row])])}>Selecionar linha</button><button disabled={!position} onClick={() => position && setSelected([...new Set(map.grid.map(row => row[position.col]).filter(Boolean))])}>Selecionar coluna</button><button onClick={() => { const previous = history.current.pop(); if (previous) { future.current.push(snapshot()); restore(previous); } }} disabled={!history.current.length || readOnly}>Desfazer alteração da tabela</button><button onClick={() => { const next = future.current.pop(); if (next) { history.current.push(snapshot()); restore(next); } }} disabled={!future.current.length || readOnly}>Refazer alteração da tabela</button></div>
+    <div className="word-table-sections">
+      <fieldset disabled={readOnly}><legend>Linhas, colunas e células</legend><div className="word-table-actions">
+        {act('Limpar conteúdo das células', () => cells.forEach(cell => { cell.innerHTML = '<p><br></p>'; }), !cells.length)}
+        {act('Linha acima', () => structural(() => insertTableRow(table, position!.row)), !position || map.height >= 200)}
+        {act('Linha abaixo', () => structural(() => insertTableRow(table, position!.row + position!.rows)), !position || map.height >= 200)}
+        {act('Coluna à esquerda', () => structural(() => insertTableColumn(table, position!.col)), !position || map.width >= 20)}
+        {act('Coluna à direita', () => structural(() => insertTableColumn(table, position!.col + position!.cols)), !position || map.width >= 20)}
+        {act('Excluir linha', () => { structural(() => deleteTableRow(table, position!.row)); if (!table.isConnected) onClose(); }, !position)}
+        {act('Excluir coluna', () => { structural(() => deleteTableColumn(table, position!.col)); if (!table.isConnected) onClose(); }, !position)}
+        {act('Mesclar células', () => { const first = mergeTableCells(table, cells); setSelected([first]); anchor.current = first; }, cells.length < 2)}
+        {act('Dividir células mescladas', () => structural(() => cells.forEach(cell => splitTableCell(table, cell))), !cells.some(c => c.rowSpan > 1 || c.colSpan > 1))}
+        {act('Dividir tabela antes da linha', () => {
+          if (!position || position.row === 0) throw new Error('Selecione uma linha depois da primeira.');
+          if (map.positions.some(p => p.row < position.row && p.row + p.rows > position.row)) throw new Error('Divida as células que atravessam essa linha antes de separar a tabela.');
+          const second = table.cloneNode(false) as HTMLTableElement, body = document.createElement('tbody'); second.append(body);
+          Array.from(table.rows).slice(position.row).forEach(row => body.append(row)); const paragraph = document.createElement('p'); paragraph.innerHTML = '<br>'; table.after(paragraph, second); onClose();
+        }, !position || position.row === 0)}
+      </div><div className="word-table-fields"><label>Dividir em linhas<input aria-label="Divisões em linhas" type="number" min={1} max={20} value={splitRows} onChange={e => setSplitRows(Number(e.target.value))} /></label><label>Dividir em colunas<input aria-label="Divisões em colunas" type="number" min={1} max={20} value={splitCols} onChange={e => setSplitCols(Number(e.target.value))} /></label></div>{act('Dividir célula selecionada', () => structural(() => subdivideTableCell(table, current, splitRows, splitCols)), cells.length !== 1)}</fieldset>
+      <fieldset disabled={readOnly}><legend>Tamanho e ajuste ao conteúdo</legend><label>Ajuste automático<select aria-label="Ajuste automático da tabela" value={table.dataset.wordFit || 'window'} onChange={e => mutate(() => fitTable(table, e.target.value as TableFit))}><option value="content">Ao conteúdo das células</option><option value="window">À largura da página</option><option value="fixed">Largura fixa / colunas iguais</option></select></label><div className="word-table-fields"><label>Largura (px)<input type="number" min={24} max={1500} value={width} onChange={e => setWidth(Number(e.target.value))} /></label><label>Altura mínima (px)<input type="number" min={0} max={1500} value={height} onChange={e => setHeight(Number(e.target.value))} /></label><label>Margens internas (px)<input type="number" min={0} max={50} value={padding} onChange={e => setPadding(Number(e.target.value))} /></label></div><div className="word-table-actions">
+        {act('Aplicar largura às colunas selecionadas', () => { const indices = new Set(map.positions.filter(p => cells.includes(p.cell)).flatMap(p => Array.from({ length: p.cols }, (_, i) => p.col + i))); const group = document.createElement('colgroup'); for (let c = 0; c < map.width; c++) { const col = document.createElement('col'); col.style.width = indices.has(c) ? `${Math.max(24, Math.min(1500, width))}px` : ''; group.append(col); } table.querySelectorAll('colgroup').forEach(g => g.remove()); table.prepend(group); table.style.tableLayout = 'fixed'; table.dataset.wordFit = 'fixed'; }, !cells.length)}
+        <button onClick={() => apply(cell => { cell.parentElement!.style.height = `${Math.max(0, Math.min(1500, height))}px`; cell.style.height = `${Math.max(0, Math.min(1500, height))}px`; })}>Aplicar altura mínima</button>
+        <button onClick={() => apply(cell => { cell.style.padding = `${Math.max(0, Math.min(50, padding))}px`; })}>Aplicar margens internas</button>
+        {act('Distribuir colunas', () => fitTable(table, 'fixed'))}
+        {act('Distribuir linhas', () => { const scale = table.getBoundingClientRect().width / table.offsetWidth || 1; const h = Math.max(...Array.from(table.rows).map(row => row.getBoundingClientRect().height)) / scale; Array.from(table.rows).forEach(row => { row.style.height = `${h}px`; }); })}
+        {act('Permitir quebra de linha entre páginas', () => { const rows = new Set(cells.map(cell => cell.parentElement!)); rows.forEach(row => { delete row.dataset.wordCantSplit; row.style.breakInside = 'auto'; }); }, !cells.length)}
+        {act('Manter linha inteira na impressão', () => { const rows = new Set(cells.map(cell => cell.parentElement!)); rows.forEach(row => { row.dataset.wordCantSplit = 'true'; row.style.breakInside = 'avoid'; }); }, !cells.length)}
+      </div><p>O ajuste ao conteúdo acompanha a digitação e quebra textos longos dentro da página.</p></fieldset>
+      <fieldset disabled={readOnly}><legend>Alinhamento e direção</legend><div className="word-table-actions">{(['left', 'center', 'right', 'justify'] as const).map((align, i) => <button key={align} onClick={() => apply(cell => { cell.style.textAlign = align; cell.querySelectorAll<HTMLElement>('p,div,h1,h2,h3').forEach(p => { p.style.textAlign = align; }); })}>{['Esquerda', 'Centralizar', 'Direita', 'Justificar'][i]}</button>)}{(['top', 'middle', 'bottom'] as const).map((align, i) => <button key={align} onClick={() => apply(cell => { cell.style.verticalAlign = align; })}>{['Topo', 'Meio', 'Base'][i]}</button>)}<button onClick={() => apply(cell => { cell.style.writingMode = cell.style.writingMode === 'vertical-rl' ? 'horizontal-tb' : 'vertical-rl'; })}>Alternar direção do texto</button></div><label>Alinhamento da tabela<select aria-label="Alinhamento da tabela" value={table.style.marginLeft === 'auto' ? table.style.marginRight === 'auto' ? 'center' : 'right' : 'left'} onChange={e => mutate(() => { table.style.marginLeft = e.target.value === 'left' ? '0' : 'auto'; table.style.marginRight = e.target.value === 'right' ? '0' : 'auto'; })}><option value="left">Esquerda</option><option value="center">Centro</option><option value="right">Direita</option></select></label></fieldset>
+      <fieldset disabled={readOnly}><legend>Design, sombreamento e bordas</legend><label>Fundo das células<input aria-label="Cor de fundo das células" type="color" value={bg} onChange={e => setBg(e.target.value)} /></label><div className="word-table-actions"><button onClick={() => apply(cell => { cell.style.backgroundColor = bg; })}>Aplicar fundo à seleção</button><button onClick={() => apply(cell => { cell.style.backgroundColor = ''; })}>Remover fundo</button>{act('Linhas alternadas', () => map.positions.forEach(p => { p.cell.style.backgroundColor = p.row % 2 ? '#eff6ff' : '#ffffff'; p.cell.style.color = '#111827'; }))}{act('Destacar cabeçalho', () => { const first = table.rows[0]; Array.from(first.cells).forEach(cell => { cell.style.backgroundColor = '#2563eb'; cell.style.color = '#ffffff'; cell.style.fontWeight = 'bold'; }); })}{act('Repetir cabeçalho na impressão', () => { const head = table.tHead || table.createTHead(); if (!head.rows.length) head.append(table.rows[0]); })}</div>
+        <div className="word-table-fields"><label>Cor das bordas<input aria-label="Cor das bordas" type="color" value={border} onChange={e => setBorder(e.target.value)} /></label><label>Espessura<input aria-label="Espessura das bordas" type="number" min={0} max={10} value={borderWidth} onChange={e => setBorderWidth(Number(e.target.value))} /></label><label>Traçado<select value={borderStyle} onChange={e => setBorderStyle(e.target.value)}><option value="solid">Sólido</option><option value="dashed">Tracejado</option><option value="dotted">Pontilhado</option><option value="double">Duplo</option></select></label></div>
+        <div className="word-table-actions">{['Todas as bordas', 'Sem bordas', 'Borda externa', 'Bordas internas', 'Borda superior', 'Borda inferior', 'Borda esquerda', 'Borda direita'].map((label, kind) => <button key={kind} disabled={!cells.length} onClick={() => mutate(() => {
+          const ps = map.positions.filter(p => cells.includes(p.cell)), top = Math.min(...ps.map(p => p.row)), bottom = Math.max(...ps.map(p => p.row + p.rows)), left = Math.min(...ps.map(p => p.col)), right = Math.max(...ps.map(p => p.col + p.cols));
+          ps.forEach(p => { const edges = [p.row === top, p.row + p.rows === bottom, p.col === left, p.col + p.cols === right]; (['borderTop', 'borderBottom', 'borderLeft', 'borderRight'] as const).forEach((side, i) => { if (kind <= 1 || kind === 2 && edges[i] || kind === 3 && !edges[i] || kind === i + 4) p.cell.style[side] = kind === 1 ? 'none' : `${Math.max(0, Math.min(10, borderWidth))}px ${borderStyle} ${border}`; }); });
+        })}>{label}</button>)}</div></fieldset>
+      <fieldset disabled={readOnly}><legend>Ordenar linhas</legend><div className="word-table-fields"><label>Coluna<select aria-label="Coluna de ordenação" value={Math.min(sortCol, map.width - 1)} onChange={e => setSortCol(Number(e.target.value))}>{Array.from({ length: map.width }, (_, i) => <option key={i} value={i}>{i + 1}</option>)}</select></label><label>Tipo<select value={numeric ? 'number' : 'text'} onChange={e => setNumeric(e.target.value === 'number')}><option value="text">Texto</option><option value="number">Número</option></select></label><label>Ordem<select value={descending ? 'desc' : 'asc'} onChange={e => setDescending(e.target.value === 'desc')}><option value="asc">Crescente</option><option value="desc">Decrescente</option></select></label></div><label><input type="checkbox" checked={header} onChange={e => setHeader(e.target.checked)} />Preservar primeira linha</label>{act('Ordenar tabela', () => { sortTable(table, Math.min(sortCol, map.width - 1), descending, numeric, header); setSelected([]); })}</fieldset>
+      <fieldset disabled={readOnly}><legend>Cálculo na célula selecionada</legend><div className="word-table-fields"><label>Função<select aria-label="Função da tabela" value={formula} onChange={e => setFormula(e.target.value)}>{['SUM', 'AVERAGE', 'COUNT', 'MIN', 'MAX'].map((fn, i) => <option key={fn} value={fn}>{['Soma', 'Média', 'Contagem', 'Mínimo', 'Máximo'][i]}</option>)}</select></label><label>Células<select value={direction} onChange={e => setDirection(e.target.value)}><option value="ABOVE">Acima</option><option value="LEFT">À esquerda</option></select></label></div>{act('Inserir resultado', () => { if (!position) return; const source = direction === 'ABOVE' ? map.grid.slice(0, position.row).map(row => row[position.col]) : map.grid[position.row].slice(0, position.col); const values = [...new Set(source)].filter(c => c && c !== current).map(c => c.textContent?.trim() || '').filter(Boolean).map(v => Number(v.includes(',') ? v.replace(/\./g, '').replace(',', '.') : v)).filter(Number.isFinite); if (!values.length) throw new Error('Não há números nessa direção.'); const sum = values.reduce((a, b) => a + b, 0), result = formula === 'SUM' ? sum : formula === 'AVERAGE' ? sum / values.length : formula === 'COUNT' ? values.length : formula === 'MIN' ? Math.min(...values) : Math.max(...values); current.textContent = result.toLocaleString('pt-BR', { maximumFractionDigits: 8 }); }, !position)}<p>Insere o resultado atual. Reaplique o cálculo após alterar os valores.</p></fieldset>
+      <fieldset disabled={readOnly}><legend>Converter e remover</legend><div className="word-table-actions">{act('Converter tabela em texto (tabulações)', () => { const holder = document.createElement('div'); map.grid.forEach((row, r) => { const p = document.createElement('p'); p.style.whiteSpace = 'pre-wrap'; p.textContent = row.map((cell, c) => map.positions.some(pos => pos.cell === cell && pos.row === r && pos.col === c) ? cell.textContent : '').join('\t'); holder.append(p); }); table.replaceWith(...holder.childNodes); onClose(); })}{act('Excluir tabela', () => { table.remove(); onClose(); })}</div></fieldset>
+    </div>
+    {error && <p role="alert" className="word-table-error">{error}</p>}<footer><button onClick={onClose}>Concluído</button></footer>
+  </div></div>;
+}

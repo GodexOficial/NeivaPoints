@@ -1,10 +1,13 @@
+import { useDialogFocus } from '../hooks/useDialogFocus';
+import { AnimatedDisclosure } from '../components/common/AnimatedDisclosure';
+import { useAnimatedList } from '../hooks/useAnimatedList';
 import React, { useEffect, useRef, useState } from 'react';
 import { AppWindow, Check, ExternalLink, FileText, GripVertical, ImagePlus, Link as LinkIcon, LoaderCircle, Pencil, Plus, Presentation, Table as TableIcon, Trash2, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AppsService, type AppsGridSettings } from '../services/appsService';
 import type { ExternalApp } from '../types';
 import type { WordDocument } from '../types/doc';
-import { createNewDocument } from '../services/docService';
+import { createNewDocument, getLocalDocuments } from '../services/docService';
 import { WordEditor } from '../components/apps/word/WordEditor';
 
 const STANDARD_APPS_COUNT = 3;
@@ -45,6 +48,10 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   const [isManaging, setIsManaging] = useState(false);
   const [gridSettings, setGridSettings] = useState<AppsGridSettings>(() => AppsService.getGridSettings());
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropSlot, setDropSlot] = useState<number | null>(null);
+  const [isOrderSaving, setIsOrderSaving] = useState(false);
+  const [orderMessage, setOrderMessage] = useState('');
+  const orderSavingRef = useRef(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingApp, setEditingApp] = useState<ExternalApp | null | undefined>(undefined);
   const [form, setForm] = useState<AppForm>(emptyForm);
@@ -52,6 +59,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<WordDocument | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const appGridRef = useAnimatedList<HTMLDivElement>(apps.map(app => app.id + ':' + app.position).join('|') + ':' + gridSettings.columns + ':' + isLoading);
   const gridSize = gridSettings.columns * gridSettings.rows;
   const customCapacity = gridSize - STANDARD_APPS_COUNT;
 
@@ -71,15 +79,27 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   };
 
   const saveOrder = async (next: ExternalApp[]) => {
-    const ordered = sortedApps(next).map((app, position) => ({ ...app, position }));
+    if (orderSavingRef.current) return;
+    orderSavingRef.current = true;
+    setIsOrderSaving(true); setOrderMessage('');
+    const ordered = next.map((app, position) => ({ ...app, position }));
     setApps(ordered);
-    setApps(await AppsService.reorder(ordered));
+    try {
+      setApps(await AppsService.reorder(ordered));
+      setOrderMessage('Ordem dos aplicativos salva.');
+    } catch {
+      setApps(sortedApps(await AppsService.getAll()).slice(0, customCapacity));
+      setOrderMessage('Não foi possível salvar a ordem dos aplicativos. Tente novamente.');
+    } finally {
+      orderSavingRef.current = false; setIsOrderSaving(false);
+    }
   };
 
   const moveApp = async (appId: string, targetSlot: number) => {
+    if (!isTeacher || orderSavingRef.current) return;
     const ordered = sortedApps(apps);
     const fromIndex = ordered.findIndex((app) => app.id === appId);
-    if (fromIndex < 0) return;
+    if (fromIndex < 0 || fromIndex === Math.min(targetSlot, ordered.length - 1)) return;
     const [moved] = ordered.splice(fromIndex, 1);
     ordered.splice(Math.min(targetSlot, ordered.length), 0, moved);
     setSelectedId(null);
@@ -127,7 +147,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   };
 
   const handleSlotClick = (slot: number) => {
-    if (isTeacher && isManaging && selectedId) void moveApp(selectedId, slot - STANDARD_APPS_COUNT);
+    if (slot >= STANDARD_APPS_COUNT && isTeacher && isManaging && selectedId) void moveApp(selectedId, slot - STANDARD_APPS_COUNT);
   };
   const handleAppManageClick = (app: ExternalApp) => {
     if (!isManaging) return;
@@ -142,7 +162,8 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
 
   const openStandardApp = (app: StandardApp) => {
     if (app.id !== 'word') return;
-    setSelectedDocument(createNewDocument('Novo Documento Word'));
+    const recent = getLocalDocuments().filter(doc => !doc.id.startsWith('doc-sample-')).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+    setSelectedDocument(recent || createNewDocument('Novo Documento Word'));
     onWordEditorChange(true);
   };
 
@@ -159,23 +180,58 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
             <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Seus atalhos em um só lugar</h1>
             <p className="mt-2 max-w-2xl text-sm font-medium leading-relaxed text-blue-100">{isTeacher ? 'Adicione links, escolha uma capa e organize a grade como preferir. Os alunos sempre verão esta mesma ordem.' : 'Escolha um aplicativo para abri-lo em uma nova aba.'}</p>
           </div>
-          {isTeacher && <button type="button" onClick={() => { setIsManaging((current) => !current); setSelectedId(null); }} className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-extrabold shadow-lg transition-colors cursor-pointer ${isManaging ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-white text-blue-700 hover:bg-blue-50'}`}>
+          {isTeacher && <button type="button" aria-pressed={isManaging} onClick={() => { setIsManaging((current) => !current); setSelectedId(null); }} className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-extrabold shadow-lg transition-colors cursor-pointer ${isManaging ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-white text-blue-700 hover:bg-blue-50'}`}>
             {isManaging ? <Check size={18} /> : <Pencil size={18} />}{isManaging ? 'Concluir edição' : 'Editar grade'}
           </button>}
         </div>
       </section>
 
-      {isTeacher && isManaging && <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100 sm:flex sm:items-center sm:justify-between">
-        <div className="text-sm"><strong>Modo de edição:</strong> arraste um ícone para outro espaço ou clique em um ícone e depois no destino.</div>
+      <AnimatedDisclosure open={isTeacher && isManaging}><section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100 sm:flex sm:items-center sm:justify-between">
+        <div className="text-sm"><strong>Modo de edição:</strong> arraste um atalho para reorganizar ou clique nele e depois no destino. Word, Excel e PowerPoint permanecem fixos.</div>
         <button type="button" onClick={openCreate} disabled={apps.length >= customCapacity} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-extrabold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 cursor-pointer"><Plus size={16} />Adicionar aplicativo</button>
-      </section>}
+      </section></AnimatedDisclosure>
 
-      <section aria-label="Grade de aplicativos" className="rounded-3xl border border-slate-200 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+      <section aria-label="Grade de aplicativos" className="glass-panel rounded-3xl border border-slate-200 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+        {isTeacher && <p role="status" aria-live="polite" className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-300">{isOrderSaving ? 'Salvando nova ordem…' : orderMessage || 'Arraste os atalhos para reorganizar. Para editar ou organizar por cliques, use “Editar grade”.'}</p>}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1"><div><h2 className="text-base font-extrabold text-slate-900 dark:text-white">Aplicativos</h2><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{displayedApps.length} de {gridSize}</span></div>{isTeacher && isManaging && <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300"><label>Colunas<select value={gridSettings.columns} onChange={(event) => updateGridSettings({ columns: Number(event.target.value) as AppsGridSettings['columns'] })} className="ml-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option></select></label><label>Linhas<select value={gridSettings.rows} onChange={(event) => updateGridSettings({ rows: Number(event.target.value) as AppsGridSettings['rows'] })} className="ml-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option></select></label></div>}</div>
         {isLoading ? <div className="flex min-h-72 items-center justify-center text-sm font-semibold text-slate-500"><LoaderCircle className="mr-2 animate-spin" size={18} /> Carregando aplicativos…</div> : <>
-          <div className="grid gap-2 sm:gap-3" style={{ gridTemplateColumns: `repeat(${gridSettings.columns}, minmax(0, 1fr))` }}>
-            {slots.map(({ index, app }) => <div key={index} onDragOver={(event) => { if (isManaging && isTeacher && index >= STANDARD_APPS_COUNT) event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); const appId = event.dataTransfer.getData('text/neivapoints-app') || draggedId; if (isManaging && appId && index >= STANDARD_APPS_COUNT) void moveApp(appId, index - STANDARD_APPS_COUNT); setDraggedId(null); }} onClick={() => !app && handleSlotClick(index)} className={`relative flex aspect-square min-w-0 items-center justify-center rounded-2xl transition-colors ${app ? '' : isManaging ? 'cursor-pointer border-2 border-dashed border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-blue-700 dark:hover:bg-blue-950/30' : 'border border-slate-100/70 bg-slate-50/45 dark:border-slate-800/70 dark:bg-slate-800/20'}`} aria-label={app ? undefined : `Espaço ${index + 1} da grade`}>
-              {app && <AppTile app={app} colorIndex={index} editable={isTeacher && isManaging && app.source === 'custom'} selected={app.source === 'custom' && selectedId === app.id} onOpenStandard={() => app.source === 'standard' && openStandardApp(app)} onEdit={() => { if (app.source === 'custom') openEdit(app); }} onDelete={() => { if (app.source === 'custom') void handleDelete(app); }} onManageClick={() => { if (app.source === 'custom') handleAppManageClick(app); }} onDragStart={(event) => { if (app.source !== 'custom') return; setDraggedId(app.id); event.dataTransfer.setData('text/neivapoints-app', app.id); event.dataTransfer.effectAllowed = 'move'; }} onDragEnd={() => setDraggedId(null)} />}
+          <div ref={appGridRef} className="relative grid gap-2 sm:gap-3" style={{ gridTemplateColumns: `repeat(${gridSettings.columns}, minmax(0, 1fr))` }}>
+            {slots.map(({ index, app }) => <div key={app?.id || `slot-${index}`} data-motion-id={app?.id}
+              role={!app && isManaging && index >= STANDARD_APPS_COUNT ? 'button' : undefined}
+              tabIndex={!app && isManaging && index >= STANDARD_APPS_COUNT ? 0 : undefined}
+              onKeyDown={(event) => { if (!app && isManaging && index >= STANDARD_APPS_COUNT && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); handleSlotClick(index); } }}
+              onDragOver={(event) => {
+                if (!isTeacher || isOrderSaving || !draggedId || index < STANDARD_APPS_COUNT) return;
+                event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDropSlot(index);
+              }}
+              onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropSlot(current => current === index ? null : current); }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const appId = event.dataTransfer.getData('text/neivapoints-app') || draggedId;
+                if (isTeacher && !isOrderSaving && appId && index >= STANDARD_APPS_COUNT) void moveApp(appId, index - STANDARD_APPS_COUNT);
+                setDraggedId(null); setDropSlot(null);
+              }}
+              onClick={() => !app && handleSlotClick(index)}
+              data-dragging={draggedId === app?.id || undefined}
+              data-drop-target={dropSlot === index || undefined}
+              className={`app-grid-slot relative flex aspect-square min-w-0 items-center justify-center rounded-2xl transition-colors ${app ? '' : isManaging && index >= STANDARD_APPS_COUNT ? 'cursor-pointer border-2 border-dashed border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-blue-700 dark:hover:bg-blue-950/30' : 'border border-slate-100/70 bg-slate-50/45 dark:border-slate-800/70 dark:bg-slate-800/20'}`}
+              aria-label={app ? undefined : `Espaço ${index + 1} da grade`}>
+              {app && <AppTile app={app} colorIndex={index}
+                editable={isTeacher && isManaging && app.source === 'custom'}
+                reorderable={isTeacher && !isOrderSaving && app.source === 'custom'}
+                selected={app.source === 'custom' && selectedId === app.id}
+                onOpenStandard={() => app.source === 'standard' && openStandardApp(app)}
+                onEdit={() => { if (app.source === 'custom') openEdit(app); }}
+                onDelete={() => { if (app.source === 'custom') void handleDelete(app); }}
+                onManageClick={() => { if (app.source === 'custom') handleAppManageClick(app); }}
+                onDragStart={(event) => {
+                  if (!isTeacher || isOrderSaving || app.source !== 'custom') { event.preventDefault(); return; }
+                  setDraggedId(app.id); setSelectedId(null); setOrderMessage('');
+                  event.dataTransfer.setData('text/neivapoints-app', app.id);
+                  event.dataTransfer.setData('text/plain', app.id);
+                  event.dataTransfer.effectAllowed = 'move';
+                }}
+                onDragEnd={() => { setDraggedId(null); setDropSlot(null); }} />}
             </div>)}
           </div>
           {apps.length === 0 && !isManaging && <div className="py-4 text-center text-sm text-slate-500 dark:text-slate-400">{isTeacher ? 'Entre no modo de edição para adicionar o primeiro aplicativo.' : 'Ainda não há aplicativos disponíveis.'}</div>}
@@ -187,14 +243,36 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   );
 };
 
-interface AppTileProps { app: HubApp; colorIndex: number; editable: boolean; selected: boolean; onOpenStandard: () => void; onEdit: () => void; onDelete: () => void; onManageClick: () => void; onDragStart: (event: React.DragEvent<HTMLButtonElement>) => void; onDragEnd: () => void; }
-const AppTile: React.FC<AppTileProps> = ({ app, colorIndex, editable, selected, onOpenStandard, onEdit, onDelete, onManageClick, onDragStart, onDragEnd }) => {
+interface AppTileProps { app: HubApp; colorIndex: number; editable: boolean; reorderable: boolean; selected: boolean; onOpenStandard: () => void; onEdit: () => void; onDelete: () => void; onManageClick: () => void; onDragStart: (event: React.DragEvent<HTMLElement>) => void; onDragEnd: () => void; }
+const AppTile: React.FC<AppTileProps> = ({ app, colorIndex, editable, reorderable, selected, onOpenStandard, onEdit, onDelete, onManageClick, onDragStart, onDragEnd }) => {
   const defaultIcon = app.source === 'standard' ? (app.id === 'word' ? <FileText size={36} strokeWidth={2.3} className="text-white" /> : app.id === 'excel' ? <TableIcon size={36} strokeWidth={2.3} className="text-white" /> : <Presentation size={36} strokeWidth={2.3} className="text-white" />) : <LinkIcon size={36} strokeWidth={2.3} className="text-white" />;
-  const icon = <div className={`flex h-full w-full items-center justify-center overflow-hidden rounded-[1.1rem] bg-gradient-to-br shadow-md ring-1 ring-black/5 ${APP_COLORS[colorIndex % APP_COLORS.length]}`}>{'coverUrl' in app && app.coverUrl ? <img src={app.coverUrl} alt="" className="h-full w-full object-cover" /> : defaultIcon}</div>;
-  if (app.source === 'standard') return <button type="button" onClick={onOpenStandard} disabled={!app.available} className={`group flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none ${app.available ? 'cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500' : 'cursor-not-allowed opacity-60'}`} title={app.available ? `Abrir ${app.name}` : `${app.name}: em breve`}><div className="relative h-[min(62%,7.5rem)] w-[min(62%,7.5rem)] transition-transform duration-200 group-hover:scale-105">{icon}</div><span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span><span className={`-mt-1 text-[10px] font-bold ${app.available ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>{app.available ? 'Padrão' : 'Em breve'}</span></button>;
-  if (!editable) return <a href={app.url} target="_blank" rel="noopener noreferrer" className="group flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none focus-visible:ring-2 focus-visible:ring-blue-500" title={`Abrir ${app.name} em uma nova aba`}><div className="relative h-[min(62%,7.5rem)] w-[min(62%,7.5rem)] transition-transform duration-200 group-hover:scale-105 group-focus-visible:scale-105">{icon}<ExternalLink size={12} className="absolute -right-1 -top-1 rounded-full bg-white p-0.5 text-slate-700 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 dark:bg-slate-800 dark:text-slate-200" /></div><span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span></a>;
-  return <button type="button" draggable onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onManageClick} className={`group relative flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none cursor-grab active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-blue-500 ${selected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900' : ''}`} title="Arraste ou clique para escolher este aplicativo"><div className="h-[min(62%,7.5rem)] w-[min(62%,7.5rem)]">{icon}</div><span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span><span className="absolute left-1 top-1 rounded-md bg-white/90 p-1 text-slate-500 shadow-sm dark:bg-slate-800/90"><GripVertical size={13} /></span><span className="absolute right-1 top-1 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"><span role="button" tabIndex={0} onClick={(event) => { event.stopPropagation(); onEdit(); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onEdit(); } }} className="rounded-md bg-white p-1 text-blue-600 shadow-sm dark:bg-slate-800" aria-label={`Editar ${app.name}`}><Pencil size={13} /></span><span role="button" tabIndex={0} onClick={(event) => { event.stopPropagation(); onDelete(); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); onDelete(); } }} className="rounded-md bg-white p-1 text-red-600 shadow-sm dark:bg-slate-800" aria-label={`Excluir ${app.name}`}><Trash2 size={13} /></span></span></button>;
+  const icon = <div className={`flex h-full w-full items-center justify-center overflow-hidden rounded-[1.1rem] bg-gradient-to-br shadow-md ring-1 ring-black/5 ${APP_COLORS[colorIndex % APP_COLORS.length]}`}>{'coverUrl' in app && app.coverUrl ? <img src={app.coverUrl} alt="" draggable={false} className="h-full w-full object-cover" /> : defaultIcon}</div>;
+  if (app.source === 'standard') return <button type="button" onClick={onOpenStandard} disabled={!app.available} className={`group flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none ${app.available ? 'cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500' : 'cursor-not-allowed opacity-60'}`} title={app.available ? `Abrir ${app.name}` : `${app.name}: em breve`}><div className="relative h-[min(62%,7.5rem)] w-[min(62%,7.5rem)] transition-transform duration-300 group-hover:scale-105">{icon}</div><span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span><span className={`-mt-1 text-[10px] font-bold ${app.available ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>{app.available ? 'Padrão' : 'Em breve'}</span></button>;
+  if (!editable) return <a href={app.url} target="_blank" rel="noopener noreferrer" draggable={reorderable} onDragStart={onDragStart} onDragEnd={onDragEnd} className={`group flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${reorderable ? 'cursor-grab active:cursor-grabbing' : ''}`} title={reorderable ? `Abrir ${app.name} ou arrastar para reorganizar` : `Abrir ${app.name} em uma nova aba`}><div className="relative h-[min(62%,7.5rem)] w-[min(62%,7.5rem)] transition-transform duration-300 group-hover:scale-105 group-focus-visible:scale-105">{icon}<ExternalLink size={12} className="absolute -right-1 -top-1 rounded-full bg-white p-0.5 text-slate-700 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 dark:bg-slate-800 dark:text-slate-200" /></div><span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span></a>;
+  return <div className="group relative h-full w-full">
+    <button type="button" draggable={reorderable} aria-pressed={selected} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onManageClick}
+      className={`flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none cursor-grab active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-blue-500 ${selected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900' : ''}`}
+      title="Arraste ou clique para escolher este aplicativo">
+      <div className="h-[min(62%,7.5rem)] w-[min(62%,7.5rem)]">{icon}</div>
+      <span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span>
+      <span className="absolute left-1 top-1 rounded-md bg-white/90 p-1 text-slate-500 shadow-sm dark:bg-slate-800/90"><GripVertical size={13} /></span>
+    </button>
+    <div className="app-tile-actions absolute right-1 top-1 flex gap-1">
+      <button type="button" onClick={onEdit} className="rounded-lg bg-white p-2 text-blue-600 shadow-sm dark:bg-slate-800" aria-label={`Editar ${app.name}`}><Pencil size={15} /></button>
+      <button type="button" onClick={onDelete} className="rounded-lg bg-white p-2 text-red-600 shadow-sm dark:bg-slate-800" aria-label={`Excluir ${app.name}`}><Trash2 size={15} /></button>
+    </div>
+  </div>;
 };
 
 interface AppFormModalProps { app: ExternalApp | null; form: AppForm; error: string; isSaving: boolean; fileInputRef: React.RefObject<HTMLInputElement | null>; onClose: () => void; onChange: (patch: Partial<AppForm>) => void; onFile: (file?: File) => void; onSave: (event: React.FormEvent) => void; }
-const AppFormModal: React.FC<AppFormModalProps> = ({ app, form, error, isSaving, fileInputRef, onClose, onChange, onFile, onSave }) => <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="app-form-title"><form onSubmit={onSave} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900"><div className="mb-5 flex items-start justify-between gap-4"><div><h2 id="app-form-title" className="text-xl font-black text-slate-900 dark:text-white">{app ? 'Editar aplicativo' : 'Novo aplicativo'}</h2><p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">O aluno abrirá este link em uma nova aba.</p></div><button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" aria-label="Fechar"><X size={19} /></button></div><div className="space-y-4"><label className="block text-sm font-bold text-slate-700 dark:text-slate-200">Nome<input autoFocus value={form.name} onChange={(event) => onChange({ name: event.target.value })} maxLength={48} placeholder="Ex.: Khan Academy" className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:focus:ring-blue-950" /></label><label className="block text-sm font-bold text-slate-700 dark:text-slate-200">Link externo<input value={form.url} onChange={(event) => onChange({ url: event.target.value })} type="url" inputMode="url" placeholder="https://exemplo.com" pattern="https://.*" className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:focus:ring-blue-950" /><span className="mt-1 block text-[11px] font-medium text-slate-500">Use um endereço que comece com https://</span></label><div><span className="block text-sm font-bold text-slate-700 dark:text-slate-200">Capa <span className="font-medium text-slate-400">(opcional)</span></span><div className="mt-1.5 flex items-center gap-3"><div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600">{form.coverUrl ? <img src={form.coverUrl} alt="Prévia da capa" className="h-full w-full object-cover" /> : <ImagePlus className="m-4 text-white" size={24} />}</div><div className="flex flex-wrap gap-2"><input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => onFile(event.target.files?.[0])} /><button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer">Escolher imagem</button>{form.coverUrl && <button type="button" onClick={() => onChange({ coverUrl: '' })} className="rounded-xl px-2 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer">Remover</button>}</div></div></div></div>{error && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} disabled={isSaving} className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer">Cancelar</button><button type="submit" disabled={isSaving} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-blue-700 disabled:opacity-60 cursor-pointer">{isSaving && <LoaderCircle size={15} className="animate-spin" />}{app ? 'Salvar alterações' : 'Criar aplicativo'}</button></div></form></div>;
+const AppFormModal: React.FC<AppFormModalProps> = ({ app, form, error, isSaving, fileInputRef, onClose, onChange, onFile, onSave }) => {
+  const dialogRef = useDialogFocus(true);
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isSaving) onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isSaving, onClose]);
+  return <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="app-form-title"><form onSubmit={onSave} className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl dark:bg-slate-900"><div className="mb-5 flex items-start justify-between gap-4"><div><h2 id="app-form-title" className="text-xl font-black text-slate-900 dark:text-white">{app ? 'Editar aplicativo' : 'Novo aplicativo'}</h2><p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">O aluno abrirá este link em uma nova aba.</p></div><button type="button" onClick={onClose} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" aria-label="Fechar"><X size={19} /></button></div><div className="space-y-4"><label className="block text-sm font-bold text-slate-700 dark:text-slate-200">Nome<input autoFocus value={form.name} onChange={(event) => onChange({ name: event.target.value })} maxLength={48} placeholder="Ex.: Khan Academy" className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:focus:ring-blue-950" /></label><label className="block text-sm font-bold text-slate-700 dark:text-slate-200">Link externo<input value={form.url} onChange={(event) => onChange({ url: event.target.value })} type="url" inputMode="url" placeholder="https://exemplo.com" pattern="https://.*" className="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-800 dark:focus:ring-blue-950" /><span className="mt-1 block text-[11px] font-medium text-slate-500">Use um endereço que comece com https://</span></label><div><span className="block text-sm font-bold text-slate-700 dark:text-slate-200">Capa <span className="font-medium text-slate-400">(opcional)</span></span><div className="mt-1.5 flex items-center gap-3"><div className="h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600">{form.coverUrl ? <img src={form.coverUrl} alt="Prévia da capa" className="h-full w-full object-cover" /> : <ImagePlus className="m-4 text-white" size={24} />}</div><div className="flex flex-wrap gap-2"><input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => onFile(event.target.files?.[0])} /><button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer">Escolher imagem</button>{form.coverUrl && <button type="button" onClick={() => onChange({ coverUrl: '' })} className="rounded-xl px-2 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer">Remover</button>}</div></div></div></div>{error && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">{error}</p>}<div className="mt-6 flex justify-end gap-2"><button type="button" onClick={onClose} disabled={isSaving} className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 cursor-pointer">Cancelar</button><button type="submit" disabled={isSaving} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-extrabold text-white hover:bg-blue-700 disabled:opacity-60 cursor-pointer">{isSaving && <LoaderCircle size={15} className="animate-spin" />}{app ? 'Salvar alterações' : 'Criar aplicativo'}</button></div></form></div>;
+};

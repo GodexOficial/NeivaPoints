@@ -1,3 +1,4 @@
+import { AnimatedDisclosure } from '../components/common/AnimatedDisclosure';
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Award,
@@ -14,7 +15,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { AppsHub } from "./AppsHub";
+const AppsHub = React.lazy(() => import("./AppsHub").then(module => ({ default: module.AppsHub })));
 import { useAuth } from "../context/AuthContext";
 import { useStudentContext } from "../context/StudentContext";
 import { useLanguage } from "../context/LanguageContext";
@@ -72,7 +73,7 @@ export const StudentPortal: React.FC = () => {
   if (!currentStudent) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-4">
+        <div className="glass-panel max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 text-center space-y-4">
           <User size={36} className="mx-auto text-slate-400" />
           <h2 className="text-xl font-bold text-slate-900 dark:text-white">
             {t("details.notFoundTitle")}
@@ -111,9 +112,9 @@ export const StudentPortal: React.FC = () => {
   const monthlyProgressPercentage = Math.round((monthlyCycleProgress / engagementSettings.monthlyGoal) * 100);
 
   return (
-    <div className={`${isWordEditorOpen ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-200 selection:bg-blue-100 selection:text-blue-900 dark:selection:bg-blue-900 dark:selection:text-blue-100`}>
+    <div className={`${isWordEditorOpen ? 'h-screen overflow-hidden' : 'glass-backdrop min-h-screen'} bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col transition-colors duration-300 selection:bg-blue-100 selection:text-blue-900 dark:selection:bg-blue-900 dark:selection:text-blue-100`}>
       {/* Student Top Header Navigation */}
-      {!isWordEditorOpen && <header className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-30 shadow-2xs">
+      {!isWordEditorOpen && <header className="glass-nav bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-30 shadow-2xs">
         <div className="safe-area-x max-w-6xl mx-auto px-0 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-2 h-16">
             {/* Logo & Student Portal Badge */}
@@ -178,19 +179,19 @@ export const StudentPortal: React.FC = () => {
           </div>
         </div>
       </header>}
-      {!isWordEditorOpen && isMenuOpen && <div className="safe-area-x sm:hidden sticky top-16 z-20 border-b border-slate-200 bg-white px-0 py-3 shadow-lg dark:border-slate-800 dark:bg-slate-900">
+      {!isWordEditorOpen && <div className="sm:hidden sticky top-16 z-20"><AnimatedDisclosure open={isMenuOpen}><div className="safe-area-x border-b border-slate-200 bg-white px-0 py-3 shadow-lg dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-6xl flex-col gap-2">
           <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800"><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t("settings.themeTitle")}</span><ThemeSwitcher variant="toggle" /></div>
           <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800"><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t("settings.langTitle")}</span><LanguageSwitcher variant="toggle" /></div>
           <button type="button" onClick={logout} className="mt-1 flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-bold text-red-600 dark:border-red-800 dark:bg-red-950/40 dark:text-red-400"><LogOut size={16} />{t("auth.logout")}</button>
         </div>
-      </div>}
+      </div></AnimatedDisclosure></div>}
 
       {/* Main Content View */}
       <main className={isWordEditorOpen ? 'flex-1 min-h-0 w-full' : 'flex-1'}>
         <div className={activeTab === 'apps' ? 'block' : 'hidden'}>
           <div className={isWordEditorOpen ? 'flex-1 min-h-0 w-full' : 'max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8'}>
-            <AppsHub onWordEditorChange={setIsWordEditorOpen} />
+            <React.Suspense fallback={<div className="loading-panel" role="status"><span className="loading-indicator" />Carregando aplicativos...</div>}><AppsHub onWordEditorChange={setIsWordEditorOpen} /></React.Suspense>
           </div>
         </div>
 
@@ -234,14 +235,14 @@ export const StudentPortal: React.FC = () => {
           currentClassId={currentStudent.classId}
         />
 
-        <div className="rounded-2xl border border-violet-200 bg-white p-5 shadow-xs dark:border-violet-900/70 dark:bg-slate-900">
+        <div className="glass-panel rounded-2xl border border-violet-200 bg-white p-5 shadow-xs dark:border-violet-900/70 dark:bg-slate-900">
           <div className="mb-2 flex items-center justify-between gap-3"><div><p className="text-sm font-extrabold text-slate-900 dark:text-white">Recompensa mensal</p><p className="text-xs text-slate-500 dark:text-slate-400">A barra reinicia automaticamente ao completar cada meta.</p></div><span className="text-sm font-extrabold text-violet-600 dark:text-violet-400">{monthlyCycleProgress} / {engagementSettings.monthlyGoal} XP</span></div>
           <ProgressBar progress={monthlyProgressPercentage} size="lg" showLabel={false} />
           <p className="mt-2 text-right text-[11px] font-semibold text-slate-500 dark:text-slate-400">{monthlyXp >= engagementSettings.monthlyGoal ? `${Math.floor(monthlyXp / engagementSettings.monthlyGoal)} meta(s) concluída(s) neste mês` : "Continue acumulando XP neste mês"}</p>
         </div>
 
         {/* Hero Card: Points & Level Progress */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
+        <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -348,6 +349,7 @@ export const StudentPortal: React.FC = () => {
             </div>
             <ProgressBar
               progress={currentStudent.progressPercentage}
+              level={currentStudent.level}
               size="lg"
               showLabel={false}
             />
@@ -379,7 +381,7 @@ export const StudentPortal: React.FC = () => {
         </div>
 
         {/* Motivational / Rules Card */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs flex items-start gap-3.5">
+        <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs flex items-start gap-3.5">
           <div className="p-2.5 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 rounded-xl mt-0.5">
             <Info size={20} />
           </div>

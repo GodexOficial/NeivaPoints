@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { StudentProvider, useStudentContext } from './context/StudentContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -8,7 +8,7 @@ import { Navbar, type NavTab } from './components/layout/Navbar';
 import { Dashboard } from './pages/Dashboard';
 import { StudentsPage } from './pages/Students';
 import { ClassesPage } from './pages/Classes';
-import { AppsHub } from './pages/AppsHub';
+const AppsHub = lazy(() => import('./pages/AppsHub').then(module => ({ default: module.AppsHub })));
 import { StudentDetails } from './pages/StudentDetails';
 import { SettingsPage } from './pages/Settings';
 import { JoinClassPage } from './pages/JoinClass';
@@ -19,6 +19,7 @@ import { ClassFormModal } from './components/modals/ClassFormModal';
 import { PointsModal } from './components/modals/PointsModal';
 import { ClassPointsModal } from './components/modals/ClassPointsModal';
 import { LevelUpToast } from './components/common/LevelUpToast';
+import { InteractionMotion } from './components/common/InteractionMotion';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 const MainContent: React.FC = () => {
@@ -110,7 +111,8 @@ const MainContent: React.FC = () => {
   }
 
   return (
-    <div className={`${isWordEditorOpen ? 'h-screen overflow-hidden' : 'min-h-screen'} bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col selection:bg-blue-100 selection:text-blue-900 dark:selection:bg-blue-900/60 dark:selection:text-blue-100 transition-colors duration-200`}>
+    <div className={`${isWordEditorOpen ? 'h-dvh overflow-hidden' : 'app-shell min-h-dvh'} bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col selection:bg-blue-100 selection:text-blue-900 dark:selection:bg-blue-900/60 dark:selection:text-blue-100 transition-colors duration-300`}>
+      {!isWordEditorOpen && <a href="#main-content" className="skip-link">Pular para o conteúdo</a>}
       {!isWordEditorOpen && <Navbar
         currentTab={selectedStudentId ? ('students' as NavTab) : activeTab}
         onSelectTab={handleSelectTab}
@@ -118,7 +120,8 @@ const MainContent: React.FC = () => {
         onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
       />}
 
-      <main className={isWordEditorOpen ? 'flex-1 min-h-0 w-full' : 'flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8'}>
+      <main id="main-content" tabIndex={-1} className={isWordEditorOpen ? 'flex-1 min-h-0 w-full' : 'app-content flex-1 max-w-[1440px] min-w-0 w-full mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-10'}>
+        <div key={selectedStudentId || activeTab} className={isWordEditorOpen ? "h-full min-h-0" : "motion-page"}>
         {selectedStudentId ? (
           <StudentDetails
             studentId={selectedStudentId}
@@ -150,10 +153,13 @@ const MainContent: React.FC = () => {
             onOpenClassRemovePointsModal={handleOpenClassRemovePointsModal}
           />
         ) : activeTab === 'apps' ? (
-          <AppsHub onWordEditorChange={setIsWordEditorOpen} />
+          <Suspense fallback={<div className="loading-panel" role="status"><span className="loading-indicator" />Carregando aplicativos…</div>}>
+            <AppsHub onWordEditorChange={setIsWordEditorOpen} />
+          </Suspense>
         ) : activeTab === 'settings' ? (
           <SettingsPage />
         ) : null}
+        </div>
       </main>
 
       {/* Global Modals */}
@@ -200,6 +206,8 @@ const MainContent: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <ErrorBoundary>
+      <InteractionMotion />
+      <div className="glass-theme">
       <ThemeProvider>
         <LanguageProvider>
           <StudentProvider>
@@ -209,6 +217,7 @@ export const App: React.FC = () => {
           </StudentProvider>
         </LanguageProvider>
       </ThemeProvider>
+      </div>
     </ErrorBoundary>
   );
 };

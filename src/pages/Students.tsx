@@ -1,3 +1,4 @@
+import { useAnimatedList } from '../hooks/useAnimatedList';
 import React, { useState, useMemo } from 'react';
 import {
   UserPlus,
@@ -70,6 +71,8 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
     return result;
   }, [students, selectedClass, searchQuery, sortField, sortOrder]);
 
+  const listRef = useAnimatedList<HTMLDivElement>(viewMode + filteredAndSortedStudents.map(student => student.id).join('|'));
+
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
       setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -80,7 +83,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
+    <div className="space-y-6 animate-in fade-in duration-300">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -103,7 +106,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
       </div>
 
       {/* Filter and Search Controls */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3.5">
+      <div className="glass-panel bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800 shadow-xs space-y-3.5">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
           {/* Search Bar */}
           <div className="flex-1">
@@ -117,6 +120,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
           {/* Class Filter Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
             <button
+              aria-pressed={selectedClass === "all"}
               onClick={() => setSelectedClass('all')}
               className={`px-3 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-colors cursor-pointer ${
                 selectedClass === 'all'
@@ -131,6 +135,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
               return (
                 <button
                   key={c.id}
+                  aria-pressed={selectedClass === c.id}
                   onClick={() => setSelectedClass(c.id)}
                   className={`px-3 py-2 text-xs font-semibold rounded-xl whitespace-nowrap transition-colors cursor-pointer ${
                     selectedClass === c.id
@@ -186,6 +191,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
           {/* View toggle (Grid vs Table) */}
           <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
             <button
+              aria-pressed={viewMode === "grid"}
               onClick={() => setViewMode('grid')}
               className={`p-1.5 rounded-md cursor-pointer ${
                 viewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow-2xs text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'
@@ -195,6 +201,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
               <Grid size={15} />
             </button>
             <button
+              aria-pressed={viewMode === "table"}
               onClick={() => setViewMode('table')}
               className={`p-1.5 rounded-md cursor-pointer ${
                 viewMode === 'table' ? 'bg-white dark:bg-slate-700 shadow-2xs text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'
@@ -219,7 +226,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
 
       {/* Empty State */}
       {filteredAndSortedStudents.length === 0 ? (
-        <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
+        <div className="glass-panel py-16 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
           <div className="w-14 h-14 mx-auto mb-3.5 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500">
             <Users size={26} />
           </div>
@@ -243,7 +250,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
         </div>
       ) : viewMode === 'grid' ? (
         /* Grid View */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div ref={listRef} className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredAndSortedStudents.map((student) => (
             <StudentCard
               key={student.id}
@@ -255,7 +262,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
         </div>
       ) : (
         /* Table View */
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+        <div ref={listRef} className="glass-panel relative motion-page bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 uppercase font-semibold">
@@ -270,14 +277,14 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredAndSortedStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                  <tr data-motion-id={student.id} key={student.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
                     <td className="py-3.5 px-4">
-                      <div
+                      <button type="button"
                         onClick={() => onViewProfile(student.id)}
                         className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer text-sm truncate max-w-[180px]"
                       >
                         {student.name}
-                      </div>
+                      </button>
                     </td>
                     <td className="py-3.5 px-4">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
@@ -292,7 +299,7 @@ export const StudentsPage: React.FC<StudentsPageProps> = ({
                       <span className="text-slate-400 dark:text-slate-500 text-[11px] ml-1">pts</span>
                     </td>
                     <td className="py-3.5 px-4">
-                      <ProgressBar progress={student.progressPercentage} size="sm" />
+                      <ProgressBar progress={student.progressPercentage} level={student.level} size="sm" />
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">

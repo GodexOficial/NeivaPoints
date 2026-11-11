@@ -66,7 +66,7 @@ export const JoinClassPage: React.FC<JoinClassProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50/50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex flex-col justify-between p-4 sm:p-6 lg:p-8 transition-colors duration-200">
+    <div className="glass-backdrop min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50/50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex flex-col justify-between p-4 sm:p-6 lg:p-8 transition-colors duration-300">
       {/* Top Bar with Discrete Teacher Return, Theme Switcher & Language Switcher */}
       <div className="max-w-xl mx-auto w-full flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -95,7 +95,7 @@ export const JoinClassPage: React.FC<JoinClassProps> = ({
       <div className="max-w-md mx-auto w-full my-auto py-8">
         {!registeredStudent ? (
           /* Registration Form Screen */
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-150">
+          <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xl overflow-hidden p-6 sm:p-8 animate-in fade-in zoom-in-95 duration-300">
             <div className="text-center mb-8">
               <div className="w-14 h-14 mx-auto mb-4 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-md">
                 <GraduationCap size={28} />
@@ -168,7 +168,7 @@ export const JoinClassPage: React.FC<JoinClassProps> = ({
           </div>
         ) : (
           /* Registration Success Screen (Spec Section 7) */
-          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-emerald-100 dark:border-emerald-900/60 shadow-xl overflow-hidden p-6 sm:p-8 text-center animate-in fade-in zoom-in-95 duration-200">
+          <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-emerald-100 dark:border-emerald-900/60 shadow-xl overflow-hidden p-6 sm:p-8 text-center animate-in fade-in zoom-in-95 duration-300">
             <div className="w-16 h-16 mx-auto mb-4 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center">
               <CheckCircle size={36} />
             </div>

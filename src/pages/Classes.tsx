@@ -81,7 +81,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
   // If there are zero classes registered
   if (classes.length === 0) {
     return (
-      <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 space-y-4 animate-in fade-in">
+      <div className="glass-panel py-16 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 space-y-4 animate-in fade-in">
         <div className="w-16 h-16 mx-auto bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center">
           <GraduationCap size={36} />
         </div>
@@ -114,7 +114,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
   const localizedClassName = getClassName(currentClassId, activeClass?.name);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
+    <div className="space-y-6 animate-in fade-in duration-300">
       {/* Class Selector Tabs & Register Class Button */}
       <div className="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-1">
@@ -123,6 +123,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
             return (
               <button
                 key={c.id}
+                aria-pressed={isSelected}
                 onClick={() => setActiveClassId(c.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer ${
                   isSelected
@@ -148,7 +149,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
       </div>
 
       {/* Class Overview Header Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs">
+      <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
           <div className="flex min-w-0 items-center gap-4">
             <div className="w-14 h-14 shrink-0 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-extrabold text-2xl shadow-sm">
@@ -261,7 +262,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
               {activeStats.averageProgress}%
             </span>
             <div className="mt-2">
-              <ProgressBar progress={activeStats.averageProgress} size="sm" showLabel={false} />
+              <ProgressBar progress={activeStats.averageProgress} level={activeStats.averageLevel} size="sm" showLabel={false} />
             </div>
           </div>
         </div>
@@ -319,7 +320,7 @@ export const ClassesPage: React.FC<ClassesPageProps> = ({
           </div>
 
           {classStudents.length === 0 ? (
-            <div className="py-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
+            <div className="glass-panel py-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
               <Users size={32} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
               <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                 {t('classes.noStudentsYet')}

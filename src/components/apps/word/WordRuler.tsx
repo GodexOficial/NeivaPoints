@@ -9,6 +9,7 @@ interface WordRulerProps {
   onChangeRightMargin: (valCm: number) => void;
   onChangeFirstLineIndent: (valCm: number) => void;
   paperWidthPx?: number; // default A4 ~ 794px
+  paperWidthCm?: number;
   scopeMode?: 'paragraph' | 'all';
   targetSummary?: string;
   onToggleScopeMode?: () => void;
@@ -22,6 +23,7 @@ export const WordRuler: React.FC<WordRulerProps> = ({
   onChangeRightMargin,
   onChangeFirstLineIndent,
   paperWidthPx = 794,
+  paperWidthCm = 21,
   scopeMode = 'all',
   targetSummary,
   onToggleScopeMode,
@@ -30,7 +32,7 @@ export const WordRuler: React.FC<WordRulerProps> = ({
   const [dragging, setDragging] = useState<'left' | 'right' | 'indent' | null>(null);
 
   // A4 paper is 21 cm wide. 1 cm ~ (paperWidthPx / 21) px.
-  const pxPerCm = paperWidthPx / 21;
+  const pxPerCm = paperWidthPx / paperWidthCm;
 
   const handleMouseDown = (type: 'left' | 'right' | 'indent', e: React.MouseEvent) => {
     e.preventDefault();
@@ -42,15 +44,15 @@ export const WordRuler: React.FC<WordRulerProps> = ({
       if (!dragging || !rulerRef.current) return;
       const rect = rulerRef.current.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
-      const cmVal = Math.max(0, Math.min(21, mouseX / pxPerCm));
+      const cmVal = Math.max(0, Math.min(paperWidthCm, mouseX / (rect.width / paperWidthCm)));
       const roundedCm = Math.round(cmVal * 10) / 10;
 
       if (dragging === 'left') {
-        const maxLeft = 21 - rightMarginCm - 1;
+        const maxLeft = paperWidthCm - rightMarginCm - 1;
         onChangeLeftMargin(Math.max(0, Math.min(roundedCm, maxLeft)));
       } else if (dragging === 'right') {
-        const maxRight = 21 - leftMarginCm - 1;
-        onChangeRightMargin(Math.max(0, Math.min(21 - roundedCm, maxRight)));
+        const maxRight = paperWidthCm - leftMarginCm - 1;
+        onChangeRightMargin(Math.max(0, Math.min(paperWidthCm - roundedCm, maxRight)));
       } else if (dragging === 'indent') {
         onChangeFirstLineIndent(Math.max(0, Math.min(15, roundedCm)));
       }
@@ -68,13 +70,13 @@ export const WordRuler: React.FC<WordRulerProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, leftMarginCm, rightMarginCm, onChangeLeftMargin, onChangeRightMargin, onChangeFirstLineIndent, pxPerCm]);
+  }, [dragging, leftMarginCm, rightMarginCm, onChangeLeftMargin, onChangeRightMargin, onChangeFirstLineIndent, paperWidthCm]);
 
   // Tick marks: 0 to 21 cm
-  const ticks = Array.from({ length: 22 }, (_, i) => i);
+  const ticks = Array.from({ length: Math.floor(paperWidthCm) + 1 }, (_, i) => i);
 
   const leftPx = leftMarginCm * pxPerCm;
-  const rightPx = (21 - rightMarginCm) * pxPerCm;
+  const rightPx = (paperWidthCm - rightMarginCm) * pxPerCm;
   const indentPx = firstLineIndentCm * pxPerCm;
 
   return (
@@ -132,7 +134,7 @@ export const WordRuler: React.FC<WordRulerProps> = ({
                 className="absolute top-0 h-2.5 border-l border-slate-400 dark:border-slate-500 pointer-events-none"
                 style={{ left: `${posPx}px` }}
               />
-              {cm > 0 && cm < 21 && (
+              {cm > 0 && cm < paperWidthCm && (
                 <span
                   className="absolute top-2.5 -translate-x-1/2 pointer-events-none leading-none font-semibold text-[10px]"
                   style={{ left: `${posPx}px` }}
@@ -141,7 +143,7 @@ export const WordRuler: React.FC<WordRulerProps> = ({
                 </span>
               )}
               {/* Half cm tick mark */}
-              {cm < 21 && (
+              {cm < paperWidthCm && (
                 <div
                   className="absolute top-0 h-1.5 border-l border-slate-300 dark:border-slate-600 pointer-events-none"
                   style={{ left: `${posPx + pxPerCm / 2}px` }}

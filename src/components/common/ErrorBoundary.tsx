@@ -64,7 +64,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
-          <div className="max-w-lg w-full bg-white dark:bg-slate-900 rounded-3xl border border-red-200 dark:border-red-900/60 shadow-xl p-6 sm:p-8 text-center animate-in fade-in zoom-in-95 duration-150">
+          <div className="glass-panel max-w-lg w-full bg-white dark:bg-slate-900 rounded-3xl border border-red-200 dark:border-red-900/60 shadow-xl p-6 sm:p-8 text-center animate-in fade-in zoom-in-95 duration-300">
             <div className="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-950/60 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center shadow-xs">
               <AlertOctagon size={32} />
             </div>

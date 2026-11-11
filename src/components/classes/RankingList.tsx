@@ -54,7 +54,7 @@ export const RankingList: React.FC<RankingListProps> = ({
 
   if (ranked.length === 0) {
     return (
-      <div className="py-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
+      <div className="glass-panel py-10 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6">
         <Trophy size={32} className="mx-auto text-slate-300 dark:text-slate-600 mb-2" />
         <p className="text-sm font-medium text-slate-600 dark:text-slate-300">{t('classes.noStudentsYet')}</p>
         <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">{t('classes.registerToRank')}</p>
@@ -63,7 +63,7 @@ export const RankingList: React.FC<RankingListProps> = ({
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+    <div className="glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
       <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-850">
         <div className="flex items-center gap-2">
           <Trophy size={18} className="text-amber-500" />
@@ -88,8 +88,11 @@ export const RankingList: React.FC<RankingListProps> = ({
           return (
             <div
               key={student.id}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectStudent(student.id); } }}
               onClick={() => onSelectStudent(student.id)}
-              className={`px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 cursor-pointer transition-colors ${
+              className={`group px-5 py-3.5 flex items-center justify-between gap-3 hover:bg-blue-50/50 dark:hover:bg-blue-950/30 cursor-pointer transition-colors ${
                 rank === 1 ? 'bg-amber-50/30 dark:bg-amber-950/20' : ''
               }`}
             >

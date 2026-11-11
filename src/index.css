@@ -1,10 +1,121 @@
 @import "tailwindcss";
+@import "./glass.css";
+@import "./motion.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Shared interface tokens; vectors and rem units stay sharp at any pixel density. */
+@theme {
+  --font-sans: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+}
+
+@layer base {
+  html { color-scheme: light; scroll-padding-top: 6rem; }
+  body { text-rendering: optimizeLegibility; }
+  button, a, input, select, textarea, [role="button"] { -webkit-tap-highlight-color: transparent; }
+  :where(button, a, input, select, textarea, [role="button"]):focus-visible {
+    outline: 3px solid #6366f1;
+    outline-offset: 3px;
+  }
+  :where(button, [role="button"]) {
+    touch-action: manipulation;
+    transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out, border-color 0.3s ease-in-out, box-shadow 0.3s ease-in-out, transform 0.3s ease-in-out;
+  }
+
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]), select, textarea) {
+    min-height: 2.875rem;
+    font-size: 1rem;
+  }
+}
+
+.app-shell {
+  background-image: radial-gradient(ellipse at 5% 0%, #dbeafe80, transparent 45%), radial-gradient(ellipse at 100% 35%, #ede9fe60, transparent 40%);
+}
+.dark .app-shell {
+  background-image: radial-gradient(ellipse at 5% 0%, #1e3a8a25, transparent 45%), radial-gradient(ellipse at 100% 35%, #4c1d9520, transparent 40%);
+}
+.app-content > * { min-width: 0; }
+.app-content :where(button:not([role="switch"])) { min-height: 2.75rem; }
+.app-content :where(h1) { text-wrap: balance; }
+.app-content :where(h2, h3, p) { overflow-wrap: anywhere; }
+.app-content :where(.rounded-2xl.border, .rounded-3xl.border) {
+  box-shadow: 0 4px 24px -16px #1e3a8a35;
+}
+.dashboard-stats { grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr)); }
+.dashboard-stats > * { min-width: 0; text-align: left; }
+.dashboard-hero { box-shadow: 0 16px 40px -24px #4338ca90; }
+.dashboard-hero::after {
+  content: ''; position: absolute; width: 20rem; height: 20rem; right: -7rem; bottom: -14rem;
+  border: 2.5rem solid #ffffff0a; border-radius: 50%; pointer-events: none;
+}
+.dashboard-classes > *, .dashboard-stats > * {
+  transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out;
+}
+@media all {
+  :where(html[data-motion="full"]) .dashboard-classes > *, :where(html[data-motion="full"]) .dashboard-stats > * { animation: interface-enter 0.3s ease-in-out backwards; }
+  :where(html[data-motion="full"]) :is(.dashboard-classes, .dashboard-stats) > :nth-child(2) { animation-delay: 35ms; }
+  :where(html[data-motion="full"]) :is(.dashboard-classes, .dashboard-stats) > :nth-child(3) { animation-delay: 70ms; }
+  :where(html[data-motion="full"]) :is(.dashboard-classes, .dashboard-stats) > :nth-child(n+4) { animation-delay: 105ms; }
+}
+@media all {
+  :where(html[data-motion="full"][data-pointer="mouse"]) .dashboard-classes > *:hover, :where(html[data-motion="full"][data-pointer="mouse"]) .dashboard-stats > [role="button"]:hover {
+    transform: translateY(-4px); box-shadow: 0 12px 28px -16px #4338ca55;
+  }
+}
+button > svg { flex-shrink: 0; transition: transform 0.3s ease-in-out; }
+/* Interaction motion uses scale/translate, so no neighboring item changes size. */
+@media all {
+  :where(html[data-motion="full"]) [aria-pressed="true"], :where(html[data-motion="full"]) [aria-current="page"] { animation: selection-settle 0.3s ease-in-out; }
+  :where(html[data-motion="full"]) [role="dialog"].fixed { animation: backdrop-enter 0.3s ease-in-out both; }
+  :where(html[data-motion="full"]) [role="dialog"].fixed > :is(div, form) { animation: dialog-enter 0.3s ease-in-out both; }
+  :where(html[data-motion="full"]) .motion-page { animation: page-slide 0.3s ease-in-out both; }
+}
+@media all {
+  :where(html[data-motion="full"][data-pointer="mouse"]) .motion-card:not(.student-card):hover { translate: 0 -3px; }
+}
+.motion-card { transition: translate 0.3s ease-in-out, box-shadow 0.3s ease-in-out, border-color 0.3s ease-in-out; }
+.motion-disclosure { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.3s ease-in-out, opacity 0.3s ease-in-out; }
+.motion-disclosure[data-open="true"] { grid-template-rows: 1fr; opacity: 1; }
+.motion-disclosure-inner { overflow: hidden; min-height: 0; }
+@starting-style {
+  .motion-disclosure[data-open="true"] { grid-template-rows: 0fr; opacity: 0; }
+}
+@keyframes page-slide { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: none; } }
+@keyframes backdrop-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes selection-settle { 0% { scale: .95; } 65% { scale: 1.025; } 100% { scale: 1; } }
+.skip-link {
+  position: fixed; top: 1rem; left: 1rem; z-index: 100; padding: .875rem 1.25rem;
+  border-radius: .75rem; background: #2563eb; color: white; transform: translateY(-180%);
+}
+.skip-link:focus { transform: translateY(0); }
+.mobile-navigation { max-height: calc(100dvh - 5rem); overflow-y: auto; overscroll-behavior: contain; animation: interface-enter 0.3s ease-in-out both; }
+.mobile-navigation button { min-height: 2.75rem; }
+/* Existing animate-in classes now have a real, dependency-free implementation. */
+.animate-in { animation: interface-enter 0.3s ease-in-out both; }
+.zoom-in-95 { animation-name: dialog-enter; }
+@keyframes interface-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes dialog-enter { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes loading-turn { to { transform: rotate(360deg); } }
+.loading-panel { display: flex; align-items: center; justify-content: center; gap: .75rem; min-height: 16rem; }
+.loading-indicator { width: 1.5rem; height: 1.5rem; border: 2px solid #c7d2fe; border-top-color: #4f46e5; border-radius: 50%; animation: loading-turn 0.3s ease-in-out infinite; }
+/* Keep dialogs usable with a virtual keyboard, landscape screens and zoom. */
+[role="dialog"].fixed { overflow-y: auto; overscroll-behavior: contain; padding-block: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-bottom)); }
+[role="dialog"].fixed > div { max-height: calc(100dvh - 2rem); overflow-y: auto; }
+@media (max-width: 639px) {
+  .dashboard-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-stats > * { padding: 1rem; }
+  .dashboard-hero button { flex: 1 1 100%; justify-content: center; }
+}
+@media (pointer: coarse) {
+  :where(button, [role="button"]):not(.a4-page-content *) { min-height: 2.75rem; }
+}
+@media all {
+  :where(html[data-motion="reduced"]) *, :where(html[data-motion="reduced"]) *::before, :where(html[data-motion="reduced"]) *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
 @layer base {
   :root {
-    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    --font-sans: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
   }
 
   html.dark {
@@ -19,7 +130,7 @@
     margin: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
   }
 
   html.dark body {
@@ -112,7 +223,7 @@
 }
 
 .animate-level-up {
-  animation: levelUpPulse 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: levelUpPulse 0.3s ease-in-out forwards;
 }
 
 /* The editor uses contentEditable, so lists need explicit styles instead of
@@ -174,3 +285,20 @@
   }
 }
 
+
+/* Actions remain visible on touch devices and slide into view with a mouse. */
+.app-grid-slot [draggable="true"] { user-select: none; -webkit-user-select: none; }
+.app-grid-slot [draggable="true"] img { -webkit-user-drag: none; }
+.app-grid-slot[data-dragging="true"] { opacity: .45; }
+.app-grid-slot[data-drop-target="true"] { outline: 2px solid #6366f1; outline-offset: -2px; background-color: #818cf81a; }
+.app-tile-actions { transition: opacity 0.3s ease-in-out, translate 0.3s ease-in-out; }
+@media all {
+  :where(html[data-pointer="mouse"]) .app-tile-actions { opacity: 0; translate: 0 -4px; pointer-events: none; }
+  :where(html[data-pointer="mouse"]) .group:is(:hover, :focus-within) > .app-tile-actions { opacity: 1; translate: 0 0; pointer-events: auto; }
+}
+@media all {
+  :where(html[data-motion="reduced"]) .motion-card:hover { translate: none; }
+}
+
+/* One easing curve for CSS animations, transitions and utility classes. */
+:root { --motion-easing: ease-in-out; --motion-duration: 0.3s; }

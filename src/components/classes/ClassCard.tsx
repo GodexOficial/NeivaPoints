@@ -20,8 +20,15 @@ export const ClassCard: React.FC<ClassCardProps> = ({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault(); onSelectClass(stats.classId);
+        }
+      }}
       onClick={() => onSelectClass(stats.classId)}
-      className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 shadow-xs hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500 transition-all cursor-pointer group flex flex-col justify-between"
+      className="glass-panel bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/90 dark:border-slate-800 p-6 shadow-xs hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500 transition-all cursor-pointer group flex flex-col justify-between"
     >
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -77,13 +84,20 @@ export const ClassCard: React.FC<ClassCardProps> = ({
             <span>{t('classes.progression')}</span>
             <span>{stats.averageProgress}%</span>
           </div>
-          <ProgressBar progress={stats.averageProgress} size="sm" showLabel={false} />
+          <ProgressBar progress={stats.averageProgress} level={stats.averageLevel} size="sm" showLabel={false} />
         </div>
       </div>
 
       {/* Top Student Highlight */}
       {stats.topStudent && (
         <div
+          role={onSelectStudent ? 'button' : undefined}
+          tabIndex={onSelectStudent ? 0 : undefined}
+          onKeyDown={(event) => {
+            if (onSelectStudent && stats.topStudent && (event.key === 'Enter' || event.key === ' ')) {
+              event.preventDefault(); event.stopPropagation(); onSelectStudent(stats.topStudent.id);
+            }
+          }}
           onClick={(e) => {
             if (onSelectStudent && stats.topStudent) {
               e.stopPropagation();

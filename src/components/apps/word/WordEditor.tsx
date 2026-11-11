@@ -1,17 +1,16 @@
+import './editor-fonts.css';
+import './word-workspace.css';
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   FileText,
   Save,
-  Download,
   ArrowLeft,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  FilePlus,
   Sparkles,
   Plus,
   Trash2,
   Copy,
+  Search, Undo2, Redo2, MessageSquare, Share2, X,
 } from 'lucide-react';
 import type { WordDocument, SaveStatus, VectorShape, BitmapImage, ActiveFormatting } from '../../../types/doc';
 import {
@@ -20,7 +19,7 @@ import {
   getAutoSaveDraft,
   createNewDocument,
 } from '../../../services/docService';
-import { exportToDocx } from '../../../utils/docxExporter';
+import { createDocxBlob, exportToDocx } from '../../../utils/docxExporter';
 import { WordToolbar } from './WordToolbar';
 import { InsertShapeModal } from './InsertShapeModal';
 import { InsertImageModal } from './InsertImageModal';
@@ -28,8 +27,11 @@ import { InsertTableModal } from './InsertTableModal';
 import { TableEditModal } from './TableEditModal';
 import { FindReplaceModal } from './FindReplaceModal';
 import { WordContextMenu } from './WordContextMenu';
-import { WordRuler } from './WordRuler';
-import { WordVerticalRuler } from './WordVerticalRuler';
+import { WordViewportRulers } from './WordViewportRulers';
+import { WordInkPad, WordPanels, type WordPanel } from './WordPanels';
+import { cleanWordHtml, escapeWordText, importWordFile } from '../../../utils/wordImport';
+import { deleteTableColumn, deleteTableContent, deleteTableRow, fitTable, insertTableColumn, insertTableRow, tableMap, type TableCell } from '../../../utils/wordTable';
+import { useWordTableResize } from '../../../hooks/useWordTableResize';
 
 interface WordEditorProps {
   initialDocument: WordDocument;
@@ -38,6 +40,13 @@ interface WordEditorProps {
 
 const EMPTY_PAGE_HTML = '<p><br></p>';
 const LEGACY_EDITOR_PROMPT_HTML = '<p>Comece a digitar seu texto aqui...</p>';
+
+const hasNewerDraft = (doc: WordDocument, draft: ReturnType<typeof getAutoSaveDraft>): boolean => {
+  if (!draft || Date.parse(draft.savedAt) <= Date.parse(doc.updatedAt)) return false;
+  if (draft.content !== doc.content || draft.title !== doc.title) return true;
+  const fields: (keyof WordDocument)[] = ['paperTheme', 'paperMargin', 'leftMarginCm', 'rightMarginCm', 'topMarginCm', 'bottomMarginCm', 'firstLineIndentCm', 'watermarkText', 'orientation', 'pageSize', 'comments', 'headerText', 'footerText', 'pageNumbers'];
+  return Boolean(draft.document && fields.some(key => JSON.stringify(draft.document?.[key]) !== JSON.stringify(doc[key])));
+};
 
 const normalizePageHtml = (html?: string): string => {
   const trimmedHtml = html?.trim() || '';
@@ -93,8 +102,10 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isTableModalOpen, setIsTableModalOpen] = useState(false);
   const [isTableEditOpen, setIsTableEditOpen] = useState(false);
+  const tableDialogOpen = useRef(false); tableDialogOpen.current = isTableEditOpen;
   const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<HTMLTableElement | null>(null);
+  const [activeTableCell, setActiveTableCell] = useState<TableCell | null>(null);
 
   // Margins state
   const [leftMarginCm, setLeftMarginCm] = useState(initialDocument.leftMarginCm ?? 2.5);
@@ -102,7 +113,35 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const [topMarginCm, setTopMarginCm] = useState(initialDocument.topMarginCm ?? 2.5);
   const [bottomMarginCm, setBottomMarginCm] = useState(initialDocument.bottomMarginCm ?? 2.5);
   const [firstLineIndentCm, setFirstLineIndentCm] = useState(initialDocument.firstLineIndentCm ?? 0);
-  const [watermarkText, setWatermarkText] = useState('');
+  const [watermarkText, setWatermarkText] = useState(initialDocument.watermarkText || '');
+  const [comments, setComments] = useState<NonNullable<WordDocument['comments']>>(initialDocument.comments || []);
+  const [headerText, setHeaderText] = useState(initialDocument.headerText || '');
+  const [footerText, setFooterText] = useState(initialDocument.footerText || '');
+  const [pageNumbers, setPageNumbers] = useState(initialDocument.pageNumbers || false);
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(initialDocument.orientation || 'portrait');
+  const [pageSize, setPageSize] = useState<'a4' | 'letter'>(initialDocument.pageSize || 'a4');
+  const [zoom, setZoom] = useState(100);
+  const [rulerVisible, setRulerVisible] = useState(true);
+  const [marksVisible, setMarksVisible] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [readOnly, setReadOnly] = useState(false);
+  const [autoSave, setAutoSave] = useState(true);
+  const [panel, setPanel] = useState<WordPanel>(null);
+  const [inkOpen, setInkOpen] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [commandSearch, setCommandSearch] = useState('');
+  const [dictating, setDictating] = useState(false);
+  const recognitionRef = useRef<{ start: () => void; stop: () => void; onresult: ((event: any) => void) | null; onend: (() => void) | null; onerror: ((event: any) => void) | null; lang: string; continuous: boolean; interimResults: boolean } | null>(null);
+  const inputFileRef = useRef<HTMLInputElement>(null);
+  const selectionRef = useRef<Range | null>(null);
+  const formatPainterRef = useRef<ActiveFormatting | null>(null);
+  const initializedSave = useRef(false);
+  const latestDocument = useRef<() => WordDocument>(() => initialDocument);
+  const canDictate = typeof window !== 'undefined' && Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+  const portraitWidth = pageSize === 'a4' ? 21 : 21.59;
+  const portraitHeight = pageSize === 'a4' ? 29.7 : 27.94;
+  const pageWidthCm = orientation === 'portrait' ? portraitWidth : portraitHeight;
+  const pageHeightCm = orientation === 'portrait' ? portraitHeight : portraitWidth;
 
   // Scope and selection state for Ruler & Paragraph formatting
   const [scopeMode, setScopeMode] = useState<'paragraph' | 'all'>('all');
@@ -145,7 +184,6 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Helper to parse dimension strings into cm numbers
   const parseDimensionCm = (dim?: string): number => {
@@ -188,6 +226,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
       if (el) {
         const style = window.getComputedStyle(el);
+        fontFamily = style.fontFamily || fontFamily;
 
         // Alignment
         const textAlign = style.textAlign || 'left';
@@ -258,6 +297,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
         align,
         fontFamily,
         fontSize,
+        fontSizePt: el ? parseFloat(getComputedStyle(el).fontSize) * .75 : 12,
         textColor,
         bgColor,
         lineBgColor,
@@ -343,63 +383,113 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     return () => document.removeEventListener('selectionchange', handleGlobalSelection);
   }, [analyzeSelection]);
 
-  // Update Word & Character counts
-  const updateStats = useCallback(() => {
-    let totalWords = 0;
-    let totalChars = 0;
-    pages.forEach((p) => {
-      const tmp = document.createElement('div');
-      tmp.innerHTML = p;
-      const text = tmp.innerText || '';
-      if (text.trim()) {
-        totalWords += text.trim().split(/\s+/).length;
+  // Keep a selection bookmark when focus moves into ribbon controls or dialogs.
+  useEffect(() => {
+    const capture = () => {
+      if (tableDialogOpen.current) return;
+      const selection = window.getSelection();
+      if (!selection?.rangeCount) return;
+      const range = selection.getRangeAt(0);
+      if (pageRefs.current.some(page => page?.contains(range.commonAncestorContainer))) {
+        selectionRef.current = range.cloneRange();
+        const node = selection.anchorNode;
+        const element = node instanceof Element ? node : node?.parentElement;
+        const cell = element?.closest<HTMLTableCellElement>('td,th') || null;
+        setActiveTableCell(cell);
+        if (cell) setSelectedTable(cell.closest('table'));
       }
-      totalChars += text.length;
-    });
-    setWordCount(totalWords);
-    setCharCount(totalChars);
-  }, [pages]);
+    };
+    document.addEventListener('selectionchange', capture);
+    return () => document.removeEventListener('selectionchange', capture);
+  }, []);
 
-  // Initialize editor content & check auto-save draft
+  const restoreSelection = () => {
+    const page = pageRefs.current[activePageIndex];
+    if (!page) return;
+    page.focus();
+    const selection = window.getSelection();
+    if (!selection) return;
+    const saved = selectionRef.current;
+    if (saved && page.contains(saved.commonAncestorContainer)) {
+      selection.removeAllRanges(); selection.addRange(saved.cloneRange());
+    } else if (!selection.rangeCount || !page.contains(selection.anchorNode)) {
+      const range = document.createRange(); range.selectNodeContents(page); range.collapse(false);
+      selection.removeAllRanges(); selection.addRange(range);
+    }
+  };
+
+  const updateStats = useCallback(() => {
+    const text = pages.map(html => new DOMParser().parseFromString(html, 'text/html').body.textContent || '').join(' ');
+    setWordCount(text.trim().split(/\s+/).filter(Boolean).length); setCharCount(text.length);
+  }, [pages]);
+  useEffect(updateStats, [updateStats]);
+
+  latestDocument.current = () => {
+    const currentPages = pages.map((html, index) => pageRefs.current[index]?.innerHTML || html);
+    return { ...wordDoc, title: docTitle.trim() || 'Documento sem título', pages: currentPages,
+      content: currentPages.join('<div class="a4-page-break" style="break-before:page"></div>'),
+      paperTheme, paperMargin, leftMarginCm, rightMarginCm, topMarginCm, bottomMarginCm,
+      firstLineIndentCm, watermarkText, comments, headerText, footerText, pageNumbers, orientation, pageSize, updatedAt: new Date().toISOString() };
+  };
+
+  function applyDocument(input: WordDocument) {
+    const draft = getAutoSaveDraft(input.id);
+    const recovered = hasNewerDraft(input, draft);
+    const doc = recovered && draft ? draft.document || { ...input, title: draft.title, content: draft.content, pages: undefined } : input;
+    initializedSave.current = recovered; selectionRef.current = null;
+    setNotice(''); setShowDraftRestoredBanner(recovered); setScopeMode('all'); setSelectedBlockElements([]); setSelectedTable(null); setActiveTableCell(null);
+    setWordDoc(doc); setDocTitle(doc.title);
+    const importedPages = doc.pages?.length ? doc.pages : doc.content.split(/<div[^>]*class="[^"]*a4-page-break[^"]*"[^>]*>[\s\S]*?<\/div>/gi);
+    setPages(importedPages.map(normalizePageHtml)); setActivePageIndex(0);
+    setLeftMarginCm(doc.leftMarginCm ?? 2.5); setRightMarginCm(doc.rightMarginCm ?? 2.5);
+    setTopMarginCm(doc.topMarginCm ?? 2.5); setBottomMarginCm(doc.bottomMarginCm ?? 2.5);
+    setFirstLineIndentCm(doc.firstLineIndentCm ?? 0); setWatermarkText(doc.watermarkText || '');
+    setPaperTheme(doc.paperTheme || 'white'); setPaperMargin(doc.paperMargin || 'normal');
+    setOrientation(doc.orientation || 'portrait'); setPageSize(doc.pageSize || 'a4'); setComments(doc.comments || []);
+    setHeaderText(doc.headerText || ''); setFooterText(doc.footerText || ''); setPageNumbers(doc.pageNumbers || false);
+    setHasUnsavedChanges(recovered); setSaveStatus(recovered ? 'draft_restored' : 'saved');
+    requestAnimationFrame(() => {
+      editorContainerRef.current?.scrollTo({ top: 0, left: 0 });
+      const page = pageRefs.current[0];
+      if (page) { page.focus({ preventScroll: true }); const range = document.createRange(); range.selectNodeContents(page); range.collapse(true); const selection = getSelection(); selection?.removeAllRanges(); selection?.addRange(range); selectionRef.current = range.cloneRange(); }
+    });
+  }
+
   useEffect(() => {
     const draft = getAutoSaveDraft(initialDocument.id);
-    if (draft && draft.content && draft.content !== initialDocument.content) {
-      setDocTitle(draft.title);
-      setShowDraftRestoredBanner(true);
-      setSaveStatus('draft_restored');
+    if (hasNewerDraft(initialDocument, draft)) {
+      applyDocument(initialDocument);
     }
-    updateStats();
-  }, [initialDocument.id, initialDocument.content, updateStats]);
+  // Restore only when opening a different document, never after each keystroke.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDocument.id]);
 
-  // Handle content change & auto-save trigger
+  useEffect(() => {
+    if (!initializedSave.current) { initializedSave.current = true; return; }
+    setHasUnsavedChanges(true); setSaveStatus('unsaved');
+    if (!autoSave) return;
+    const timer = window.setTimeout(() => {
+      try {
+        setSaveStatus('saving');
+        const doc = latestDocument.current();
+        saveAutoSaveDraft(doc.id, doc.content, doc.title, doc);
+        const saved = saveLocalDocument(doc); setWordDoc(saved);
+        setSaveStatus('saved'); setHasUnsavedChanges(false);
+        setLastSavedTime(new Date().toLocaleTimeString('pt-BR'));
+      } catch { setSaveStatus('error'); setNotice('Não foi possível salvar. Verifique o espaço do navegador ou baixe uma cópia do documento.'); }
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [pages, docTitle, paperTheme, paperMargin, leftMarginCm, rightMarginCm, topMarginCm, bottomMarginCm, firstLineIndentCm, watermarkText, comments, headerText, footerText, pageNumbers, orientation, pageSize, autoSave, wordDoc.id]);
+
   const handleContentInput = () => {
-    // Read current HTML from all page divs
-    const updatedPages = pageRefs.current.map((ref, idx) => ref?.innerHTML || pages[idx] || '<p><br></p>');
-    setPages(updatedPages);
-    setHasUnsavedChanges(true);
-    setSaveStatus('unsaved');
-    updateStats();
-
-    // Debounced local auto-save every 3 seconds
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-
-    autoSaveTimerRef.current = setTimeout(() => {
-      setSaveStatus('saving');
-      const combinedHtml = updatedPages.join('<div class="a4-page-break" style="break-before: page; page-break-before: always;"></div>');
-      saveAutoSaveDraft(wordDoc.id, combinedHtml, docTitle);
-
-      setTimeout(() => {
-        setSaveStatus('saved');
-        setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        setHasUnsavedChanges(false);
-      }, 500);
-    }, 3000);
+    const updatedPages = pages.map((html, index) => pageRefs.current[index]?.innerHTML || html);
+    setPages(updatedPages); setHasUnsavedChanges(true); setSaveStatus('unsaved');
   };
+  const tableResize = useWordTableResize(readOnly, handleContentInput);
 
   // Add a new physical A4 Page
   const handleAddPage = () => {
+    if (readOnly) return;
     setPages((prev) => [...prev, EMPTY_PAGE_HTML]);
     setHasUnsavedChanges(true);
     setSaveStatus('unsaved');
@@ -411,6 +501,25 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
         newPageRef.focus();
       }
     }, 50);
+  };
+
+  const handlePageBreak = () => {
+    if (readOnly) return;
+    restoreSelection();
+    const page = pageRefs.current[activePageIndex], selection = getSelection();
+    if (!page || !selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (!page.contains(range.commonAncestorContainer)) return;
+    range.deleteContents();
+    const tail = document.createRange(); tail.selectNodeContents(page);
+    tail.setStart(range.startContainer, range.startOffset);
+    const holder = document.createElement('div'); holder.append(tail.extractContents());
+    const next = pages.map((html, index) => pageRefs.current[index]?.innerHTML || html);
+    next[activePageIndex] = normalizePageHtml(page.innerHTML);
+    next.splice(activePageIndex + 1, 0, normalizePageHtml(holder.innerHTML));
+    const newIndex = activePageIndex + 1;
+    selectionRef.current = null; setPages(next); setActivePageIndex(newIndex); setHasUnsavedChanges(true);
+    requestAnimationFrame(() => { const target = pageRefs.current[newIndex]; if (target) { target.focus(); const caret = document.createRange(); caret.selectNodeContents(target); caret.collapse(true); const current = getSelection(); current?.removeAllRanges(); current?.addRange(caret); selectionRef.current = caret.cloneRange(); } });
   };
 
   // Delete a physical A4 Page
@@ -436,6 +545,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
   // Handle Context Menu Right-Click
   const handleContextMenu = (e: React.MouseEvent, pageIdx: number) => {
+    if (!(e.target as HTMLElement).closest('table,img,svg,[data-word-draggable]') && !e.altKey) return;
     e.preventDefault();
     setActivePageIndex(pageIdx);
     const target = e.target as HTMLElement;
@@ -461,7 +571,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const handleInsertFootnote = () => {
     const activeRef = pageRefs.current[activePageIndex];
     if (!activeRef) return;
-    activeRef.focus();
+    restoreSelection();
 
     const footnoteCount = (editorContainerRef.current?.querySelectorAll('.footnote-ref').length || 0) + 1;
     const refHtml = `<sup class="footnote-ref text-blue-600 font-bold font-mono px-0.5 cursor-pointer" title="Nota de Rodapé ${footnoteCount}">[${footnoteCount}]</sup>`;
@@ -486,57 +596,26 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const handleModifyTable = (
     action: 'addRowAbove' | 'addRowBelow' | 'addColLeft' | 'addColRight' | 'deleteRow' | 'deleteCol' | 'deleteTable'
   ) => {
-    if (!contextTarget) return;
-    const cell = contextTarget.closest('td, th') as HTMLTableCellElement | null;
-    const row = contextTarget.closest('tr') as HTMLTableRowElement | null;
-    const table = contextTarget.closest('table') as HTMLTableElement | null;
-
-    if (!table) return;
-
-    if (action === 'deleteTable') {
-      table.remove();
-    } else if (action === 'addRowAbove' && row) {
-      const newRow = table.insertRow(row.rowIndex);
-      for (let i = 0; i < row.cells.length; i++) {
-        const c = newRow.insertCell(i);
-        c.innerHTML = 'Nova Célula';
-        c.style.padding = '8px';
-        c.style.border = '1px solid #cbd5e1';
-      }
-    } else if (action === 'addRowBelow' && row) {
-      const newRow = table.insertRow(row.rowIndex + 1);
-      for (let i = 0; i < row.cells.length; i++) {
-        const c = newRow.insertCell(i);
-        c.innerHTML = 'Nova Célula';
-        c.style.padding = '8px';
-        c.style.border = '1px solid #cbd5e1';
-      }
-    } else if (action === 'addColLeft' && cell) {
-      const colIndex = cell.cellIndex;
-      for (let r = 0; r < table.rows.length; r++) {
-        const c = table.rows[r].insertCell(colIndex);
-        c.innerHTML = 'Nova Célula';
-        c.style.padding = '8px';
-        c.style.border = '1px solid #cbd5e1';
-      }
-    } else if (action === 'addColRight' && cell) {
-      const colIndex = cell.cellIndex + 1;
-      for (let r = 0; r < table.rows.length; r++) {
-        const c = table.rows[r].insertCell(colIndex);
-        c.innerHTML = 'Nova Célula';
-        c.style.padding = '8px';
-        c.style.border = '1px solid #cbd5e1';
-      }
-    } else if (action === 'deleteRow' && row) {
-      row.remove();
+    if (readOnly) return;
+    const cell = contextTarget?.closest<HTMLTableCellElement>('td,th') || activeTableCell;
+    const table = cell?.closest('table') || selectedTable;
+    if (!table?.isConnected) return;
+    const p = tableMap(table).positions.find(p => p.cell === cell);
+    if (action === 'deleteTable') table.remove();
+    else if (p) {
+      if (action === 'addRowAbove') insertTableRow(table, p.row);
+      if (action === 'addRowBelow') insertTableRow(table, p.row + p.rows);
+      if (action === 'addColLeft') insertTableColumn(table, p.col);
+      if (action === 'addColRight') insertTableColumn(table, p.col + p.cols);
+      if (action === 'deleteRow') deleteTableRow(table, p.row);
+      if (action === 'deleteCol') deleteTableColumn(table, p.col);
     }
-
-    handleContentInput();
+    setActiveTableCell(null); handleContentInput();
   };
 
   // Change Cell Background
   const handleChangeCellBg = (color: string) => {
-    if (!contextTarget) return;
+    if (readOnly || !contextTarget) return;
     const cell = contextTarget.closest('td, th') as HTMLElement | null;
     if (cell) {
       cell.style.backgroundColor = color;
@@ -557,65 +636,35 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
   // Execute formatting command
   const handleExecCommand = (command: string, value?: string) => {
+    if (readOnly && !['copy', 'selectAll'].includes(command)) { setNotice('Desative o modo de leitura para editar.'); return; }
     const activeRef = pageRefs.current[activePageIndex];
     if (activeRef) {
-      activeRef.focus();
+      restoreSelection();
     }
     window.document.execCommand(command, false, value);
     handleContentInput();
     inspectActiveFormatting();
   };
 
-  // Save document explicitly
+  // Explicit save and export always include the current DOM and page layout.
   const handleSaveToBackend = () => {
-    setSaveStatus('saving');
-    const updatedPages = pageRefs.current.map((ref, idx) => ref?.innerHTML || pages[idx] || '');
-    const combinedContent = updatedPages.join('<div class="a4-page-break" style="break-before: page; page-break-before: always;"></div>');
-
-    const updatedDoc: WordDocument = {
-      ...wordDoc,
-      title: docTitle.trim() || 'Documento Sem Título',
-      content: combinedContent,
-      pages: updatedPages,
-      paperTheme,
-      paperMargin,
-      leftMarginCm,
-      rightMarginCm,
-      topMarginCm,
-      bottomMarginCm,
-      firstLineIndentCm,
-      updatedAt: new Date().toISOString(),
-    };
-
-    saveLocalDocument(updatedDoc);
-    saveAutoSaveDraft(updatedDoc.id, updatedDoc.content, updatedDoc.title);
-    setWordDoc(updatedDoc);
-
-    setTimeout(() => {
-      setSaveStatus('saved');
-      setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      setHasUnsavedChanges(false);
-    }, 400);
+    try {
+      const doc = latestDocument.current();
+      const saved = saveLocalDocument(doc); saveAutoSaveDraft(doc.id, doc.content, doc.title, doc);
+      setWordDoc(saved); setSaveStatus('saved'); setHasUnsavedChanges(false);
+      setLastSavedTime(new Date().toLocaleTimeString('pt-BR')); return true;
+    } catch { setSaveStatus('error'); setNotice('Não foi possível salvar neste navegador. Baixe uma cópia do documento.'); return false; }
   };
-
-  // Export to .docx file
   const handleExportDocx = async () => {
-    const updatedPages = pageRefs.current.map((ref, idx) => ref?.innerHTML || pages[idx] || '');
-    const combinedContent = updatedPages.join('<div class="a4-page-break" style="break-before: page; page-break-before: always;"></div>');
-    const currentDoc: WordDocument = {
-      ...wordDoc,
-      title: docTitle,
-      content: combinedContent,
-      pages: updatedPages,
-    };
-    await exportToDocx(currentDoc);
+    try { await exportToDocx(latestDocument.current()); setNotice('Arquivo DOCX exportado.'); }
+    catch { setNotice('Não foi possível exportar o DOCX. Tente novamente ou exporte como HTML.'); }
   };
 
   // Insert Vector Shape
   const handleInsertShape = (shape: VectorShape) => {
     const activeRef = pageRefs.current[activePageIndex];
     if (!activeRef) return;
-    activeRef.focus();
+    restoreSelection();
 
     const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char] || char);
     const shapeMarkup = (attributes: string) => {
@@ -671,14 +720,14 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const handleInsertImage = (img: BitmapImage) => {
     const activeRef = pageRefs.current[activePageIndex];
     if (!activeRef) return;
-    activeRef.focus();
+    restoreSelection();
 
     const alignStyle = img.align === 'center' ? 'text-align: center;' : img.align === 'right' ? 'text-align: right;' : 'text-align: left;';
-    const captionHtml = img.caption ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px; font-style: italic;">${img.caption}</div>` : '';
+    const captionHtml = img.caption ? `<div style="font-size: 11px; color: #64748b; margin-top: 4px; font-style: italic;">${escapeWordText(img.caption)}</div>` : '';
 
     const imgHtml = `
       <div contenteditable="false" style="${alignStyle} margin: 16px 0;" class="my-4">
-        <img src="${img.src}" alt="${img.alt}" style="max-width: 100%; width: ${img.width}px; height: auto; border-radius: 8px; display: inline-block; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
+        <img src="${escapeWordText(img.src)}" alt="${escapeWordText(img.alt)}" style="max-width: 100%; width: ${img.width}px; height: auto; border-radius: 8px; display: inline-block; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" />
         ${captionHtml}
       </div>
       <p><br></p>
@@ -690,9 +739,10 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
   // Insert Table HTML
   const handleInsertTableHtml = (tableHtml: string) => {
+    if (readOnly) return;
     const activeRef = pageRefs.current[activePageIndex];
     if (!activeRef) return;
-    activeRef.focus();
+    restoreSelection();
     window.document.execCommand('insertHTML', false, tableHtml);
     handleContentInput();
   };
@@ -745,7 +795,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const handleApplyLineBackground = (color: string) => {
     const activeRef = pageRefs.current[activePageIndex];
     if (!activeRef) return;
-    activeRef.focus();
+    restoreSelection();
 
     const sel = window.getSelection();
     let targetBlocks: HTMLElement[] = [];
@@ -815,20 +865,158 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const handleInsertSymbol = (symbol: string) => {
     const activeRef = pageRefs.current[activePageIndex];
     if (!activeRef) return;
-    activeRef.focus();
+    restoreSelection();
     window.document.execCommand('insertText', false, symbol);
     handleContentInput();
   };
 
-  // Create brand new document
   const handleCreateNewDoc = () => {
-    const newDoc = createNewDocument('Novo Documento Sem Título');
-    setWordDoc(newDoc);
-    setDocTitle(newDoc.title);
-    setPages([EMPTY_PAGE_HTML]);
-    setActivePageIndex(0);
-    updateStats();
+    if (hasUnsavedChanges && !handleSaveToBackend()) return;
+    try { applyDocument(createNewDocument('Documento sem título')); } catch { setNotice('Não foi possível criar o documento neste navegador.'); }
   };
+
+  const downloadText = (extension: string, content: string, type: string) => {
+    const url = URL.createObjectURL(new Blob([content], { type }));
+    const link = document.createElement('a'); link.href = url;
+    link.download = `${docTitle.replace(/[\\/:*?"<>|]/g, '').trim() || 'documento'}.${extension}`;
+    document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const getBlocks = () => {
+    restoreSelection();
+    const page = pageRefs.current[activePageIndex]; const selection = window.getSelection();
+    if (!page || !selection?.rangeCount) return [];
+    const range = selection.getRangeAt(0);
+    const node = selection.anchorNode?.nodeType === Node.ELEMENT_NODE ? selection.anchorNode as HTMLElement : selection.anchorNode?.parentElement;
+    if (selection.isCollapsed) return [node?.closest<HTMLElement>('p,h1,h2,h3,h4,li,blockquote') || page];
+    return [...page.querySelectorAll<HTMLElement>('p,h1,h2,h3,h4,li,blockquote')].filter(block => range.intersectsNode(block));
+  };
+  const handleMerge = (rows: Record<string, string>[]) => {
+    try {
+      const template = latestDocument.current();
+      rows.forEach((row, index) => {
+        const mergedPages = (template.pages || [template.content]).map(html => {
+          const dom = new DOMParser().parseFromString(html, 'text/html');
+          const walker = document.createTreeWalker(dom.body, NodeFilter.SHOW_TEXT); let node: Node | null;
+          while ((node = walker.nextNode())) node.textContent = (node.textContent || '').replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, field) => Object.hasOwn(row, field) ? String(row[field]) : match);
+          return dom.body.innerHTML;
+        });
+        saveLocalDocument({ ...template, id: `merge-${Date.now()}-${index}`, title: `${template.title} — ${String(row.nome || index + 1)}`, pages: mergedPages, content: mergedPages.join('<div class="a4-page-break"></div>') });
+      });
+      setNotice(`${rows.length} correspondência(s) criada(s). Abra em Arquivo → Abrir documentos.`);
+    } catch { setNotice('Não foi possível gerar todas as correspondências. Verifique o espaço disponível no navegador.'); }
+  };
+
+  const handleAction = async (action: string, value?: string) => {
+    try {
+      if (action === 'new') { handleCreateNewDoc(); return; }
+      if (action === 'save') { handleSaveToBackend(); return; }
+      if (action === 'docx') { await handleExportDocx(); return; }
+      if (action === 'share') {
+        const file = new File([await createDocxBlob(latestDocument.current())], `${docTitle.replace(/[\\/:*?"<>|]/g, '') || 'documento'}.docx`, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+        if (navigator.canShare?.({ files: [file] }) && navigator.share) { try { await navigator.share({ title: docTitle, files: [file] }); } catch (error) { if (!(error instanceof DOMException && error.name === 'AbortError')) setNotice('O compartilhamento não foi concluído. Use Arquivo → Baixar DOCX para enviar uma cópia.'); } }
+        else { await handleExportDocx(); setNotice('Este navegador não oferece compartilhamento de arquivos. Uma cópia DOCX foi baixada para você enviar.'); }
+        return;
+      }
+      if (action === 'open') { setPanel('open'); return; }
+      if (action === 'import') { inputFileRef.current?.click(); return; }
+      if (action === 'find') { setIsFindReplaceOpen(true); return; }
+      if (['comments', 'review', 'help', 'source', 'merge'].includes(action)) { setPanel(action as WordPanel); return; }
+      if (action === 'draw') { setInkOpen(true); return; }
+      if (action === 'ruler') { setRulerVisible(v => !v); return; }
+      if (action === 'marks') { setMarksVisible(v => !v); return; }
+      if (action === 'focus') { setFocusMode(v => !v); return; }
+      if (action === 'read-only') { setReadOnly(v => !v); return; }
+      if (action === 'zoom') { setZoom(Math.max(40, Math.min(160, Number(value) || 100))); return; }
+      if (action === 'fit') { setZoom(Math.min(120, Math.max(40, Math.floor(((editorContainerRef.current?.clientWidth || innerWidth) - 80) / (pageWidthCm * 37.795) * 100)))); return; }
+      if (action === 'html') { downloadText('html', `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>${escapeWordText(docTitle)}</title><style>body{font:12pt Calibri,Arial,sans-serif}table{border-collapse:collapse}td,th{border:1px solid #888;padding:6px}img{max-width:100%}.a4-page-break{break-before:page}</style><body>${cleanWordHtml(latestDocument.current().content)}</body></html>`, 'text/html;charset=utf-8'); return; }
+      if (action === 'txt') { downloadText('txt', new DOMParser().parseFromString(latestDocument.current().content.replace(/<\/p>/g, '</p>\n'), 'text/html').body.textContent || '', 'text/plain;charset=utf-8'); return; }
+      if (action === 'print') { const style = document.createElement('style'); style.textContent = `@page { size: ${pageSize === 'a4' ? 'A4' : 'letter'} ${orientation}; margin: 0; }`; document.head.append(style); window.addEventListener('afterprint', () => style.remove(), { once: true }); window.print(); return; }
+      if (action === 'zotero') { window.open('https://www.zotero.org/', '_blank', 'noopener,noreferrer'); return; }
+      if (action === 'read-aloud') {
+        if (!('speechSynthesis' in window)) { setNotice('A leitura em voz alta não está disponível neste navegador.'); return; }
+        if (speechSynthesis.speaking) { speechSynthesis.cancel(); setNotice('Leitura interrompida.'); return; }
+        const speech = new SpeechSynthesisUtterance(new DOMParser().parseFromString(latestDocument.current().content, 'text/html').body.textContent || ''); speech.lang = pageRefs.current[activePageIndex]?.lang || 'pt-BR'; speechSynthesis.speak(speech); return;
+      }
+      if (readOnly) { setNotice('Desative o modo de leitura para editar.'); return; }
+      if (action === 'orientation') { setOrientation(value === 'landscape' ? 'landscape' : 'portrait'); return; }
+      if (action === 'page-size') { setPageSize(value === 'letter' ? 'letter' : 'a4'); return; }
+      if (action === 'duplicate-page') { handleDuplicatePage(activePageIndex); return; }
+      if (action === 'page-break') { handlePageBreak(); return; }
+      restoreSelection();
+      const page = pageRefs.current[activePageIndex]; const selection = window.getSelection();
+      if (!page) return;
+      if (action === 'select-all') { const range = document.createRange(); range.selectNodeContents(page); selection?.removeAllRanges(); selection?.addRange(range); selectionRef.current = range.cloneRange(); return; }
+      if (action === 'copy' || action === 'cut') {
+        if (!selection?.toString()) { setNotice('Selecione o texto que deseja copiar ou recortar.'); return; }
+        if (!document.execCommand(action)) { await navigator.clipboard.writeText(selection.toString()); if (action === 'cut') document.execCommand('delete'); }
+        if (action === 'cut') handleContentInput(); return;
+      }
+      if (action === 'paste') { const text = await navigator.clipboard.readText(); restoreSelection(); document.execCommand('insertText', false, text); handleContentInput(); return; }
+      if (action === 'font-size') {
+        const size = Math.max(6, Math.min(96, Number(value) || 12));
+        document.execCommand('fontSize', false, '7');
+        page.querySelectorAll<HTMLElement>('font[size="7"]').forEach(font => { font.style.fontSize = `${size}pt`; font.removeAttribute('size'); });
+      } else if (action === 'case') {
+        const text = selection?.toString(); if (!text) { setNotice('Selecione o texto para alterar maiúsculas e minúsculas.'); return; }
+        const changed = value === 'upper' ? text.toLocaleUpperCase('pt-BR') : value === 'lower' ? text.toLocaleLowerCase('pt-BR') : text.toLocaleLowerCase('pt-BR').replace(/(^|\s)(\p{L})/gu, (_, space, letter) => space + letter.toLocaleUpperCase('pt-BR'));
+        document.execCommand('insertText', false, changed);
+      } else if (action === 'paint-format') {
+        if (!formatPainterRef.current) { formatPainterRef.current = activeFormat; setNotice('Selecione o texto de destino e clique novamente em “Copiar formatação”.'); return; }
+        const format = formatPainterRef.current; document.execCommand('fontName', false, format.fontFamily); document.execCommand('foreColor', false, format.textColor);
+        for (const command of ['bold', 'italic', 'underline'] as const) if (document.queryCommandState(command) !== format[command]) document.execCommand(command);
+        formatPainterRef.current = null; setNotice('Formatação aplicada.');
+      } else if (['line-height', 'space-before', 'space-after', 'border', 'sort'].includes(action)) {
+        const blocks = getBlocks();
+        if (action === 'sort') { const parent = blocks[0]?.parentElement; if (parent && blocks.every(block => block.parentElement === parent) && blocks.length > 1) { const marker = document.createComment('sort'); parent.insertBefore(marker, blocks[0]); [...blocks].sort((a, b) => (a.textContent || '').localeCompare(b.textContent || '', 'pt-BR')).forEach(block => parent.insertBefore(block, marker)); marker.remove(); } else setNotice('Selecione dois ou mais parágrafos para ordenar.'); }
+        else blocks.forEach(block => { if (action === 'line-height') block.style.lineHeight = String(Math.max(1, Math.min(3, Number(value)))); if (action === 'space-before') block.style.marginTop = `${Math.max(0, Math.min(96, Number(value)))}pt`; if (action === 'space-after') block.style.marginBottom = `${Math.max(0, Math.min(96, Number(value)))}pt`; if (action === 'border') block.style.borderBottom = block.style.borderBottom ? '' : '1px solid currentColor'; });
+      } else if (action === 'link') {
+        const url = window.prompt('Endereço do link (https://… ou mailto:…)'); if (!url) return;
+        if (!/^(https?:\/\/|mailto:)/i.test(url)) { setNotice('Informe um link HTTP, HTTPS ou mailto válido.'); return; }
+        restoreSelection(); if (selection?.toString()) document.execCommand('createLink', false, url); else document.execCommand('insertHTML', false, `<a href="${escapeWordText(url)}">${escapeWordText(url)}</a>`);
+      } else if (action === 'comment') {
+        const quote = selection?.toString() || ''; if (!quote.trim()) { setNotice('Selecione um trecho do documento para comentar.'); return; }
+        const text = window.prompt('Comentário sobre o trecho selecionado:'); if (!text?.trim()) return;
+        restoreSelection(); const id = `comment-${Date.now()}`;
+        document.execCommand('insertHTML', false, `<mark data-comment-id="${id}" title="${escapeWordText(text)}">${escapeWordText(quote)}</mark>`);
+        setComments(items => [...items, { id, text: text.trim(), quote, createdAt: new Date().toISOString() }]); setPanel('comments');
+      } else if (action === 'document-theme') {
+        pageRefs.current.forEach(editor => editor?.querySelectorAll<HTMLElement>('p,li,h1,h2,h3,blockquote').forEach(block => { block.style.fontFamily = value === 'academic' ? 'Georgia, serif' : value === 'modern' ? 'Arial, sans-serif' : 'Calibri, sans-serif'; if (/^H/.test(block.tagName)) block.style.color = value === 'modern' ? '#4f46e5' : '#183c67'; }));
+      } else if (action === 'toc') {
+        const entries: string[] = []; pageRefs.current.forEach((editor, pageIndex) => editor?.querySelectorAll<HTMLElement>('h1,h2,h3').forEach((heading, index) => { heading.id ||= `heading-${pageIndex}-${index}`; entries.push(`<p><a href="#${heading.id}">${escapeWordText(heading.textContent || '')}</a> · ${pageIndex + 1}</p>`); }));
+        if (!entries.length) { setNotice('Aplique estilos Título 1, 2 ou 3 antes de inserir o sumário.'); return; }
+        restoreSelection(); document.execCommand('insertHTML', false, `<section><h2>Sumário</h2>${entries.join('')}</section>`);
+      } else if (action === 'citation') {
+        const reference = window.prompt('Referência bibliográfica (autor, título, ano):'); if (!reference) return; restoreSelection(); document.execCommand('insertText', false, reference);
+      } else if (action === 'merge-field') {
+        const field = window.prompt('Nome do campo (por exemplo: nome ou turma):'); if (!field || !/^[\p{L}\d_]+$/u.test(field)) return; restoreSelection(); document.execCommand('insertText', false, `{{${field}}}`);
+      } else if (action === 'page-number') {
+        setPageNumbers(v => !v);
+      } else if (action === 'header-footer') {
+        const header = window.prompt('Cabeçalho (deixe vazio para omitir):'); if (header === null) return;
+        const footer = window.prompt('Rodapé (deixe vazio para omitir):'); if (footer === null) return;
+        setHeaderText(header); setFooterText(footer);
+      } else if (action === 'language') {
+        pageRefs.current.forEach(editor => { if (editor) { editor.lang = value || 'pt-BR'; editor.spellcheck = true; } }); setNotice('Idioma de revisão alterado.');
+      } else if (action === 'dictate') {
+        if (dictating) { recognitionRef.current?.stop(); setDictating(false); return; }
+        const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition; if (!Recognition) { setNotice('Ditado não disponível neste navegador.'); return; }
+        const recognition = new Recognition(); recognitionRef.current = recognition; recognition.lang = page.lang || 'pt-BR'; recognition.continuous = true; recognition.interimResults = false;
+        recognition.onresult = (event: any) => { for (let i = event.resultIndex; i < event.results.length; i++) if (event.results[i].isFinal) { restoreSelection(); document.execCommand('insertText', false, event.results[i][0].transcript + ' '); handleContentInput(); } };
+        recognition.onerror = () => { setDictating(false); setNotice('Não foi possível usar o microfone. Confira a permissão do navegador.'); };
+        recognition.onend = () => setDictating(false); recognition.start(); setDictating(true); return;
+      }
+      handleContentInput(); inspectActiveFormatting();
+    } catch { setNotice('Não foi possível concluir a ação. Para a área de transferência, use Ctrl+C, Ctrl+X ou Ctrl+V.'); }
+  };
+
+  useEffect(() => () => { recognitionRef.current?.stop(); window.speechSynthesis?.cancel(); }, []);
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const root = document.getElementById('root');
+    const previousInert = root?.inert || false;
+    document.body.style.overflow = 'hidden'; if (root) root.inert = true;
+    return () => { document.body.style.overflow = previousOverflow; if (root) root.inert = previousInert; };
+  }, []);
 
   // Paper theme style
   const getPaperBgStyle = () => {
@@ -837,110 +1025,25 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     return 'bg-white text-slate-900 shadow-xl border-slate-200/80 dark:border-slate-800';
   };
 
-  return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-slate-200 dark:bg-slate-950 overflow-hidden relative">
+  return createPortal(
+    <div data-motion="off" className={`word-workspace ${rulerVisible ? 'word-rulers-visible' : ''} ${focusMode ? 'word-focus' : ''} ${marksVisible ? 'word-show-marks' : ''}`} onKeyDown={event => {
+      if (event.key === 'Escape') { setFocusMode(false); setPanel(null); }
+      if (event.ctrlKey || event.metaKey) { const key = event.key.toLowerCase(); if (['s','f','h','b','i','u'].includes(key) || event.key === 'Enter') { event.preventDefault(); if (key === 's') handleSaveToBackend(); else if (['f','h'].includes(key)) setIsFindReplaceOpen(true); else if (event.key === 'Enter') handlePageBreak(); else handleExecCommand(key === 'b' ? 'bold' : key === 'i' ? 'italic' : 'underline'); } }
+    }}><div className="flex h-full min-h-0 w-full flex-col bg-slate-200 dark:bg-slate-950 overflow-hidden relative">
       {/* Sticky Fixed Toolbar & Controls Block */}
-      <div className="shrink-0 z-30 bg-white dark:bg-slate-900 shadow-md border-b border-slate-200/80 dark:border-slate-800">
-        {/* Top Header Bar */}
-        <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
-          {/* Left: Back button & Title input */}
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={onBackToHub}
-              className="p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-              title="Voltar para Suíte de Apps"
-            >
-              <ArrowLeft size={18} />
-            </button>
-
-            <div className="p-2 bg-blue-600 text-white rounded-xl shadow-2xs shrink-0">
-              <FileText size={18} />
-            </div>
-
-            <div className="flex-1 min-w-0">
-              <input
-                type="text"
-                value={docTitle}
-                onChange={(e) => {
-                  setDocTitle(e.target.value);
-                  setHasUnsavedChanges(true);
-                }}
-                placeholder="Nome do Documento..."
-                className="text-base font-extrabold text-slate-900 dark:text-white bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 px-2 py-0.5 rounded-lg border border-transparent focus:border-blue-500 transition-colors w-full truncate"
-              />
-              <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 px-2">
-                <span>Word App</span>
-                <span>•</span>
-                <span>{pages.length} {pages.length === 1 ? 'página' : 'páginas'} A4</span>
-                <span>•</span>
-                {/* Auto-Save status badge */}
-                <span className="flex items-center gap-1 font-semibold">
-                  {saveStatus === 'saved' && (
-                    <>
-                      <CheckCircle2 size={12} className="text-emerald-500" />
-                      <span className="text-emerald-600 dark:text-emerald-400">Salvo localmente ({lastSavedTime})</span>
-                    </>
-                  )}
-                  {saveStatus === 'saving' && (
-                    <>
-                      <Clock size={12} className="text-blue-500 animate-spin" />
-                      <span className="text-blue-600 dark:text-blue-400">Salvando rascunho...</span>
-                    </>
-                  )}
-                  {saveStatus === 'unsaved' && (
-                    <>
-                      <AlertCircle size={12} className="text-amber-500" />
-                      <span className="text-amber-600 dark:text-amber-400">Alterações pendentes</span>
-                    </>
-                  )}
-                  {saveStatus === 'draft_restored' && (
-                    <>
-                      <Sparkles size={12} className="text-purple-500" />
-                      <span className="text-purple-600 dark:text-purple-400">Rascunho restaurado!</span>
-                    </>
-                  )}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right: Quick actions */}
-          <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
-            <button
-              type="button"
-              onClick={handleCreateNewDoc}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              title="Novo Documento"
-            >
-              <FilePlus size={15} />
-              <span className="hidden md:inline">Novo</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleSaveToBackend}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer"
-              title="Salvar no Servidor e Local"
-            >
-              <Save size={15} />
-              <span>Salvar</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportDocx}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800 shadow-2xs transition-colors cursor-pointer"
-              title="Baixar arquivo no formato .docx"
-            >
-              <Download size={15} />
-              <span>Baixar .docx</span>
-            </button>
-          </div>
+      <div className="word-toolbar-shell shrink-0 z-30 bg-white dark:bg-slate-900 shadow-md border-b border-slate-200/80 dark:border-slate-800">
+        <header className="word-titlebar">
+          <div className="word-quick-actions"><FileText size={20} /><label className="word-autosave">Salvamento automático <input type="checkbox" checked={autoSave} onChange={e => setAutoSave(e.target.checked)} aria-label="Salvamento automático" /></label><button title="Salvar (Ctrl+S)" aria-label="Salvar documento" onMouseDown={e => e.preventDefault()} onClick={handleSaveToBackend}><Save size={17} /></button><button title="Desfazer" onMouseDown={e => e.preventDefault()} onClick={() => handleExecCommand('undo')}><Undo2 size={17} /></button><button title="Refazer" onMouseDown={e => e.preventDefault()} onClick={() => handleExecCommand('redo')}><Redo2 size={17} /></button></div>
+          <div className="word-document-title"><input aria-label="Nome do documento" value={docTitle} onChange={e => setDocTitle(e.target.value)} /><small role="status">{saveStatus === 'saved' ? 'Salvo neste navegador · ' + lastSavedTime : saveStatus === 'saving' ? 'Salvando…' : saveStatus === 'error' ? 'Erro ao salvar' : 'Alterações não salvas'}</small></div>
+          <div className="word-command-search"><Search size={16} /><input aria-label="Pesquisar comandos" placeholder="Pesquisar comandos e ajuda" value={commandSearch} onChange={e => setCommandSearch(e.target.value)} />{commandSearch && <div className="word-command-results">{[['save','Salvar documento'],['docx','Baixar DOCX'],['open','Abrir documentos'],['import','Importar arquivo'],['find','Localizar e substituir'],['comment','Novo comentário'],['print','Imprimir / PDF'],['help','Ajuda e atalhos']].filter(([, label]) => label.toLowerCase().includes(commandSearch.toLowerCase())).map(([action, label]) => <button key={action} onMouseDown={e => e.preventDefault()} onClick={() => { handleAction(action); setCommandSearch(''); }}>{label}</button>)}</div>}</div>
+          <button className="word-comments-button" onClick={() => setPanel('comments')}><MessageSquare size={17} /><span>Comentários</span></button>
+          <select aria-label="Modo de edição" value={readOnly ? 'read' : 'edit'} onChange={e => setReadOnly(e.target.value === 'read')}><option value="edit">Editando</option><option value="read">Leitura</option></select>
+          <button className="word-comments-button" onClick={() => handleAction('share')}><Share2 size={17} /><span>Compartilhar</span></button>
         </header>
 
         {/* Ribbon Formatting Toolbar */}
         <WordToolbar
+          onAction={handleAction} rulerVisible={rulerVisible} marksVisible={marksVisible} focusMode={focusMode} readOnly={readOnly} zoom={zoom} orientation={orientation} pageSize={pageSize} dictating={dictating} canDictate={canDictate}
           onExecCommand={handleExecCommand}
           onApplyLineBackground={handleApplyLineBackground}
           onOpenInsertShape={() => setIsShapeModalOpen(true)}
@@ -958,14 +1061,14 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
           paperTheme={paperTheme}
           onChangePaperTheme={setPaperTheme}
           paperMargin={paperMargin}
-          onChangePaperMargin={setPaperMargin}
-          leftMarginCm={scopeMode === 'paragraph' ? paragraphLeftMarginCm : leftMarginCm}
-          rightMarginCm={scopeMode === 'paragraph' ? paragraphRightMarginCm : rightMarginCm}
+          onChangePaperMargin={margin => { setPaperMargin(margin); const value = margin === 'narrow' ? 1.2 : margin === 'wide' ? 3.8 : 2.5; setLeftMarginCm(value); setRightMarginCm(value); setTopMarginCm(value); setBottomMarginCm(value); setScopeMode('all'); }}
+          leftMarginCm={leftMarginCm}
+          rightMarginCm={rightMarginCm}
           topMarginCm={topMarginCm}
           bottomMarginCm={bottomMarginCm}
           firstLineIndentCm={scopeMode === 'paragraph' ? paragraphIndentCm : firstLineIndentCm}
-          onChangeLeftMargin={handleRulerLeftMargin}
-          onChangeRightMargin={handleRulerRightMargin}
+          onChangeLeftMargin={setLeftMarginCm}
+          onChangeRightMargin={setRightMarginCm}
           onChangeTopMargin={setTopMarginCm}
           onChangeBottomMargin={setBottomMarginCm}
           onChangeFirstLineIndent={handleRulerFirstLineIndent}
@@ -975,20 +1078,11 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
           activeFormat={activeFormat}
         />
 
-        {/* Top Horizontal Ruler */}
-        <div className="flex justify-center bg-slate-100 dark:bg-slate-900 pl-6">
-          <WordRuler
-            leftMarginCm={scopeMode === 'paragraph' ? paragraphLeftMarginCm : leftMarginCm}
-            rightMarginCm={scopeMode === 'paragraph' ? paragraphRightMarginCm : rightMarginCm}
-            firstLineIndentCm={scopeMode === 'paragraph' ? paragraphIndentCm : firstLineIndentCm}
-            onChangeLeftMargin={handleRulerLeftMargin}
-            onChangeRightMargin={handleRulerRightMargin}
-            onChangeFirstLineIndent={handleRulerFirstLineIndent}
-            scopeMode={scopeMode}
-            targetSummary={selectedBlockSummary}
-            onToggleScopeMode={handleToggleScopeMode}
-          />
-        </div>
+        {activeTableCell?.isConnected && !readOnly && <div className="word-table-context" role="toolbar" aria-label="Tabela selecionada">
+          <strong>Tabela</strong><button onMouseDown={e => e.preventDefault()} onClick={() => { setSelectedTable(activeTableCell.closest('table')); setIsTableEditOpen(true); }}>Ferramentas de tabela</button>
+          <button onMouseDown={e => e.preventDefault()} onClick={() => { const table = activeTableCell.closest('table'); if (table) { fitTable(table, 'content'); handleContentInput(); } }}>Ajustar ao conteúdo</button>
+          <span>Tab: próxima célula · arraste a borda para redimensionar</span>
+        </div>}
 
         {/* Restored Draft Banner Notice */}
         {showDraftRestoredBanner && (
@@ -1010,32 +1104,30 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
         )}
       </div>
 
+      {rulerVisible && <WordViewportRulers canvasRef={editorContainerRef} pageIndex={activePageIndex} zoom={zoom} pageWidthCm={pageWidthCm} pageHeightCm={pageHeightCm}
+        left={scopeMode === 'paragraph' ? paragraphLeftMarginCm : leftMarginCm}
+        right={scopeMode === 'paragraph' ? paragraphRightMarginCm : rightMarginCm}
+        indent={scopeMode === 'paragraph' ? paragraphIndentCm : firstLineIndentCm}
+        top={topMarginCm} bottom={bottomMarginCm} readOnly={readOnly}
+        changeLeft={handleRulerLeftMargin} changeRight={handleRulerRightMargin} changeIndent={handleRulerFirstLineIndent} changeTop={setTopMarginCm} changeBottom={setBottomMarginCm} />}
+
       {/* Main Canvas Container (Multi-Page A4 Physical View) */}
       <main
         ref={editorContainerRef}
-        className="flex-1 overflow-y-auto p-4 sm:p-8 flex flex-col items-center gap-8 bg-slate-300/70 dark:bg-slate-950 relative selection:bg-blue-200 dark:selection:bg-blue-900"
+        className="word-canvas"
       >
+        <div className="word-page-stack" style={{ zoom: zoom / 100 }}>
         {pages.map((pageHtml, pageIndex) => (
           <div
             key={pageIndex}
-            className="flex items-start justify-center gap-1.5 relative w-full max-w-[210mm] min-h-[297mm] group/page"
+            className="word-page-wrap flex items-start gap-1.5 relative group/page"
+            style={{ width: `${pageWidthCm}cm`, minHeight: `${pageHeightCm}cm` }}
             onClick={() => setActivePageIndex(pageIndex)}
           >
-            {/* Left Vertical Ruler for this specific page */}
-            <div className="sticky top-4 hidden md:block">
-              <WordVerticalRuler
-                topMarginCm={topMarginCm}
-                bottomMarginCm={bottomMarginCm}
-                onChangeTopMargin={setTopMarginCm}
-                onChangeBottomMargin={setBottomMarginCm}
-                paperHeightPx={1123}
-              />
-            </div>
-
             {/* A4 Sheet Box */}
             <div className="flex-1 flex flex-col items-center relative">
               {/* Floating Page Header Banner */}
-              <div className="w-full flex items-center justify-between mb-1.5 px-2 text-[11px] text-slate-500 dark:text-slate-400 font-semibold select-none">
+              <div className="word-page-controls w-full flex items-center justify-between mb-1.5 px-2 text-[11px] text-slate-500 dark:text-slate-400 font-semibold select-none">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-200/90 dark:bg-slate-800 shadow-2xs border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200">
                   <span>📄 Folha A4 • Página {pageIndex + 1} de {pages.length}</span>
                 </span>
@@ -1070,16 +1162,18 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
               {/* Physical A4 Sheet */}
               <div
-                className={`w-full rounded-2xl border transition-all duration-200 relative overflow-hidden a4-page-sheet ${getPaperBgStyle()} ${activePageIndex === pageIndex ? 'ring-2 ring-blue-500/40 shadow-2xl' : 'shadow-md'}`}
+                className={`w-full rounded-2xl border transition-all duration-300 relative overflow-hidden a4-page-sheet ${getPaperBgStyle()} ${activePageIndex === pageIndex ? 'ring-2 ring-blue-500/40 shadow-2xl' : 'shadow-md'}`}
                 style={{
-                  width: '210mm',
-                  minHeight: '297mm',
+                  width: `${pageWidthCm}cm`,
+                  minHeight: `${pageHeightCm}cm`,
                   paddingLeft: `${leftMarginCm}cm`,
                   paddingRight: `${rightMarginCm}cm`,
                   paddingTop: `${topMarginCm}cm`,
                   paddingBottom: `${bottomMarginCm}cm`,
                 }}
               >
+                {headerText && <div className="word-page-header">{headerText}</div>}
+                {(footerText || pageNumbers) && <div className="word-page-footer"><span>{footerText}</span>{pageNumbers && <span>Página {pageIndex + 1} de {pages.length}</span>}</div>}
                 {/* Watermark Overlay if active */}
                 {watermarkText && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 opacity-15 rotate-[-35deg]">
@@ -1108,7 +1202,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                         el.innerHTML = pageHtml;
                       }
                     }}
-                    contentEditable
+                    contentEditable={!readOnly}
+                    role="textbox" aria-label={`Conteúdo da página ${pageIndex + 1}`} aria-multiline="true" spellCheck lang="pt-BR"
                     suppressContentEditableWarning
                     onFocus={() => {
                       setActivePageIndex(pageIndex);
@@ -1117,20 +1212,41 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                     }}
                     onBlur={() => setEditingPageIndex(null)}
                     onInput={handleContentInput}
+                    onPointerDown={tableResize.onPointerDown}
+                    onPointerMove={tableResize.onPointerMove}
+                    onBeforeInput={e => {
+                      if (readOnly) return;
+                      const type = (e.nativeEvent as InputEvent).inputType;
+                      if (type?.startsWith('delete') && deleteTableContent(e.currentTarget, type.includes('Backward'))) { e.preventDefault(); handleContentInput(); }
+                    }}
+                    onKeyDown={e => {
+                      if (!readOnly && (e.key === 'Delete' || e.key === 'Backspace') && deleteTableContent(e.currentTarget, e.key === 'Backspace')) { e.preventDefault(); handleContentInput(); return; }
+                      if (readOnly || e.key !== 'Tab') return;
+                      const cell = (e.target as HTMLElement).closest<HTMLTableCellElement>('td,th') || (getSelection()?.anchorNode?.parentElement?.closest<HTMLTableCellElement>('td,th'));
+                      const table = cell?.closest('table'); if (!cell || !table) return;
+                      e.preventDefault();
+                      let all = tableMap(table).positions.map(p => p.cell), index = all.indexOf(cell), next = index + (e.shiftKey ? -1 : 1);
+                      if (next >= all.length) { if (table.rows.length >= 200) return; insertTableRow(table, table.rows.length); handleContentInput(); all = tableMap(table).positions.map(p => p.cell); }
+                      if (next < 0) return;
+                      const range = document.createRange(); range.selectNodeContents(all[next]); range.collapse(true); const selection = getSelection(); selection?.removeAllRanges(); selection?.addRange(range); selectionRef.current = range.cloneRange();
+                    }}
                     onKeyUp={analyzeSelection}
                     onMouseUp={analyzeSelection}
                     onSelect={analyzeSelection}
                     onContextMenu={(e) => handleContextMenu(e, pageIndex)}
                     onDoubleClick={(e) => {
                       const table = (e.target as HTMLElement).closest('table');
-                      if (table) {
+                      if (table && !readOnly) {
+                        setActiveTableCell((e.target as HTMLElement).closest<HTMLTableCellElement>('td,th'));
                         setSelectedTable(table as HTMLTableElement);
                         setIsTableEditOpen(true);
                       }
                     }}
-                    className="outline-hidden focus:outline-hidden min-h-[920px] prose dark:prose-invert max-w-none text-base leading-relaxed a4-page-content"
+                    className="outline-hidden focus:outline-hidden word-editable prose dark:prose-invert max-w-none text-base leading-relaxed a4-page-content"
                     style={{
                       wordBreak: 'break-word',
+                      minHeight: `${Math.max(4, pageHeightCm - topMarginCm - bottomMarginCm)}cm`,
+                      color: paperTheme === 'dark' ? '#f1f5f9' : '#111827',
                       textIndent: `${firstLineIndentCm}cm`,
                     }}
                   />
@@ -1139,9 +1255,10 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
             </div>
           </div>
         ))}
+        </div>
 
         {/* Bottom "+ Adicionar Página A4" Button */}
-        <div className="w-full max-w-[210mm] flex justify-center py-4 select-none">
+        <div className="word-add-page w-full max-w-[210mm] flex justify-center py-4 select-none">
           <button
             type="button"
             onClick={handleAddPage}
@@ -1154,25 +1271,23 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
         </div>
       </main>
 
-      {/* Bottom Status Bar */}
-      <footer className="shrink-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-4 py-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
-        <div className="flex items-center gap-4">
-          <span className="font-semibold text-slate-700 dark:text-slate-300">
-            {wordCount} palavras
-          </span>
-          <span>•</span>
-          <span>{charCount} caracteres</span>
-          <span>•</span>
-          <span className="font-bold text-blue-600 dark:text-blue-400">
-            Página {activePageIndex + 1} de {pages.length}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2 text-[11px]">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Salvamento automático local ativo</span>
-        </div>
-      </footer>
+      <footer className="word-statusbar"><div><span>Página {activePageIndex + 1} de {pages.length}</span><span>{wordCount} palavras</span><span className="word-status-optional">{charCount} caracteres</span><span className="word-status-optional">Português (Brasil)</span></div><div><button onClick={() => setFocusMode(v => !v)} aria-pressed={focusMode}>Foco</button><button onClick={() => setReadOnly(v => !v)} aria-pressed={readOnly}>{readOnly ? 'Editar' : 'Leitura'}</button><button aria-label="Diminuir zoom" onClick={() => setZoom(z => Math.max(40, z - 10))}>−</button><input type="range" min={40} max={160} step={5} aria-label="Zoom do documento" value={zoom} onChange={e => setZoom(Number(e.target.value))} /><button aria-label="Aumentar zoom" onClick={() => setZoom(z => Math.min(160, z + 10))}>+</button><span>{zoom}%</span></div></footer>
+      <button className="word-back-button" aria-label="Voltar para aplicativos" title="Voltar para aplicativos" onClick={() => { if (!hasUnsavedChanges || handleSaveToBackend()) onBackToHub(); }}><ArrowLeft size={19} /></button>
+      {notice && <div className="word-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Fechar aviso"><X size={16} /></button></div>}
+      <input ref={inputFileRef} type="file" accept=".docx,.html,.htm,.txt" hidden onChange={async e => {
+        const file = e.target.files?.[0]; if (!file) return;
+        try {
+          if (hasUnsavedChanges && !handleSaveToBackend()) return;
+          const result = await importWordFile(file);
+          const doc = createNewDocument(result.title);
+          const imported = saveLocalDocument({ ...doc, content: result.html, pages: [result.html] });
+          applyDocument(imported);
+          setNotice(result.warnings ? 'Documento importado. Alguns recursos avançados do arquivo podem ter sido simplificados.' : 'Documento importado.');
+        } catch (error) { setNotice(error instanceof Error ? error.message : 'Não foi possível importar o arquivo.'); }
+        finally { e.target.value = ''; }
+      }} />
+      <WordPanels panel={panel} close={() => setPanel(null)} current={latestDocument.current()} open={doc => { if (!hasUnsavedChanges || handleSaveToBackend()) applyDocument(doc); }} source={pages[activePageIndex] || ''} applySource={html => { const page = pageRefs.current[activePageIndex]; if (page) { page.innerHTML = cleanWordHtml(html); handleContentInput(); } }} merge={handleMerge} removeComment={id => { document.querySelectorAll<HTMLElement>('[data-comment-id]').forEach(node => { if (node.dataset.commentId === id) node.replaceWith(...node.childNodes); }); setComments(items => items.filter(item => item.id !== id)); handleContentInput(); }} />
+      {inkOpen && <WordInkPad close={() => setInkOpen(false)} insert={handleInsertImage} />}
 
       {/* Context Menu on Right Click */}
       {contextMenu && (
@@ -1183,7 +1298,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
           onExecCommand={handleExecCommand}
           onApplyLineBackground={handleApplyLineBackground}
           onRemovePageBreak={() => handleDeletePage(activePageIndex)}
-          onRemoveAllPageBreaks={() => setPages(['<p><br></p>'])}
+          onRemoveAllPageBreaks={() => { setPages(pages.map((html, i) => pageRefs.current[i]?.innerHTML || html).join('') ? [pages.map((html, i) => pageRefs.current[i]?.innerHTML || html).join('')] : [EMPTY_PAGE_HTML]); setHasUnsavedChanges(true); }}
           hasPageBreaks={pages.length > 1}
           targetElement={contextTarget}
           onOpenTableModal={() => setIsTableEditOpen(true)}
@@ -1199,6 +1314,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
         isOpen={isTableEditOpen}
         onClose={() => setIsTableEditOpen(false)}
         targetTable={selectedTable}
+        activeCell={activeTableCell} readOnly={readOnly}
         onContentChange={handleContentInput}
       />
 
@@ -1207,6 +1323,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
         isOpen={isFindReplaceOpen}
         onClose={() => setIsFindReplaceOpen(false)}
         editorRef={{ current: pageRefs.current[activePageIndex] }}
+        getEditors={() => pageRefs.current.filter((page): page is HTMLDivElement => Boolean(page))}
         onContentChange={handleContentInput}
       />
 
@@ -1226,7 +1343,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
         isOpen={isTableModalOpen}
         onClose={() => setIsTableModalOpen(false)}
         onInsertHtml={handleInsertTableHtml}
+        selectedText={isTableModalOpen ? selectionRef.current?.toString() || '' : ''}
       />
-    </div>
+    </div></div>, document.body
   );
 };

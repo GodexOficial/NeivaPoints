@@ -51,6 +51,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
             <button
               key={opt.id}
               type="button"
+              aria-pressed={isSelected}
               onClick={() => setTheme(opt.id)}
               className={`flex items-start justify-between p-4 rounded-2xl border-2 transition-all text-left cursor-pointer ${
                 isSelected
@@ -92,6 +93,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
       >
         <button
           type="button"
+          aria-pressed={!isDark}
           onClick={() => setTheme("light")}
           className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
             !isDark
@@ -106,6 +108,7 @@ export const ThemeSwitcher: React.FC<ThemeSwitcherProps> = ({
         </button>
         <button
           type="button"
+          aria-pressed={isDark}
           onClick={() => setTheme("dark")}
           className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
             isDark

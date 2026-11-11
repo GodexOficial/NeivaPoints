@@ -52,6 +52,7 @@ export const WordContextMenu: React.FC<WordContextMenuProps> = ({
   onInsertFootnote,
   onChangeCellBg,
   onModifyTable,
+  onOpenTableModal,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; left: number }>({ top: y, left: x });
@@ -91,7 +92,7 @@ export const WordContextMenu: React.FC<WordContextMenuProps> = ({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 w-56 text-xs font-semibold text-slate-700 dark:text-slate-200 divide-y divide-slate-100 dark:divide-slate-800 selection:bg-none animate-in fade-in zoom-in-95 duration-100"
+      className="fixed z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl py-2 w-56 text-xs font-semibold text-slate-700 dark:text-slate-200 divide-y divide-slate-100 dark:divide-slate-800 selection:bg-none animate-in fade-in zoom-in-95 duration-300"
       style={{ top: `${position.top}px`, left: `${position.left}px` }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -313,6 +314,14 @@ export const WordContextMenu: React.FC<WordContextMenuProps> = ({
             <Trash2 size={13} />
             <span>Excluir Linha</span>
           </button>
+          <button
+            type="button"
+            onClick={() => handleAction(() => onModifyTable('deleteCol'))}
+            className="w-full flex items-center gap-2.5 px-3 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer text-left"
+          >
+            <Trash2 size={13} /><span>Excluir Coluna</span>
+          </button>
+          <button type="button" onClick={() => handleAction(onOpenTableModal)} className="w-full flex items-center gap-2.5 px-3 py-1 hover:bg-blue-100 dark:hover:bg-slate-800 text-left"><Table size={13} /><span>Ferramentas de Tabela</span></button>
           <button
             type="button"
             onClick={() => handleAction(() => onModifyTable('deleteTable'))}

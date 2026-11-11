@@ -31,6 +31,7 @@ export interface ActiveFormatting {
   align: 'left' | 'center' | 'right' | 'justify';
   fontFamily: string;
   fontSize: string;
+  fontSizePt?: number;
   textColor: string;
   bgColor: string;
   lineBgColor: string;
@@ -56,6 +57,13 @@ export interface WordDocument {
   topMarginCm?: number;
   bottomMarginCm?: number;
   firstLineIndentCm?: number;
+  watermarkText?: string;
+  orientation?: 'portrait' | 'landscape';
+  pageSize?: 'a4' | 'letter';
+  headerText?: string;
+  footerText?: string;
+  pageNumbers?: boolean;
+  comments?: { id: string; text: string; quote: string; createdAt: string }[];
 }
 
 export type SaveStatus = 'saved' | 'saving' | 'draft_restored' | 'unsaved' | 'error';

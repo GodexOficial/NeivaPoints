@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Edit3, X, AlertCircle } from 'lucide-react';
 import type { ClassId, StudentWithStats } from '../../types';
@@ -19,6 +20,7 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const dialogRef = useDialogFocus(isOpen);
   const { classes, addStudent, updateStudent } = useStudentContext();
   const { t, getClassName } = useLanguage();
 
@@ -65,7 +67,7 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && document.querySelectorAll('[role="dialog"]')[document.querySelectorAll('[role="dialog"]').length - 1] === dialogRef.current) onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -118,15 +120,14 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
   };
 
   return (
-    <div
+    <div ref={dialogRef} tabIndex={-1}
       onClick={onClose}
+      role="dialog" aria-modal="true" aria-labelledby="StudentFormModal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs cursor-pointer"
-      role="dialog"
-      aria-modal="true"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150 cursor-default"
+        className="glass-panel relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-300 cursor-default"
       >
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
           <div className="flex items-center gap-2.5">
@@ -134,7 +135,7 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
               {isEditing ? <Edit3 size={18} /> : <UserPlus size={18} />}
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white" id="StudentFormModal-title">
                 {isEditing ? t('form.editTitle') : t('form.newTitle')}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -145,6 +146,8 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
             </div>
           </div>
           <button
+            type="button"
+            aria-label={t('modal.cancel')}
             onClick={onClose}
             className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
@@ -248,7 +251,7 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
             >
-              {t('form.cancel')}
+              {t('modal.cancel')}
             </button>
             <button
               type="submit"

@@ -141,13 +141,15 @@ export class AppsService {
   }
 
   static async reorder(apps: ExternalApp[]): Promise<ExternalApp[]> {
-    const reordered = sortApps(apps).map((app, position) => ({
+    // The array is already in the order chosen by the teacher. Sorting by the
+    // old positions here would silently undo every drag before persisting it.
+    const reordered = apps.map((app, position) => ({
       ...app,
       position,
       updatedAt: new Date().toISOString(),
     }));
 
-    if (isSupabaseConfigured) {
+    if (isSupabaseConfigured && reordered.length > 0) {
       try {
         const { error } = await supabase
           .from('external_apps')
@@ -162,7 +164,8 @@ export class AppsService {
           })));
         if (error) throw error;
       } catch (error) {
-        console.warn('Nova ordem salva apenas neste navegador.', error);
+        console.warn('Não foi possível salvar a nova ordem compartilhada.', error);
+        throw error;
       }
     }
     saveLocal(reordered);

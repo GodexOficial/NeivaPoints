@@ -1,777 +1,86 @@
-import React, { useState } from 'react';
-import {
-  Bold,
-  Italic,
-  Underline,
-  Strikethrough,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  AlignJustify,
-  List,
-  ListOrdered,
-  Heading1,
-  Heading2,
-  Heading3,
-  Quote,
-  Square,
-  Image as ImageIcon,
-  Table as TableIcon,
-  Highlighter,
-  Palette,
-  Subscript,
-  Superscript,
-  Indent,
-  Outdent,
-  Printer,
-  RotateCcw,
-  RotateCw,
-  Search,
-  Bookmark,
-  Sliders,
-  PaintBucket,
-  FileCheck,
-  FilePlus,
-  Trash2,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlignCenter, AlignJustify, AlignLeft, AlignRight, ArrowDownAZ, Bold, BookOpen, ClipboardPaste, Copy, Eraser, FileDown, FilePlus, FolderOpen, Highlighter, Image, Indent, Italic, Link, List, ListOrdered, MessageSquare, Mic, Outdent, PaintBucket, Paintbrush, PanelTop, Pilcrow, Printer, Quote, Redo2, Save, Search, Scissors, SpellCheck, Square, Strikethrough, Subscript, Superscript, Table, Type, Underline, Undo2, Volume2, ZoomIn, ZoomOut } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { ActiveFormatting } from '../../../types/doc';
 import { WordColorPicker } from './WordColorPicker';
 
 interface WordToolbarProps {
   onExecCommand: (command: string, value?: string) => void;
+  onAction: (action: string, value?: string) => void;
   onApplyLineBackground: (color: string) => void;
-  onOpenInsertShape: () => void;
-  onOpenInsertImage: () => void;
-  onOpenInsertTable: () => void;
-  onAddPage: () => void;
-  onDeletePage?: () => void;
-  currentPageNumber?: number;
-  totalPages?: number;
-  onInsertSymbol: (symbol: string) => void;
-  onOpenFindReplace: () => void;
-  onInsertFootnote: () => void;
-  watermarkText: string;
-  onChangeWatermark: (text: string) => void;
-  paperTheme: 'white' | 'sepia' | 'dark';
-  onChangePaperTheme: (theme: 'white' | 'sepia' | 'dark') => void;
-  paperMargin: 'normal' | 'narrow' | 'wide';
-  onChangePaperMargin: (margin: 'normal' | 'narrow' | 'wide') => void;
-  leftMarginCm: number;
-  rightMarginCm: number;
-  topMarginCm: number;
-  bottomMarginCm: number;
-  firstLineIndentCm: number;
-  onChangeLeftMargin: (val: number) => void;
-  onChangeRightMargin: (val: number) => void;
-  onChangeTopMargin: (val: number) => void;
-  onChangeBottomMargin: (val: number) => void;
-  onChangeFirstLineIndent: (val: number) => void;
-  scopeMode?: 'paragraph' | 'all';
-  targetSummary?: string;
-  onToggleScopeMode?: () => void;
+  onOpenInsertShape: () => void; onOpenInsertImage: () => void; onOpenInsertTable: () => void;
+  onAddPage: () => void; onDeletePage?: () => void;
+  currentPageNumber?: number; totalPages?: number;
+  onInsertSymbol: (symbol: string) => void; onOpenFindReplace: () => void; onInsertFootnote: () => void;
+  watermarkText: string; onChangeWatermark: (text: string) => void;
+  paperTheme: 'white' | 'sepia' | 'dark'; onChangePaperTheme: (theme: 'white' | 'sepia' | 'dark') => void;
+  paperMargin: 'normal' | 'narrow' | 'wide'; onChangePaperMargin: (margin: 'normal' | 'narrow' | 'wide') => void;
+  leftMarginCm: number; rightMarginCm: number; topMarginCm: number; bottomMarginCm: number; firstLineIndentCm: number;
+  onChangeLeftMargin: (value: number) => void; onChangeRightMargin: (value: number) => void;
+  onChangeTopMargin: (value: number) => void; onChangeBottomMargin: (value: number) => void; onChangeFirstLineIndent: (value: number) => void;
+  scopeMode?: 'paragraph' | 'all'; targetSummary?: string; onToggleScopeMode?: () => void;
   activeFormat?: ActiveFormatting;
+  rulerVisible: boolean; marksVisible: boolean; focusMode: boolean; readOnly: boolean;
+  zoom: number; orientation: 'portrait' | 'landscape'; pageSize: 'a4' | 'letter';
+  dictating: boolean; canDictate: boolean;
 }
 
-export const WordToolbar: React.FC<WordToolbarProps> = ({
-  onExecCommand,
-  onApplyLineBackground,
-  onOpenInsertShape,
-  onOpenInsertImage,
-  onOpenInsertTable,
-  onAddPage,
-  onDeletePage,
-  currentPageNumber = 1,
-  totalPages = 1,
-  onInsertSymbol,
-  onOpenFindReplace,
-  onInsertFootnote,
-  watermarkText,
-  onChangeWatermark,
-  paperTheme,
-  onChangePaperTheme,
-  paperMargin,
-  onChangePaperMargin,
-  leftMarginCm,
-  rightMarginCm,
-  topMarginCm,
-  bottomMarginCm,
-  firstLineIndentCm,
-  onChangeLeftMargin,
-  onChangeRightMargin,
-  onChangeTopMargin,
-  onChangeBottomMargin,
-  onChangeFirstLineIndent,
-  scopeMode = 'all',
-  targetSummary,
-  onToggleScopeMode,
-  activeFormat,
-}) => {
-  const [activeTab, setActiveTab] = useState<'home' | 'insert' | 'layout'>('home');
-  const [textColor, setTextColor] = useState('#000000');
-  const [bgColor, setBgColor] = useState('#fef08a');
-  const [lineBgColor, setLineBgColor] = useState('#e2e8f0');
-  const [fontFamily, setFontFamily] = useState('Calibri, sans-serif');
-  const [fontSize, setFontSize] = useState('3');
+function Tool({ icon: Icon, label, onClick, active, large, disabled }: { icon: LucideIcon; label: string; onClick: () => void; active?: boolean; large?: boolean; disabled?: boolean }) {
+  return <button type="button" className={`word-tool ${large ? 'word-tool-large' : ''}`} title={label} aria-label={label} aria-pressed={active} disabled={disabled} onMouseDown={event => event.preventDefault()} onClick={onClick}><Icon size={large ? 27 : 17} strokeWidth={1.7} />{large && <span>{label}</span>}</button>;
+}
+function Group({ label, children }: { label: string; children: React.ReactNode }) {
+  return <section className="word-ribbon-group" aria-label={label}><div className="word-group-tools">{children}</div><span className="word-group-label">{label}</span></section>;
+}
+const tabs = ['Arquivo', 'Início', 'Inserir', 'Desenhar', 'Design', 'Layout', 'Referências', 'Correspondências', 'Revisão', 'Exibir', 'Desenvolvedor', 'Ajuda'];
+const fonts = ['Aptos', 'Calibri', 'Arial', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'Trebuchet MS', 'Comic Sans MS', 'Impact', 'Montserrat', 'Bebas Neue', 'Playfair Display', 'Pacifico', 'Dancing Script', 'Lobster', 'Oswald', 'Raleway', 'Poppins', 'Roboto Slab', 'Merriweather', 'Abril Fatface', 'Caveat', 'Space Grotesk', 'DM Mono', 'Cinzel', 'Lora'];
 
-  const fonts = [
-    { name: 'Calibri', val: 'Calibri, sans-serif' },
-    { name: 'Arial', val: 'Arial, sans-serif' },
-    { name: 'Times New Roman', val: 'Times New Roman, serif' },
-    { name: 'Georgia', val: 'Georgia, serif' },
-    { name: 'Courier New', val: 'Courier New, monospace' },
-    { name: 'Trebuchet MS', val: 'Trebuchet MS, sans-serif' },
-    { name: 'Comic Sans MS', val: 'Comic Sans MS, cursive' },
-    { name: 'Impact', val: 'Impact, sans-serif' },
-    { name: 'Montserrat', val: "'Montserrat', sans-serif" },
-    { name: 'Bebas Neue', val: "'Bebas Neue', sans-serif" },
-    { name: 'Playfair Display', val: "'Playfair Display', serif" },
-    { name: 'Pacifico', val: "'Pacifico', cursive" },
-    { name: 'Dancing Script', val: "'Dancing Script', cursive" },
-    { name: 'Lobster', val: "'Lobster', cursive" },
-    { name: 'Oswald', val: "'Oswald', sans-serif" },
-    { name: 'Raleway', val: "'Raleway', sans-serif" },
-    { name: 'Poppins', val: "'Poppins', sans-serif" },
-    { name: 'Roboto Slab', val: "'Roboto Slab', serif" },
-    { name: 'Merriweather', val: "'Merriweather', serif" },
-    { name: 'Abril Fatface', val: "'Abril Fatface', serif" },
-    { name: 'Caveat', val: "'Caveat', cursive" },
-    { name: 'Space Grotesk', val: "'Space Grotesk', sans-serif" },
-    { name: 'DM Mono', val: "'DM Mono', monospace" },
-    { name: 'Cinzel', val: "'Cinzel', serif" },
-    { name: 'Lora', val: "'Lora', serif" },
-  ];
-
-  const fontSizes = [
-    { label: '8 pt', val: '1' },
-    { label: '10 pt', val: '2' },
-    { label: '12 pt', val: '3' },
-    { label: '14 pt', val: '4' },
-    { label: '18 pt', val: '5' },
-    { label: '24 pt', val: '6' },
-    { label: '36 pt', val: '7' },
-  ];
-
-  const symbols = ['©', '®', '™', '★', '✦', '✔', '✖', '←', '→', '↑', '↓', '±', '∞', '∑', 'π', '√', '€', '£', '¥', '§'];
-
-  const handleFontFamilyChange = (val: string) => {
-    setFontFamily(val);
-    onExecCommand('fontName', val);
-  };
-
-  const handleFontSizeChange = (val: string) => {
-    setFontSize(val);
-    onExecCommand('fontSize', val);
-  };
-
-  // Helper for active button styling box
-  const getToolBtnClass = (isActive: boolean | undefined) =>
-    `p-1.5 rounded-lg transition-all cursor-pointer ${
-      isActive
-        ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-500 font-bold scale-105'
-        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
-    }`;
-
-  const getHeadingBtnClass = (blockName: string) =>
-    `px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-      activeFormat?.formatBlock === blockName
-        ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-500 font-bold'
-        : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white'
-    }`;
-
-  const currentFontFamily = activeFormat?.fontFamily || fontFamily;
-  const currentFontSize = activeFormat?.fontSize || fontSize;
-  const currentTextColor = activeFormat?.textColor || textColor;
-  const currentBgColor = activeFormat?.bgColor || bgColor;
-
-  return (
-    <div className="bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 rounded-t-2xl shadow-2xs overflow-x-auto">
-      {/* Ribbon Tabs */}
-      <div className="flex items-center gap-1 px-4 pt-2 border-b border-slate-200/70 dark:border-slate-800 bg-white/50 dark:bg-slate-950/50">
-        <button
-          type="button"
-          onClick={() => setActiveTab('home')}
-          className={`px-4 py-1.5 text-xs font-bold rounded-t-xl transition-colors cursor-pointer border-b-2 ${
-            activeTab === 'home'
-              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-transparent'
-          }`}
-        >
-          Início (Formatação)
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('insert')}
-          className={`px-4 py-1.5 text-xs font-bold rounded-t-xl transition-colors cursor-pointer border-b-2 ${
-            activeTab === 'insert'
-              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-transparent'
-          }`}
-        >
-          Inserir (Páginas / Vetores / Mídia)
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('layout')}
-          className={`px-4 py-1.5 text-xs font-bold rounded-t-xl transition-colors cursor-pointer border-b-2 ${
-            activeTab === 'layout'
-              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border-transparent'
-          }`}
-        >
-          Exibição & Layout
-        </button>
-      </div>
-
-      {/* Toolbar Controls Panel */}
-      <div className="p-2.5 flex items-center gap-2 flex-wrap text-slate-700 dark:text-slate-200 min-h-[52px]">
-        {activeTab === 'home' && (
-          <>
-            {/* Undo / Redo */}
-            <div className="flex items-center gap-0.5 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => onExecCommand('undo')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-200 cursor-pointer"
-                title="Desfazer (Ctrl+Z)"
-              >
-                <RotateCcw size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('redo')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-700 dark:text-slate-200 cursor-pointer"
-                title="Refazer (Ctrl+Y)"
-              >
-                <RotateCw size={15} />
-              </button>
-            </div>
-
-            <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
-
-            {/* Font Family */}
-            <select
-              value={currentFontFamily}
-              onChange={(e) => handleFontFamilyChange(e.target.value)}
-              className="text-xs font-medium p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white cursor-pointer"
-            >
-              {fonts.map((f) => (
-                <option key={f.name} value={f.val}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-
-            {/* Font Size */}
-            <select
-              value={currentFontSize}
-              onChange={(e) => handleFontSizeChange(e.target.value)}
-              className="text-xs font-medium p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white cursor-pointer"
-            >
-              {fontSizes.map((fs) => (
-                <option key={fs.val} value={fs.val}>
-                  {fs.label}
-                </option>
-              ))}
-            </select>
-
-            <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
-
-            {/* Text Style formatting */}
-            <div className="flex items-center gap-0.5 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => onExecCommand('bold')}
-                className={getToolBtnClass(activeFormat?.bold)}
-                title="Negrito (Ctrl+B)"
-              >
-                <Bold size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('italic')}
-                className={getToolBtnClass(activeFormat?.italic)}
-                title="Itálico (Ctrl+I)"
-              >
-                <Italic size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('underline')}
-                className={getToolBtnClass(activeFormat?.underline)}
-                title="Sublinhado (Ctrl+U)"
-              >
-                <Underline size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('strikeThrough')}
-                className={getToolBtnClass(activeFormat?.strikeThrough)}
-                title="Tachado"
-              >
-                <Strikethrough size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('subscript')}
-                className={getToolBtnClass(activeFormat?.subscript)}
-                title="Subscrito"
-              >
-                <Subscript size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('superscript')}
-                className={getToolBtnClass(activeFormat?.superscript)}
-                title="Sobrescrito"
-              >
-                <Superscript size={15} />
-              </button>
-            </div>
-
-            <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
-
-            {/* Colors & Text Shading */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-0.5 px-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-              <WordColorPicker
-                value={currentTextColor}
-                onChange={(val) => {
-                  const finalColor = val || '#000000';
-                  setTextColor(finalColor);
-                  onExecCommand('foreColor', finalColor);
-                }}
-                title="Cor da Fonte"
-                icon={<Palette size={15} />}
-                hasNoColorOption={true}
-                noColorLabel="Automático"
-              />
-
-              <WordColorPicker
-                value={currentBgColor}
-                onChange={(val) => {
-                  setBgColor(val);
-                  onExecCommand('hiliteColor', val || 'transparent');
-                }}
-                title="Marca-Texto / Destaque"
-                icon={<Highlighter size={15} className="text-amber-500" />}
-                hasNoColorOption={true}
-                noColorLabel="Sem Cor"
-              />
-
-              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-0.5" />
-
-              <WordColorPicker
-                value={activeFormat?.lineBgColor || lineBgColor}
-                onChange={(val) => {
-                  setLineBgColor(val);
-                  onApplyLineBackground(val);
-                }}
-                title="Preenchimento de Fundo da Linha"
-                icon={<PaintBucket size={15} className="text-blue-500" />}
-                hasNoColorOption={true}
-                noColorLabel="Sem Cor"
-              />
-            </div>
-
-            <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-0.5" />
-
-            {/* Alignments with active indicator box */}
-            <div className="flex items-center gap-0.5 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => onExecCommand('justifyLeft')}
-                className={getToolBtnClass(activeFormat?.align === 'left')}
-                title="Alinhar à Esquerda"
-              >
-                <AlignLeft size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('justifyCenter')}
-                className={getToolBtnClass(activeFormat?.align === 'center')}
-                title="Centralizar"
-              >
-                <AlignCenter size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('justifyRight')}
-                className={getToolBtnClass(activeFormat?.align === 'right')}
-                title="Alinhar à Direita"
-              >
-                <AlignRight size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('justifyFull')}
-                className={getToolBtnClass(activeFormat?.align === 'justify')}
-                title="Justificar"
-              >
-                <AlignJustify size={15} />
-              </button>
-            </div>
-
-            {/* Lists & Indent */}
-            <div className="flex items-center gap-0.5 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => onExecCommand('insertUnorderedList')}
-                className={getToolBtnClass(activeFormat?.unorderedList)}
-                title="Lista com Marcadores"
-              >
-                <List size={15} />
-              </button>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => onExecCommand('insertOrderedList')}
-                className={getToolBtnClass(activeFormat?.orderedList)}
-                title="Lista Numerada"
-              >
-                <ListOrdered size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('indent')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg cursor-pointer"
-                title="Aumentar Recuo"
-              >
-                <Indent size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('outdent')}
-                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg cursor-pointer"
-                title="Diminuir Recuo"
-              >
-                <Outdent size={15} />
-              </button>
-            </div>
-
-            {/* Find & Replace button */}
-            <button
-              type="button"
-              onClick={onOpenFindReplace}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold cursor-pointer"
-              title="Localizar e Substituir texto"
-            >
-              <Search size={14} />
-              <span>Localizar / Substituir</span>
-            </button>
-
-            {/* Headings */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-              <button
-                type="button"
-                onClick={() => onExecCommand('formatBlock', '<h1>')}
-                className={getHeadingBtnClass('h1')}
-                title="Título 1"
-              >
-                <Heading1 size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('formatBlock', '<h2>')}
-                className={getHeadingBtnClass('h2')}
-                title="Título 2"
-              >
-                <Heading2 size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('formatBlock', '<h3>')}
-                className={getHeadingBtnClass('h3')}
-                title="Título 3"
-              >
-                <Heading3 size={15} />
-              </button>
-              <button
-                type="button"
-                onClick={() => onExecCommand('formatBlock', '<blockquote>')}
-                className={getHeadingBtnClass('blockquote')}
-                title="Citação"
-              >
-                <Quote size={15} />
-              </button>
-            </div>
-          </>
-        )}
-
-        {activeTab === 'insert' && (
-          <>
-            {/* Multi-Page A4 Management Button */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
-              <button
-                type="button"
-                onClick={onAddPage}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-                title="Adicionar Nova Folha A4"
-              >
-                <FilePlus size={15} />
-                <span>+ Adicionar Página A4</span>
-              </button>
-              <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300 px-2">
-                Pág. {currentPageNumber} de {totalPages}
-              </span>
-              {totalPages > 1 && onDeletePage && (
-                <button
-                  type="button"
-                  onClick={onDeletePage}
-                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
-                  title="Excluir Página Atual"
-                >
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-
-            {/* Vector Shapes Button */}
-            <button
-              type="button"
-              onClick={onOpenInsertShape}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-            >
-              <Square size={16} />
-              <span>+ Inserir Vetor / Forma</span>
-            </button>
-
-            {/* Bitmap Image Button */}
-            <button
-              type="button"
-              onClick={onOpenInsertImage}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-            >
-              <ImageIcon size={16} />
-              <span>+ Inserir Imagem (Bitmap)</span>
-            </button>
-
-            {/* Table Button */}
-            <button
-              type="button"
-              onClick={onOpenInsertTable}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-            >
-              <TableIcon size={16} />
-              <span>+ Inserir Tabela</span>
-            </button>
-
-            {/* Footnote button */}
-            <button
-              type="button"
-              onClick={onInsertFootnote}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-            >
-              <Bookmark size={16} />
-              <span>Nota de Rodapé</span>
-            </button>
-
-            <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-1" />
-
-            {/* Special Symbols Picker */}
-            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700 overflow-x-auto">
-              <span className="text-[11px] font-bold text-slate-400 px-1 uppercase">Símbolos:</span>
-              {symbols.map((sym) => (
-                <button
-                  key={sym}
-                  type="button"
-                  onClick={() => onInsertSymbol(sym)}
-                  className="px-2 py-0.5 hover:bg-blue-50 dark:hover:bg-blue-950 text-slate-800 dark:text-white rounded-md text-xs font-bold cursor-pointer"
-                >
-                  {sym}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-
-        {activeTab === 'layout' && (
-          <>
-            {/* Precision Ruler Numerical Adjustment Controls */}
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs flex-wrap">
-              <div className="flex items-center gap-1">
-                <span className="font-bold text-slate-500 flex items-center gap-1">
-                  <Sliders size={13} />
-                  <span>Régua:</span>
-                </span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${scopeMode === 'paragraph' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300' : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'}`}>
-                  {scopeMode === 'paragraph' ? `Parágrafo ${targetSummary ? `(${targetSummary})` : ''}` : 'Documento Inteiro'}
-                </span>
-                {onToggleScopeMode && (
-                  <button
-                    type="button"
-                    onClick={onToggleScopeMode}
-                    className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer ml-0.5"
-                    title="Alternar entre Parágrafo Selecionado e Documento Inteiro"
-                  >
-                    (Alternar)
-                  </button>
-                )}
-              </div>
-
-              {/* Horizontal Margins */}
-              <label className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                <span>Esq:</span>
-                <input
-                  type="number"
-                  step={0.1}
-                  min={0}
-                  max={8}
-                  value={leftMarginCm}
-                  onChange={(e) => onChangeLeftMargin(Number(e.target.value))}
-                  className="w-12 p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center font-mono"
-                />
-              </label>
-
-              <label className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                <span>Dir:</span>
-                <input
-                  type="number"
-                  step={0.1}
-                  min={0}
-                  max={8}
-                  value={rightMarginCm}
-                  onChange={(e) => onChangeRightMargin(Number(e.target.value))}
-                  className="w-12 p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center font-mono"
-                />
-              </label>
-
-              {/* Vertical Margins */}
-              <label className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                <span>Topo:</span>
-                <input
-                  type="number"
-                  step={0.1}
-                  min={0.5}
-                  max={10}
-                  value={topMarginCm}
-                  onChange={(e) => onChangeTopMargin(Number(e.target.value))}
-                  className="w-12 p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center font-mono"
-                />
-              </label>
-
-              <label className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                <span>Base:</span>
-                <input
-                  type="number"
-                  step={0.1}
-                  min={0.5}
-                  max={10}
-                  value={bottomMarginCm}
-                  onChange={(e) => onChangeBottomMargin(Number(e.target.value))}
-                  className="w-12 p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center font-mono"
-                />
-              </label>
-
-              {/* Indent */}
-              <label className="flex items-center gap-1 font-semibold text-slate-700 dark:text-slate-300">
-                <span>Recuo:</span>
-                <input
-                  type="number"
-                  step={0.1}
-                  min={0}
-                  max={10}
-                  value={firstLineIndentCm}
-                  onChange={(e) => onChangeFirstLineIndent(Number(e.target.value))}
-                  className="w-12 p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-center font-mono"
-                />
-              </label>
-            </div>
-
-            {/* Watermark Selector */}
-            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 p-1 px-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-              <span className="font-bold text-slate-500 flex items-center gap-1">
-                <FileCheck size={13} />
-                <span>Marca D'água:</span>
-              </span>
-              <select
-                value={watermarkText}
-                onChange={(e) => onChangeWatermark(e.target.value)}
-                className="p-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-semibold cursor-pointer"
-              >
-                <option value="">Nenhuma</option>
-                <option value="CONFIDENCIAL">CONFIDENCIAL</option>
-                <option value="RASCUNHO">RASCUNHO</option>
-                <option value="EXEMPLO ESCOLAR">EXEMPLO ESCOLAR</option>
-                <option value="URGENTE">URGENTE</option>
-              </select>
-            </div>
-
-            {/* Paper Theme / Style */}
-            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 p-1 px-2 rounded-xl border border-slate-200 dark:border-slate-700">
-              <span className="text-xs font-bold text-slate-500">Cor do Papel:</span>
-              <button
-                type="button"
-                onClick={() => onChangePaperTheme('white')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg cursor-pointer border ${
-                  paperTheme === 'white' ? 'bg-white text-slate-900 border-blue-500 shadow-2xs' : 'text-slate-600 border-transparent'
-                }`}
-              >
-                Branco Padrão
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangePaperTheme('sepia')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg cursor-pointer border ${
-                  paperTheme === 'sepia' ? 'bg-amber-100 text-amber-900 border-amber-500 shadow-2xs' : 'text-slate-600 border-transparent'
-                }`}
-              >
-                Sépia Leitura
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangePaperTheme('dark')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg cursor-pointer border ${
-                  paperTheme === 'dark' ? 'bg-slate-900 text-white border-blue-500 shadow-2xs' : 'text-slate-600 border-transparent'
-                }`}
-              >
-                Papel Escuro
-              </button>
-            </div>
-
-            {/* Paper Margin */}
-            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-800 p-1 px-2 rounded-xl border border-slate-200 dark:border-slate-700">
-              <span className="text-xs font-bold text-slate-500">Margens:</span>
-              <button
-                type="button"
-                onClick={() => onChangePaperMargin('normal')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg cursor-pointer border ${
-                  paperMargin === 'normal' ? 'bg-blue-600 text-white border-blue-600' : 'text-slate-600 border-transparent'
-                }`}
-              >
-                Normal (2.5 cm)
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangePaperMargin('narrow')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg cursor-pointer border ${
-                  paperMargin === 'narrow' ? 'bg-blue-600 text-white border-blue-600' : 'text-slate-600 border-transparent'
-                }`}
-              >
-                Estreita (1.2 cm)
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangePaperMargin('wide')}
-                className={`px-2.5 py-1 text-xs font-bold rounded-lg cursor-pointer border ${
-                  paperMargin === 'wide' ? 'bg-blue-600 text-white border-blue-600' : 'text-slate-600 border-transparent'
-                }`}
-              >
-                Larga (3.8 cm)
-              </button>
-            </div>
-
-            {/* Print button */}
-            <button
-              type="button"
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold cursor-pointer"
-            >
-              <Printer size={15} />
-              <span>Imprimir / PDF</span>
-            </button>
-          </>
-        )}
-      </div>
+export const WordToolbar: React.FC<WordToolbarProps> = p => {
+  const [tab, setTab] = useState('Início');
+  const [fontSize, setFontSize] = useState('12');
+  const f = p.activeFormat;
+  useEffect(() => { setFontSize(String(Math.round(f?.fontSizePt || 12))); }, [f?.fontSizePt]);
+  const cmd = (command: string, value?: string) => p.onExecCommand(command, value);
+  const action = (name: string, value?: string) => p.onAction(name, value);
+  const small = (icon: LucideIcon, label: string, command: string, active?: boolean, value?: string) => <Tool icon={icon} label={label} active={active} onClick={() => cmd(command, value)} />;
+  return <div className="word-ribbon">
+    <div className="word-tabs" role="tablist" aria-label="Faixa de opções do documento">{tabs.map(name => <button type="button" role="tab" key={name} aria-selected={tab === name} aria-controls="word-ribbon-panel" id={`word-tab-${name}`} onMouseDown={e => e.preventDefault()} onClick={() => setTab(name)}>{name}</button>)}</div>
+    <div className="word-ribbon-panel" id="word-ribbon-panel" role="tabpanel" aria-labelledby={`word-tab-${tab}`}>
+      {tab === 'Arquivo' && <>
+        <Group label="Documento"><Tool icon={FilePlus} label="Novo documento" large onClick={() => action('new')} /><Tool icon={FolderOpen} label="Abrir documentos" large onClick={() => action('open')} /><Tool icon={FolderOpen} label="Importar arquivo" large onClick={() => action('import')} /><Tool icon={Save} label="Salvar documento" large onClick={() => action('save')} /></Group>
+        <Group label="Exportar"><Tool icon={FileDown} label="Baixar DOCX" large onClick={() => action('docx')} /><Tool icon={FileDown} label="Baixar HTML" large onClick={() => action('html')} /><Tool icon={FileDown} label="Baixar texto" large onClick={() => action('txt')} /><Tool icon={Printer} label="Imprimir / PDF" large onClick={() => action('print')} /></Group>
+        <p className="word-ribbon-note">Arquivos salvos neste navegador. Importe DOCX, HTML ou TXT.</p>
+      </>}
+      {tab === 'Início' && <>
+        <Group label="Área de transferência"><Tool icon={ClipboardPaste} label="Colar" large onClick={() => action('paste')} /><div className="word-tool-column"><button onMouseDown={e => e.preventDefault()} onClick={() => action('cut')}><Scissors size={16} />Recortar</button><button onMouseDown={e => e.preventDefault()} onClick={() => action('copy')}><Copy size={16} />Copiar</button><button onMouseDown={e => e.preventDefault()} onClick={() => action('paint-format')}><Paintbrush size={16} />Copiar formatação</button></div></Group>
+        <Group label="Fonte"><div className="word-tool-stack"><div className="word-tool-row"><select aria-label="Fonte" value={fonts.find(font => f?.fontFamily.toLowerCase().includes(font.toLowerCase())) || 'Calibri'} onChange={e => cmd('fontName', e.target.value)}>{fonts.map(font => <option key={font}>{font}</option>)}</select><input aria-label="Tamanho da fonte" type="number" min={6} max={96} value={fontSize} onChange={e => setFontSize(e.target.value)} onFocus={() => setFontSize(String(Math.round(f?.fontSizePt || 12)))} onBlur={() => action('font-size', fontSize)} onKeyDown={e => { if (e.key === 'Enter') { action('font-size', fontSize); e.currentTarget.blur(); } }} /><Tool icon={ZoomIn} label="Aumentar fonte" onClick={() => { const size = Math.min(96, (f?.fontSizePt || 12) + 1); setFontSize(String(size)); action('font-size', String(size)); }} /><Tool icon={ZoomOut} label="Diminuir fonte" onClick={() => { const size = Math.max(6, (f?.fontSizePt || 12) - 1); setFontSize(String(size)); action('font-size', String(size)); }} /><select aria-label="Maiúsculas e minúsculas" value="" onChange={e => action('case', e.target.value)}><option value="" disabled>Aa</option><option value="upper">MAIÚSCULAS</option><option value="lower">minúsculas</option><option value="title">Iniciais Maiúsculas</option></select><Tool icon={Eraser} label="Limpar formatação" onClick={() => cmd('removeFormat')} /></div>
+          <div className="word-tool-row">{small(Bold, 'Negrito (Ctrl+B)', 'bold', f?.bold)}{small(Italic, 'Itálico (Ctrl+I)', 'italic', f?.italic)}{small(Underline, 'Sublinhado (Ctrl+U)', 'underline', f?.underline)}{small(Strikethrough, 'Tachado', 'strikeThrough', f?.strikeThrough)}{small(Subscript, 'Subscrito', 'subscript', f?.subscript)}{small(Superscript, 'Sobrescrito', 'superscript', f?.superscript)}<WordColorPicker title="Cor do texto" value={f?.textColor} onChange={color => cmd('foreColor', color)} icon={<Type size={17} />} hasNoColorOption={false} /><WordColorPicker title="Realce do texto" value={f?.bgColor} onChange={color => cmd('hiliteColor', color)} icon={<Highlighter size={17} />} /></div></div></Group>
+        <Group label="Parágrafo"><div className="word-tool-stack"><div className="word-tool-row">{small(List, 'Marcadores', 'insertUnorderedList', f?.unorderedList)}{small(ListOrdered, 'Numeração', 'insertOrderedList', f?.orderedList)}{small(Outdent, 'Diminuir recuo', 'outdent')}{small(Indent, 'Aumentar recuo', 'indent')}<Tool icon={ArrowDownAZ} label="Ordenar parágrafos A–Z" onClick={() => action('sort')} /><Tool icon={Pilcrow} label="Mostrar marcas de parágrafo" active={p.marksVisible} onClick={() => action('marks')} /></div><div className="word-tool-row">{small(AlignLeft, 'Alinhar à esquerda', 'justifyLeft', f?.align === 'left')}{small(AlignCenter, 'Centralizar', 'justifyCenter', f?.align === 'center')}{small(AlignRight, 'Alinhar à direita', 'justifyRight', f?.align === 'right')}{small(AlignJustify, 'Justificar', 'justifyFull', f?.align === 'justify')}<select aria-label="Espaçamento entre linhas" defaultValue="1.5" onChange={e => action('line-height', e.target.value)}>{['1', '1.15', '1.5', '2', '2.5', '3'].map(v => <option key={v}>{v}</option>)}</select><WordColorPicker title="Sombreamento do parágrafo" value={f?.lineBgColor} onChange={p.onApplyLineBackground} icon={<PaintBucket size={17} />} /><Tool icon={Square} label="Borda inferior do parágrafo" onClick={() => action('border')} /></div></div></Group>
+        <Group label="Estilos"><div className="word-styles">{[['p', 'Normal'], ['h1', 'Título 1'], ['h2', 'Título 2'], ['h3', 'Título 3'], ['blockquote', 'Citação']].map(([tag, name]) => <button key={tag} type="button" aria-pressed={f?.formatBlock === tag} onMouseDown={e => e.preventDefault()} onClick={() => cmd('formatBlock', tag)}><span className={tag}>AaBbCcDd</span><small>{name}</small></button>)}</div></Group>
+        <Group label="Edição"><div className="word-tool-column"><button onClick={p.onOpenFindReplace}><Search size={16} />Localizar</button><button onClick={p.onOpenFindReplace}><Search size={16} />Substituir</button><button onMouseDown={e => e.preventDefault()} onClick={() => action('select-all')}><Type size={16} />Selecionar tudo</button></div></Group>
+        <Group label="Voz e revisão"><Tool icon={Mic} label={p.dictating ? 'Parar ditado' : 'Ditar'} large active={p.dictating} disabled={!p.canDictate} onClick={() => action('dictate')} /><Tool icon={SpellCheck} label="Editor" large onClick={() => action('review')} /></Group>
+      </>}
+      {tab === 'Inserir' && <>
+        <Group label="Páginas"><Tool icon={FilePlus} label="Página em branco" large onClick={p.onAddPage} /><Tool icon={PanelTop} label="Quebra de página" large onClick={() => action('page-break')} /></Group>
+        <Group label="Ilustrações"><Tool icon={Table} label="Tabela" large onClick={p.onOpenInsertTable} /><Tool icon={Image} label="Imagens" large onClick={p.onOpenInsertImage} /><Tool icon={Square} label="Formas" large onClick={p.onOpenInsertShape} /></Group>
+        <Group label="Links e comentários"><Tool icon={Link} label="Inserir link" large onClick={() => action('link')} /><Tool icon={MessageSquare} label="Novo comentário" large onClick={() => action('comment')} /><Tool icon={PanelTop} label="Cabeçalho / rodapé" large onClick={() => action('header-footer')} /><Tool icon={Type} label="Número de página" large onClick={() => action('page-number')} /></Group>
+        <Group label="Símbolos"><select aria-label="Inserir símbolo" value="" onChange={e => p.onInsertSymbol(e.target.value)}><option value="" disabled>Escolha um símbolo</option>{['©', '®', '™', '★', '✔', '±', '∞', '∑', 'π', '√', '€', '§'].map(s => <option key={s}>{s}</option>)}</select><Tool icon={Type} label="Data e hora" onClick={() => p.onInsertSymbol(new Date().toLocaleString('pt-BR'))} /></Group>
+      </>}
+      {tab === 'Desenhar' && <><Group label="Tinta"><Tool icon={Paintbrush} label="Desenho livre" large onClick={() => action('draw')} /><Tool icon={Square} label="Formas geométricas" large onClick={p.onOpenInsertShape} /></Group><p className="word-ribbon-note">Desenhe com mouse, caneta ou toque e insira a ilustração no documento.</p></>}
+      {tab === 'Design' && <>
+        <Group label="Aparência da página"><select aria-label="Cor do papel" value={p.paperTheme} onChange={e => p.onChangePaperTheme(e.target.value as typeof p.paperTheme)}><option value="white">Papel branco</option><option value="sepia">Papel sépia</option><option value="dark">Papel escuro</option></select><label>Marca-d'água<input aria-label="Marca-d'água" value={p.watermarkText} onChange={e => p.onChangeWatermark(e.target.value)} placeholder="Ex.: RASCUNHO" /></label></Group>
+        <Group label="Estilo do documento"><Tool icon={Type} label="Tema clássico" large onClick={() => action('document-theme', 'classic')} /><Tool icon={Type} label="Tema moderno" large onClick={() => action('document-theme', 'modern')} /><Tool icon={Quote} label="Tema acadêmico" large onClick={() => action('document-theme', 'academic')} /></Group>
+      </>}
+      {tab === 'Layout' && <>
+        <Group label="Configurar página"><select aria-label="Margens predefinidas" value={p.paperMargin} onChange={e => p.onChangePaperMargin(e.target.value as typeof p.paperMargin)}><option value="normal">Margens normais</option><option value="narrow">Margens estreitas</option><option value="wide">Margens largas</option></select><select aria-label="Orientação" value={p.orientation} onChange={e => action('orientation', e.target.value)}><option value="portrait">Retrato</option><option value="landscape">Paisagem</option></select><select aria-label="Tamanho do papel" value={p.pageSize} onChange={e => action('page-size', e.target.value)}><option value="a4">A4</option><option value="letter">Carta</option></select></Group>
+        <Group label="Margens em centímetros">{[['Esquerda', p.leftMarginCm, p.onChangeLeftMargin], ['Direita', p.rightMarginCm, p.onChangeRightMargin], ['Superior', p.topMarginCm, p.onChangeTopMargin], ['Inferior', p.bottomMarginCm, p.onChangeBottomMargin], ['Primeira linha', p.firstLineIndentCm, p.onChangeFirstLineIndent]].map(([label, value, change]) => <label key={String(label)}>{String(label)}<input aria-label={`Margem ${label}`} type="number" min={0} max={8} step={.1} value={value as number} onChange={e => (change as (v: number) => void)(Math.max(0, Math.min(8, Number(e.target.value))))} /></label>)}</Group>
+        <Group label="Parágrafo"><label>Antes (pt)<input aria-label="Espaço antes" type="number" min={0} max={96} defaultValue={0} onChange={e => action('space-before', e.target.value)} /></label><label>Depois (pt)<input aria-label="Espaço depois" type="number" min={0} max={96} defaultValue={8} onChange={e => action('space-after', e.target.value)} /></label><button onClick={p.onToggleScopeMode}>{p.scopeMode === 'paragraph' ? 'Aplicar à página' : 'Aplicar ao parágrafo'}</button></Group>
+      </>}
+      {tab === 'Referências' && <><Group label="Referências"><Tool icon={BookOpen} label="Inserir sumário" large onClick={() => action('toc')} /><Tool icon={Quote} label="Nota de rodapé" large onClick={p.onInsertFootnote} /><Tool icon={Quote} label="Inserir referência" large onClick={() => action('citation')} /><Tool icon={BookOpen} label="Biblioteca Zotero (site)" large onClick={() => action('zotero')} /></Group></>}
+      {tab === 'Correspondências' && <><Group label="Campos"><Tool icon={Type} label="Inserir campo" large onClick={() => action('merge-field')} /><Tool icon={FilePlus} label="Gerar correspondências" large onClick={() => action('merge')} /></Group><p className="word-ribbon-note">Use campos como {'{{nome}}'} e gere cópias com uma lista de destinatários.</p></>}
+      {tab === 'Revisão' && <><Group label="Revisar"><Tool icon={SpellCheck} label="Editor" large onClick={() => action('review')} /><Tool icon={Volume2} label="Ler em voz alta" large onClick={() => action('read-aloud')} /><Tool icon={MessageSquare} label="Novo comentário" large onClick={() => action('comment')} /><Tool icon={MessageSquare} label="Comentários" large onClick={() => action('comments')} /></Group><Group label="Idioma"><select aria-label="Idioma de revisão" defaultValue="pt-BR" onChange={e => action('language', e.target.value)}><option value="pt-BR">Português (Brasil)</option><option value="en-US">English (US)</option><option value="es">Español</option></select></Group></>}
+      {tab === 'Exibir' && <><Group label="Exibição"><Tool icon={PanelTop} label="Régua" large active={p.rulerVisible} onClick={() => action('ruler')} /><Tool icon={Pilcrow} label="Marcas de parágrafo" large active={p.marksVisible} onClick={() => action('marks')} /><Tool icon={BookOpen} label="Modo de leitura" large active={p.readOnly} onClick={() => action('read-only')} /><Tool icon={PanelTop} label="Modo foco" large active={p.focusMode} onClick={() => action('focus')} /></Group><Group label="Zoom"><Tool icon={ZoomOut} label="Diminuir zoom" onClick={() => action('zoom', String(p.zoom - 10))} /><span>{p.zoom}%</span><Tool icon={ZoomIn} label="Aumentar zoom" onClick={() => action('zoom', String(p.zoom + 10))} /><button onClick={() => action('zoom', '100')}>100%</button><button onClick={() => action('fit')}>Ajustar à largura</button></Group><Group label="Página atual"><button onClick={() => action('duplicate-page')}>Duplicar página</button><button onClick={p.onDeletePage} disabled={!p.onDeletePage}>Excluir página</button><span>{p.currentPageNumber} de {p.totalPages}</span></Group></>}
+      {tab === 'Desenvolvedor' && <><Group label="Documento HTML"><Tool icon={Type} label="Editar código HTML" large onClick={() => action('source')} /><Tool icon={FileDown} label="Exportar HTML" large onClick={() => action('html')} /></Group><p className="word-ribbon-note">O código importado é limpo antes de entrar no documento. Macros VBA não são executadas.</p></>}
+      {tab === 'Ajuda' && <><Group label="Atalhos"><Tool icon={BookOpen} label="Ajuda e atalhos" large onClick={() => action('help')} /><Tool icon={Undo2} label="Desfazer" large onClick={() => cmd('undo')} /><Tool icon={Redo2} label="Refazer" large onClick={() => cmd('redo')} /></Group><p className="word-ribbon-note">Ctrl+B negrito · Ctrl+I itálico · Ctrl+U sublinhado · Ctrl+S salvar · Ctrl+F localizar · Ctrl+Enter nova página.</p></>}
     </div>
-  );
+  </div>;
 };

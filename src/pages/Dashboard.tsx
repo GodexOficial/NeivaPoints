@@ -30,9 +30,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const { t, getClassName } = useLanguage();
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-150">
+    <div className="space-y-8 animate-in fade-in duration-300">
       {/* Top Banner / Welcome */}
-      <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-800 rounded-3xl p-6 sm:p-8 text-white shadow-md relative overflow-hidden">
+      <div className="dashboard-hero bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-800 rounded-3xl p-6 sm:p-10 text-white shadow-md relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-10 -translate-y-10 w-64 h-64 bg-white/5 rounded-full blur-2xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
@@ -40,10 +40,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <Sparkles size={14} className="text-amber-300" />
               <span>{t('dash.badge')}</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
               {t('dash.title')}
             </h1>
-            <p className="mt-1 text-sm text-blue-100 max-w-xl">
+            <p className="mt-3 text-base leading-relaxed text-blue-100 max-w-xl">
               {t('dash.subtitle')}
             </p>
           </div>
@@ -83,9 +83,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3.5">
           {t('dash.overview')}
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="dashboard-stats grid gap-4">
           {/* Total Students */}
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+          <div className="glass-panel bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
             <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
               {t('dash.totalStudents')}
             </span>
@@ -102,8 +102,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
             return (
               <div
                 key={c.id}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectClass(c.id); } }}
                 onClick={() => onSelectClass(c.id)}
-                className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-blue-300 dark:hover:border-blue-500 cursor-pointer transition-colors"
+                className="glass-panel bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-blue-300 dark:hover:border-blue-500 cursor-pointer transition-colors"
               >
                 <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block truncate">
                   {label}
@@ -152,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {classes.length === 0 ? (
-          <div className="py-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 space-y-3">
+          <div className="glass-panel py-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 space-y-3">
             <GraduationCap size={36} className="mx-auto text-slate-300 dark:text-slate-600" />
             <h3 className="text-base font-bold text-slate-800 dark:text-slate-200">{t('dash.noClasses')}</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">{t('dash.noClassesDesc')}</p>
@@ -168,7 +171,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="dashboard-classes grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
             {classes.map((classItem) => {
               const stats = dashboardStats.classStats[classItem.id] || {
                 classId: classItem.id,

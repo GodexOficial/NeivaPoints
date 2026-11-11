@@ -1,0 +1,117 @@
+/* Explicit surface classes keep document paper, charts and semantic colors intact. */
+.glass-theme {
+  --glass-surface: #f8fbffed;
+  --glass-border: #a5b8d480;
+  --glass-shadow: 0 12px 36px -22px #254b7859, inset 0 1px 0 #fff;
+  min-height: 100dvh;
+  position: relative;
+  isolation: isolate;
+  background-color: #eef3fc;
+}
+.dark .glass-theme {
+  --glass-surface: #111d35ed;
+  --glass-border: #90b5e938;
+  --glass-shadow: 0 16px 44px -24px #000a, inset 0 1px 0 #d2eaff20;
+  background-color: #080e20;
+}
+.glass-theme::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: radial-gradient(ellipse at 0% 8%, #22d3ee40, transparent 42%), radial-gradient(ellipse at 95% 30%, #a78bfa45, transparent 44%), radial-gradient(ellipse at 35% 95%, #60a5fa30, transparent 45%);
+}
+.dark .glass-theme::before {
+  background-image: radial-gradient(ellipse at 0% 8%, #0891b235, transparent 42%), radial-gradient(ellipse at 95% 30%, #7c3aed35, transparent 44%), radial-gradient(ellipse at 35% 95%, #1d4ed825, transparent 45%);
+}
+.glass-theme :is(.app-shell, .glass-backdrop),
+.dark .glass-theme :is(.app-shell, .glass-backdrop) {
+  background-color: transparent;
+  background-image: none;
+}
+.glass-theme :is(.glass-panel, .glass-nav, .mobile-navigation) {
+  background-color: var(--glass-surface);
+  border-color: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+@supports (backdrop-filter: blur(1px)) {
+  .glass-theme { --glass-surface: #f8fbffb8; }
+  .dark .glass-theme { --glass-surface: #111d35c7; }
+  /* Static gradients already soften the glass: do not blur every list card. */
+  .glass-theme :is(.glass-panel, .glass-nav, .mobile-navigation) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass-theme :is(.glass-nav, .mobile-navigation, [role="dialog"] > .glass-panel) {
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+}
+/* Restrict control treatment to application screens, outside the Word canvas. */
+.glass-theme :is(.app-shell, .glass-backdrop) :where(button.rounded-xl, button.rounded-lg, input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]), select, textarea) {
+  border-style: solid;
+  border-width: 1px;
+  border-color: var(--glass-border);
+  box-shadow: inset 0 1px 0 #ffffff40, 0 3px 8px -6px #19355580;
+}
+.glass-theme button.app-brand { border: 0; box-shadow: none; }
+.glass-theme button.app-brand:focus-visible { outline: 2px solid #3b82f6; outline-offset: 3px; }
+
+.glass-theme :is(.app-shell, .glass-backdrop) :where(button.bg-white, input.bg-white, select.bg-white, textarea.bg-white) {
+  background-color: var(--glass-surface);
+}
+.glass-theme :is(.app-shell, .glass-backdrop) :where(button.bg-blue-600, button.bg-indigo-600) {
+  background-image: linear-gradient(135deg, #ffffff18, #ffffff00 65%);
+  border-color: #ffffff40;
+  box-shadow: inset 0 1px 0 #ffffff45, 0 5px 14px -8px #2563eb;
+}
+.glass-theme .dashboard-hero {
+  background-image: radial-gradient(ellipse at 0% 0%, #087c96, transparent 62%), linear-gradient(115deg, #102f62, #261054);
+  border: 1px solid #b9dcff45;
+  box-shadow: inset 0 1px 0 #ffffff30, 0 18px 40px -25px #312e81aa;
+}
+.glass-theme .dashboard-hero button.bg-white {
+  background-color: #f0f9fff2;
+  color: #1743a0;
+}
+.glass-theme :is(.app-shell, .glass-backdrop) :where(input:not([type=checkbox]):not([type=radio]), select, textarea) {
+  font-size: 1rem;
+}
+.glass-theme .glass-nav [aria-current=page],
+.glass-theme .mobile-navigation [aria-current=page] {
+  border: 1px solid #60a5fa66;
+  box-shadow: inset 0 1px 0 #ffffff60, 0 3px 10px -7px #2563eb;
+}
+.glass-theme .glass-nav .lucide { width: 1.25rem; height: 1.25rem; stroke-width: 1.8; }
+.glass-theme :is(.app-shell, .glass-backdrop) button > .lucide {
+  flex-shrink: 0;
+  min-width: 1.125rem;
+  min-height: 1.125rem;
+  stroke-width: 1.8;
+}
+.glass-theme :is(.app-shell, .glass-backdrop) :where(.text-slate-400, .text-slate-500) { color: #52637a; }
+.dark .glass-theme :is(.app-shell, .glass-backdrop) :where(.dark\:text-slate-400, .dark\:text-slate-500) { color: #b0bfd5; }
+.glass-theme :is(.app-shell, .glass-backdrop) :where(input, textarea)::placeholder { color: #64748b; opacity: 1; }
+.dark .glass-theme :is(.app-shell, .glass-backdrop) :where(input, textarea)::placeholder { color: #a6b6ce; }
+.glass-theme :is(.app-shell, .glass-backdrop) :where(.text-xs) { font-size: .8125rem; line-height: 1.5; }
+.glass-theme :is(.app-shell, .glass-backdrop) :where(h1.text-3xl, h1.text-4xl) { font-size: clamp(1.75rem, 1.3rem + 1.7vw, 2.5rem); }
+.glass-theme :is(.app-shell, .glass-backdrop) :where(button, input, select, textarea) { max-width: 100%; }
+@media (max-width: 639px) {
+  .glass-theme :is(.glass-nav, .mobile-navigation, [role="dialog"] > .glass-panel) { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+  .glass-theme .glass-nav button { min-width: 2.75rem; min-height: 2.75rem; }
+  .glass-theme .glass-backdrop { padding-inline: max(.75rem, env(safe-area-inset-left)); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass-theme { --glass-surface: #f8fbff; }
+  .dark .glass-theme { --glass-surface: #111d35; }
+  .glass-theme :is(.glass-panel, .glass-nav, .mobile-navigation) { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (forced-colors: active) {
+  .glass-theme :is(.glass-panel, .glass-nav, .mobile-navigation) { background: Canvas; border-color: CanvasText; box-shadow: none; }
+}
+@media print {
+  .glass-theme::before { display: none; }
+  .glass-theme { background: transparent; }
+  .glass-theme :is(.glass-panel, .glass-nav) { background: white; box-shadow: none; backdrop-filter: none; }
+}

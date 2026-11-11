@@ -19,6 +19,7 @@ import { useAuth } from "../context/AuthContext";
 import { ConfirmDialog } from "../components/common/ConfirmDialog";
 import { LanguageSwitcher } from "../components/common/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/common/ThemeSwitcher";
+import { useMotionSettings } from "../hooks/useMotionSettings";
 import { DEFAULT_ENGAGEMENT_SETTINGS, EngagementService, type EngagementSettings } from "../services/engagementService";
 import { RewardManagement } from "../components/rewards/RewardManagement";
 
@@ -33,7 +34,8 @@ export const SettingsPage: React.FC = () => {
     resetClassesToDefault,
     clearAllData,
   } = useStudentContext();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const { mode: motionMode, setMode: setMotionMode } = useMotionSettings();
   const {
     teacherSecurityKey,
     studentSecurityKey,
@@ -85,7 +87,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl space-y-8 animate-in fade-in duration-150">
+    <div className="max-w-4xl space-y-8 animate-in fade-in duration-300">
       <div>
         <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
           {t("settings.title")}
@@ -103,7 +105,7 @@ export const SettingsPage: React.FC = () => {
       )}
 
       {/* Appearance & Theme Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
+      <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
         <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="p-2.5 bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 rounded-xl">
             <SunMoon size={22} />
@@ -119,10 +121,20 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         <ThemeSwitcher variant="full" />
+        <fieldset className="space-y-3 border-t border-slate-200 pt-5 dark:border-slate-700">
+          <legend className="text-sm font-bold text-slate-900 dark:text-white">{language === 'pt' ? 'Animações' : 'Animations'}</legend>
+          <p className="text-xs text-slate-600 dark:text-slate-300">{language === 'pt' ? 'Controle os efeitos do site sem alterar as configurações do Windows ou do navegador. O foco de luz acompanha o mouse quando ele é usado.' : 'Control site effects without changing Windows or browser settings. The light follows the mouse when used.'}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(['always', 'system'] as const).map(mode => <label key={mode} className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-4 text-sm text-slate-800 dark:border-slate-700 dark:text-slate-100">
+              <input type="radio" name="motion-mode" value={mode} checked={motionMode === mode} onChange={() => setMotionMode(mode)} className="mt-1 accent-blue-600" />
+              <span>{mode === 'always' ? (language === 'pt' ? 'Sempre animar' : 'Always animate') : (language === 'pt' ? 'Respeitar preferência do sistema' : 'Follow system preference')}</span>
+            </label>)}
+          </div>
+        </fieldset>
       </div>
 
       {/* Language Selection Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
+      <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
         <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
             <Globe size={22} />
@@ -141,7 +153,7 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Teacher Security Master Key Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
+      <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
         <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="p-2.5 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 rounded-xl">
             <KeyRound size={22} />
@@ -226,7 +238,7 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Login XP rules */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
+      <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-5">
         <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 rounded-xl"><Timer size={22} /></div>
           <div><h2 className="text-base font-bold text-slate-900 dark:text-white">XP por presença</h2><p className="text-xs text-slate-500 dark:text-slate-400">Regras aplicadas aos alunos conectados e à meta mensal.</p></div>
@@ -248,7 +260,7 @@ export const SettingsPage: React.FC = () => {
       <RewardManagement onFeedback={showFeedback} />
 
       {/* Data Management Section */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
+      <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
         <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="p-2.5 bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 rounded-xl">
             <Database size={22} />
@@ -341,7 +353,7 @@ export const SettingsPage: React.FC = () => {
       </div>
 
       {/* Level Progression Reference */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
+      <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs space-y-6">
         <div className="flex items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="p-2.5 bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 rounded-xl">
             <Info size={22} />

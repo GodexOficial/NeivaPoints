@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, Check, Users, X } from 'lucide-react';
 import { DEFAULT_REASONS, QUICK_POINT_OPTIONS } from '../../types';
@@ -23,6 +24,7 @@ export const ClassPointsModal: React.FC<ClassPointsModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const dialogRef = useDialogFocus(isOpen);
   const { t, getReasonLabel } = useLanguage();
   const { addPointsToClass, removePointsFromClass } = useStudentContext();
   const [amount, setAmount] = useState<number | ''>(10);
@@ -44,6 +46,15 @@ export const ClassPointsModal: React.FC<ClassPointsModalProps> = ({
       setSaving(false);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !saving) onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, saving, onClose]);
 
   if (!isOpen || !classId) return null;
 
@@ -77,11 +88,11 @@ export const ClassPointsModal: React.FC<ClassPointsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs" role="dialog" aria-modal="true">
-      <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="class-points-title">
+      <div className="glass-panel relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl animate-in zoom-in-95 border border-slate-200 dark:border-slate-800 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
           <div>
-            <h3 className="text-base font-semibold text-slate-900 dark:text-white">{t(mode === 'remove' ? 'classes.bulkRemovePointsTitle' : 'classes.bulkPointsTitle')}</h3>
+            <h3 id="class-points-title" className="text-base font-semibold text-slate-900 dark:text-white">{t(mode === 'remove' ? 'classes.bulkRemovePointsTitle' : 'classes.bulkPointsTitle')}</h3>
             <p className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400"><Users size={13} />{className} · {studentCount} {t('classes.bulkPointsStudents')}</p>
           </div>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" aria-label={t('modal.cancel')}><X size={18} /></button>

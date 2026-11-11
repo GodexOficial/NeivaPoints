@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import React, { useState, useEffect } from "react";
 import { GraduationCap, Edit3, X, AlertCircle, Palette } from "lucide-react";
 import type { ClassInfo } from "../../types";
@@ -48,6 +49,7 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const dialogRef = useDialogFocus(isOpen);
   const { addClass, updateClass } = useStudentContext();
   const { t } = useLanguage();
 
@@ -86,7 +88,7 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape' && document.querySelectorAll('[role="dialog"]')[document.querySelectorAll('[role="dialog"]').length - 1] === dialogRef.current) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -136,15 +138,14 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
   };
 
   return (
-    <div
+    <div ref={dialogRef} tabIndex={-1}
       onClick={onClose}
+      role="dialog" aria-modal="true" aria-labelledby="ClassFormModal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs cursor-pointer"
-      role="dialog"
-      aria-modal="true"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150 cursor-default"
+        className="glass-panel relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-300 cursor-default"
       >
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/60 dark:bg-slate-800/60">
           <div className="flex items-center gap-2.5">
@@ -152,7 +153,7 @@ export const ClassFormModal: React.FC<ClassFormModalProps> = ({
               {isEditing ? <Edit3 size={18} /> : <GraduationCap size={18} />}
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white" id="ClassFormModal-title">
                 {isEditing ? t("classForm.editTitle") : t("classForm.newTitle")}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">

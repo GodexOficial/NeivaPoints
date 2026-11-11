@@ -1,3 +1,4 @@
+import { useDialogFocus } from '../../hooks/useDialogFocus';
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, MinusCircle, X, Check, ArrowRight, AlertCircle } from 'lucide-react';
 import type { StudentWithStats } from '../../types';
@@ -22,6 +23,7 @@ export const PointsModal: React.FC<PointsModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const dialogRef = useDialogFocus(isOpen);
   const { addPoints, removePoints } = useStudentContext();
   const { t, getClassName, getReasonLabel } = useLanguage();
 
@@ -50,7 +52,7 @@ export const PointsModal: React.FC<PointsModalProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen || showRemoveConfirm) return;
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && document.querySelectorAll('[role="dialog"]')[document.querySelectorAll('[role="dialog"]').length - 1] === dialogRef.current) onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -151,20 +153,19 @@ export const PointsModal: React.FC<PointsModalProps> = ({
 
   return (
     <>
-      <div
+      <div ref={dialogRef} tabIndex={-1}
         onClick={onClose}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs cursor-pointer"
-        role="dialog"
-        aria-modal="true"
+        role="dialog" aria-modal="true" aria-labelledby="PointsModal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs cursor-pointer"
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-150 cursor-default"
+          className="glass-panel relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-300 cursor-default"
         >
           {/* Header */}
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
             <div>
-              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white" id="PointsModal-title">
                 {mode === 'add' ? t('modal.addTitle') : t('modal.removeTitle')}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -172,6 +173,8 @@ export const PointsModal: React.FC<PointsModalProps> = ({
               </p>
             </div>
             <button
+              type="button"
+              aria-label={t('modal.cancel')}
               onClick={onClose}
               className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >

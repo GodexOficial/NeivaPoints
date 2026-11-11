@@ -83,7 +83,7 @@ export const LevelUpToast: React.FC<LevelUpToastProps> = ({ notification, onDism
       {/* Auto-dismiss countdown bar */}
       <div className="h-1 bg-slate-100 dark:bg-slate-800 w-full overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-indigo-500 to-violet-600 transition-all duration-75 ease-linear"
+          className="h-full bg-gradient-to-r from-indigo-500 to-violet-600 transition-all duration-300 ease-in-out"
           style={{ width: `${progress}%` }}
         />
       </div>

@@ -64,7 +64,7 @@ export const saveLocalDocument = (doc: WordDocument): WordDocument => {
     return updatedDoc;
   } catch (e) {
     console.error('Failed to save document locally', e);
-    return doc;
+    throw e;
   }
 };
 
@@ -78,12 +78,13 @@ export const deleteLocalDocument = (id: string): void => {
   }
 };
 
-export const saveAutoSaveDraft = (docId: string, content: string, title: string): void => {
+export const saveAutoSaveDraft = (docId: string, content: string, title: string, document?: WordDocument): void => {
   try {
     const draftData = {
       docId,
       title,
       content,
+      document,
       savedAt: new Date().toISOString(),
     };
     localStorage.setItem(`${DRAFT_PREFIX}${docId}`, JSON.stringify(draftData));
@@ -92,7 +93,7 @@ export const saveAutoSaveDraft = (docId: string, content: string, title: string)
   }
 };
 
-export const getAutoSaveDraft = (docId: string): { docId: string; title: string; content: string; savedAt: string } | null => {
+export const getAutoSaveDraft = (docId: string): { docId: string; title: string; content: string; savedAt: string; document?: WordDocument } | null => {
   try {
     const raw = localStorage.getItem(`${DRAFT_PREFIX}${docId}`);
     if (!raw) return null;

@@ -6,6 +6,7 @@ interface WordVerticalRulerProps {
   onChangeTopMargin: (valCm: number) => void;
   onChangeBottomMargin: (valCm: number) => void;
   paperHeightPx?: number; // default A4 height ~ 1123px (29.7cm)
+  paperHeightCm?: number;
 }
 
 export const WordVerticalRuler: React.FC<WordVerticalRulerProps> = ({
@@ -14,12 +15,13 @@ export const WordVerticalRuler: React.FC<WordVerticalRulerProps> = ({
   onChangeTopMargin,
   onChangeBottomMargin,
   paperHeightPx = 1123,
+  paperHeightCm = 29.7,
 }) => {
   const rulerRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState<'top' | 'bottom' | null>(null);
 
   // A4 paper is 29.7 cm high. 1 cm ~ (paperHeightPx / 29.7) px.
-  const pxPerCm = paperHeightPx / 29.7;
+  const pxPerCm = paperHeightPx / paperHeightCm;
 
   const handleMouseDown = (type: 'top' | 'bottom', e: React.MouseEvent) => {
     e.preventDefault();
@@ -31,15 +33,15 @@ export const WordVerticalRuler: React.FC<WordVerticalRulerProps> = ({
       if (!dragging || !rulerRef.current) return;
       const rect = rulerRef.current.getBoundingClientRect();
       const mouseY = e.clientY - rect.top;
-      const cmVal = Math.max(0, Math.min(29.7, mouseY / pxPerCm));
+      const cmVal = Math.max(0, Math.min(paperHeightCm, mouseY / (rect.height / paperHeightCm)));
       const roundedCm = Math.round(cmVal * 10) / 10;
 
       if (dragging === 'top') {
-        const maxTop = 29.7 - bottomMarginCm - 2;
+        const maxTop = paperHeightCm - bottomMarginCm - 2;
         onChangeTopMargin(Math.max(0.5, Math.min(roundedCm, maxTop)));
       } else if (dragging === 'bottom') {
-        const maxBottom = 29.7 - topMarginCm - 2;
-        onChangeBottomMargin(Math.max(0.5, Math.min(29.7 - roundedCm, maxBottom)));
+        const maxBottom = paperHeightCm - topMarginCm - 2;
+        onChangeBottomMargin(Math.max(0.5, Math.min(paperHeightCm - roundedCm, maxBottom)));
       }
     };
 
@@ -55,13 +57,13 @@ export const WordVerticalRuler: React.FC<WordVerticalRulerProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, topMarginCm, bottomMarginCm, onChangeTopMargin, onChangeBottomMargin, pxPerCm]);
+  }, [dragging, topMarginCm, bottomMarginCm, onChangeTopMargin, onChangeBottomMargin, paperHeightCm]);
 
   // Tick marks: 0 to 29 cm
-  const ticks = Array.from({ length: 30 }, (_, i) => i);
+  const ticks = Array.from({ length: Math.floor(paperHeightCm) + 1 }, (_, i) => i);
 
   const topPx = topMarginCm * pxPerCm;
-  const bottomPx = (29.7 - bottomMarginCm) * pxPerCm;
+  const bottomPx = (paperHeightCm - bottomMarginCm) * pxPerCm;
 
   return (
     <div

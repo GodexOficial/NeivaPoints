@@ -147,7 +147,7 @@ export const WordColorPicker: React.FC<WordColorPickerProps> = ({
       {isOpen && createPortal(
         <div
           ref={popoverRef}
-          className="fixed z-[1000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-64 overflow-y-auto text-xs select-none animate-in fade-in zoom-in-95 duration-100"
+          className="fixed z-[1000] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-3 w-64 overflow-y-auto text-xs select-none animate-in fade-in zoom-in-95 duration-300"
           style={popoverPosition}
           onClick={(e) => e.stopPropagation()}
         >

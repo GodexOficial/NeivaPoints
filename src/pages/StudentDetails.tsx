@@ -51,7 +51,7 @@ export const StudentDetails: React.FC<StudentDetailsProps> = ({ studentId, onBac
 
   if (!student) {
     return (
-      <div className="py-16 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 space-y-4">
+      <div className="glass-panel py-16 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-8 space-y-4">
         <div className="w-16 h-16 mx-auto bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-400 dark:text-slate-500">
           <User size={32} />
         </div>
@@ -90,7 +90,7 @@ export const StudentDetails: React.FC<StudentDetailsProps> = ({ studentId, onBac
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
+    <div className="space-y-6 animate-in fade-in duration-300">
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between">
         <button
@@ -123,7 +123,7 @@ export const StudentDetails: React.FC<StudentDetailsProps> = ({ studentId, onBac
       </div>
 
       {/* Prominent Student Profile Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs">
+      <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -233,7 +233,7 @@ export const StudentDetails: React.FC<StudentDetailsProps> = ({ studentId, onBac
               {student.progressPercentage}%
             </span>
           </div>
-          <ProgressBar progress={student.progressPercentage} size="lg" showLabel={false} />
+          <ProgressBar progress={student.progressPercentage} level={student.level} size="lg" showLabel={false} />
           <div className="flex justify-between items-center mt-2 text-xs text-slate-400 dark:text-slate-500 font-medium">
             <span>{t('details.levelStart', { level: student.level, points: (student.level - 1) * 100 })}</span>
             <span>{t('details.levelTarget', { points: student.pointsToNextLevel, nextLevel: student.level + 1, total: student.level * 100 })}</span>

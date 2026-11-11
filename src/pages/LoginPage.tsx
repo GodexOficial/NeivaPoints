@@ -158,7 +158,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex flex-col justify-between p-4 sm:p-6 lg:p-8 transition-colors duration-200">
+    <div className="glass-backdrop min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 flex flex-col justify-between p-4 sm:p-6 lg:p-8 transition-colors duration-300">
       {/* Top Bar with Language and Theme switchers */}
       <header className="max-w-5xl mx-auto w-full flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -186,7 +186,7 @@ export const LoginPage: React.FC = () => {
 
       {/* Main Login / Register Container */}
       <main className="max-w-md mx-auto w-full my-6">
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xl overflow-hidden p-6 sm:p-8 animate-in fade-in duration-200">
+        <div className="glass-panel bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/90 dark:border-slate-800 shadow-xl overflow-hidden p-6 sm:p-8 animate-in fade-in duration-300">
           {/* Role Switcher Tabs */}
           <div className="flex p-1.5 bg-slate-100 dark:bg-slate-800 rounded-2xl mb-6">
             <button
@@ -282,6 +282,8 @@ export const LoginPage: React.FC = () => {
                     <Lock size={16} className="absolute left-3.5 top-3 text-slate-400 dark:text-slate-500" />
                     <button
                       type="button"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                      aria-pressed={showPassword}
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
                     >
@@ -401,6 +403,8 @@ export const LoginPage: React.FC = () => {
                     />
                     <button
                       type="button"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                      aria-pressed={showPassword}
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
                     >
@@ -425,6 +429,8 @@ export const LoginPage: React.FC = () => {
                     <KeyRound size={16} className="absolute left-3.5 top-3 text-slate-400 dark:text-slate-500" />
                     <button
                       type="button"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                      aria-pressed={showPassword}
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
                     >
@@ -516,6 +522,8 @@ export const LoginPage: React.FC = () => {
                     <Lock size={16} className="absolute left-3.5 top-3 text-slate-400 dark:text-slate-500" />
                     <button
                       type="button"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                      aria-pressed={showPassword}
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
                     >
@@ -616,6 +624,8 @@ export const LoginPage: React.FC = () => {
                     />
                     <button
                       type="button"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                      aria-pressed={showPassword}
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 cursor-pointer"
                     >

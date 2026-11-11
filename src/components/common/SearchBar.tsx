@@ -23,7 +23,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
       </div>
 
       <input
-        type="text"
+        type="search"
+        aria-label={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
@@ -35,8 +36,8 @@ export const SearchBar: React.FC<SearchBarProps> = ({
         <button
           type="button"
           onClick={() => onChange("")}
-          className="absolute right-3 p-1 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-          aria-label="Clear search"
+          className="absolute right-1 p-3 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+          aria-label="Limpar busca"
         >
           <X size={15} />
         </button>

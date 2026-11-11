@@ -18,6 +18,7 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
       <div className={`flex flex-col sm:flex-row gap-3 ${className}`}>
         <button
           type="button"
+          aria-pressed={language === "pt"}
           onClick={() => setLanguage("pt")}
           className={`flex-1 flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${
             language === "pt"
@@ -45,6 +46,7 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
 
         <button
           type="button"
+          aria-pressed={language === "en"}
           onClick={() => setLanguage("en")}
           className={`flex-1 flex items-center justify-between p-4 rounded-2xl border-2 transition-all cursor-pointer ${
             language === "en"
@@ -78,6 +80,7 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
       >
         <button
           type="button"
+          aria-pressed={language === "pt"}
           onClick={() => setLanguage("pt")}
           className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
             language === "pt"
@@ -86,11 +89,11 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
           }`}
           title="Português"
         >
-          <span className="text-sm leading-none">🇧🇷</span>
           <span>PT</span>
         </button>
         <button
           type="button"
+          aria-pressed={language === "en"}
           onClick={() => setLanguage("en")}
           className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
             language === "en"
@@ -99,7 +102,6 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
           }`}
           title="English"
         >
-          <span className="text-sm leading-none">🇺🇸</span>
           <span>EN</span>
         </button>
       </div>
@@ -120,9 +122,6 @@ export const LanguageSwitcher: React.FC<LanguageSwitcherProps> = ({
       aria-label={t("nav.switchLang")}
     >
       <Globe size={14} className="text-slate-600 dark:text-slate-400 shrink-0" />
-      <span className="text-sm leading-none">
-        {language === "pt" ? "" : ""}
-      </span>
       <span className="uppercase tracking-wider font-extrabold">
         {language === "pt" ? "PT-BR" : "EN-US"}
       </span>

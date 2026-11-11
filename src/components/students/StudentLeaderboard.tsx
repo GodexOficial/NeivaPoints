@@ -89,15 +89,15 @@ export const StudentLeaderboard: React.FC<StudentLeaderboardProps> = ({ students
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-xs dark:border-amber-900/70 dark:bg-slate-900">
+        <div className="glass-panel overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-xs dark:border-amber-900/70 dark:bg-slate-900">
           <div className="flex items-center gap-2 border-b border-amber-100 bg-amber-50/60 px-4 py-3 dark:border-amber-900/60 dark:bg-amber-950/20"><Users size={16} className="text-amber-600 dark:text-amber-400" /><h3 className="text-sm font-extrabold text-slate-900 dark:text-white">{t('leaderboard.yourClassTitle', { className: ownClassName })}</h3></div>
           <RankingRows entries={rankStudents(ownClassStudents)} currentStudentId={currentStudentId} emptyLabel={t('leaderboard.empty')} />
         </div>
 
         <div className="space-y-4">
-          {otherClassGroups.length === 0 ? <div className="rounded-2xl border border-slate-200 bg-white p-5 text-xs text-slate-500 shadow-xs dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">{t('leaderboard.noOtherClasses')}</div> : otherClassGroups.map((group) => {
+          {otherClassGroups.length === 0 ? <div className="glass-panel rounded-2xl border border-slate-200 bg-white p-5 text-xs text-slate-500 shadow-xs dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">{t('leaderboard.noOtherClasses')}</div> : otherClassGroups.map((group) => {
             const classStudents = students.filter((student) => student.classId === group.classId);
-            return <div key={group.classId} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900"><div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800"><h3 className="text-sm font-extrabold text-slate-900 dark:text-white">{t('leaderboard.otherClassTitle', { className: group.className })}</h3></div><RankingRows entries={rankStudents(classStudents)} currentStudentId={currentStudentId} emptyLabel={t('leaderboard.empty')} /></div>;
+            return <div key={group.classId} className="glass-panel overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900"><div className="border-b border-slate-100 px-4 py-3 dark:border-slate-800"><h3 className="text-sm font-extrabold text-slate-900 dark:text-white">{t('leaderboard.otherClassTitle', { className: group.className })}</h3></div><RankingRows entries={rankStudents(classStudents)} currentStudentId={currentStudentId} emptyLabel={t('leaderboard.empty')} /></div>;
           })}
         </div>
       </div>
