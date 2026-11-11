@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
 } from "react";
 import type {
   AuthUser,
@@ -15,6 +16,7 @@ import type {
 } from "../types";
 import { AuthService, type TeacherAccount } from "../services/authService";
 import { StudentService } from "../services/studentService";
+import { enrichStudentWithStats } from '../utils/levelCalculator';
 
 interface AuthContextType {
   currentUser: AuthUser | null;
@@ -51,6 +53,7 @@ interface AuthContextType {
   updateTeacherSecurityKey: (newKey: string) => Promise<void>;
   updateStudentSecurityKey: (newKey: string) => Promise<void>;
   refreshAuth: () => void;
+  applyConfirmedPoints: (studentId: string, points: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -75,6 +78,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [currentStudent, setCurrentStudent] = useState<StudentWithStats | null>(
     null,
   );
+  const confirmedPointsRevision = useRef(0);
+  const applyConfirmedPoints = useCallback((studentId: string, points: number) => {
+    if (!Number.isSafeInteger(points) || points < 0) return;
+    confirmedPointsRevision.current++;
+    setCurrentStudent(current => current?.id === studentId ? enrichStudentWithStats({ ...current,points }) : current);
+  }, []);
 
   // Track the teacher account if role is teacher
   const [currentTeacher, setCurrentTeacher] = useState<TeacherAccount | null>(
@@ -82,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const refreshAuth = useCallback(async () => {
+    const pointsRevision = confirmedPointsRevision.current;
     const session = AuthService.getSession();
     setCurrentUser(session);
     try {
@@ -94,7 +104,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
     if (session && session.role === "student" && session.studentId) {
       const found = await StudentService.getStudentWithStatsById(session.studentId);
-      setCurrentStudent(found || null);
+      if (confirmedPointsRevision.current === pointsRevision && AuthService.getSession()?.studentId === session.studentId) setCurrentStudent(found || null);
     } else {
       setCurrentStudent(null);
     }
@@ -260,6 +270,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       updateTeacherSecurityKey,
       updateStudentSecurityKey,
       refreshAuth,
+      applyConfirmedPoints,
     }),
     [
       currentUser,
@@ -279,6 +290,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       updateTeacherSecurityKey,
       updateStudentSecurityKey,
       refreshAuth,
+      applyConfirmedPoints,
     ],
   );
 

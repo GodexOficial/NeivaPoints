@@ -33,7 +33,7 @@ import { RewardCalendar } from "../components/students/RewardCalendar";
 import { RewardService, type Reward } from "../services/rewardService";
 
 export const StudentPortal: React.FC = () => {
-  const { currentStudent, logout, refreshAuth } = useAuth();
+  const { currentStudent, logout, refreshAuth, applyConfirmedPoints } = useAuth();
   const { getClassById, transactions, students, refreshData } = useStudentContext();
   const { t, language, getClassName } = useLanguage();
   const [activeTab, setActiveTab] = useState<'portal' | 'apps'>('portal');
@@ -65,10 +65,12 @@ export const StudentPortal: React.FC = () => {
     return () => { active = false; };
   }, []);
 
-  const refreshPoints = useCallback(() => {
+  const studentId = currentStudent?.id;
+  const refreshPoints = useCallback((points?: number) => {
+    if (points !== undefined && studentId) applyConfirmedPoints(studentId,points);
+    else void refreshAuth();
     void refreshData();
-    void refreshAuth();
-  }, [refreshAuth, refreshData]);
+  }, [studentId,applyConfirmedPoints,refreshAuth,refreshData]);
 
   if (!currentStudent) {
     return (
@@ -222,7 +224,7 @@ export const StudentPortal: React.FC = () => {
           </div>
         </div>
 
-        <LoginXpTracker studentId={currentStudent.id} settings={engagementSettings} onPointsChanged={refreshPoints} />
+        <LoginXpTracker key={currentStudent.id} student={currentStudent} settings={engagementSettings} onPointsChanged={refreshPoints} />
 
         <RewardCalendar rewards={rewards} />
 

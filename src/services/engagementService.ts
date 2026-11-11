@@ -16,6 +16,41 @@ export const DEFAULT_ENGAGEMENT_SETTINGS: EngagementSettings = {
   endTime: "18:15",
 };
 
+export interface AttendanceResponse {
+  version?: number; sessionId?: string; reason?: string; startedAt?: string;
+  activeUntil?: string; nextAwardAt?: string; serverNow?: string;
+  locked?: boolean; claimable?: boolean; closed?: boolean;
+  awarded?: boolean; amount?: number; points?: number; xpPerMinute?: number; creditedMinutes?: number;
+  allowed?: boolean;
+}
+const pendingAttendance = new Map<string, Promise<AttendanceResponse>>();
+async function attendanceRpc(name: string, args: Record<string,string>): Promise<AttendanceResponse> {
+  if (!isSupabaseConfigured) throw new Error('XP por presença requer conexão com o banco. Nenhum ponto foi creditado.');
+  const key = name + JSON.stringify(args), existing = pendingAttendance.get(key); if (existing) return existing;
+  const request = (async () => {
+    const controller = new AbortController(), timeout = window.setTimeout(() => controller.abort(), 12000);
+    try {
+      const { data, error } = await supabase.rpc(name, args).abortSignal(controller.signal);
+      if (error) {
+        if (['PGRST202','42P01','42883'].includes(error.code)) throw new Error('O XP por presença precisa da atualização SQL no Supabase.');
+        throw new Error(controller.signal.aborted ? 'A confirmação demorou. A sessão será consultada novamente, sem duplicar o crédito.' : 'Não foi possível confirmar o XP no servidor. Tentaremos novamente.');
+      }
+      if (typeof data === 'string') return { sessionId: data };
+      if (!data || typeof data !== 'object') throw new Error('Resposta de XP inválida. Nenhum crédito foi confirmado.');
+      const result = data as AttendanceResponse;
+      for (const field of ['startedAt','activeUntil','nextAwardAt','serverNow'] as const) {
+        if (result[field] !== undefined && result[field] !== null && !Number.isFinite(Date.parse(result[field]!))) throw new Error('O servidor retornou um horário de XP inválido.');
+      }
+      for (const field of ['points','amount','xpPerMinute','creditedMinutes'] as const) {
+        if (result[field] !== undefined && (!Number.isSafeInteger(result[field]) || result[field]! < 0)) throw new Error('O servidor retornou um saldo de XP inválido.');
+      }
+      return result;
+    } finally { window.clearTimeout(timeout); }
+  })();
+  pendingAttendance.set(key,request);
+  try { return await request; } finally { if (pendingAttendance.get(key) === request) pendingAttendance.delete(key); }
+}
+
 const SETTINGS_KEYS = {
   xpPerMinute: "login_xp_per_minute",
   confirmationMinutes: "login_xp_confirmation_minutes",
@@ -50,8 +85,8 @@ export class EngagementService {
     if (error) throw error;
     const values = new Map((data || []).map((item: { key: string; value: string }) => [item.key, item.value]));
     const settings: EngagementSettings = {
-      xpPerMinute: safePositiveInt(values.get(SETTINGS_KEYS.xpPerMinute), DEFAULT_ENGAGEMENT_SETTINGS.xpPerMinute),
-      confirmationMinutes: safePositiveInt(values.get(SETTINGS_KEYS.confirmationMinutes), DEFAULT_ENGAGEMENT_SETTINGS.confirmationMinutes),
+      xpPerMinute: Math.min(10000,safePositiveInt(values.get(SETTINGS_KEYS.xpPerMinute), DEFAULT_ENGAGEMENT_SETTINGS.xpPerMinute)),
+      confirmationMinutes: Math.min(120,safePositiveInt(values.get(SETTINGS_KEYS.confirmationMinutes), DEFAULT_ENGAGEMENT_SETTINGS.confirmationMinutes)),
       monthlyGoal: safePositiveInt(values.get(SETTINGS_KEYS.monthlyGoal), DEFAULT_ENGAGEMENT_SETTINGS.monthlyGoal),
       startTime: safeTime(values.get(SETTINGS_KEYS.startTime), DEFAULT_ENGAGEMENT_SETTINGS.startTime),
       endTime: safeTime(values.get(SETTINGS_KEYS.endTime), DEFAULT_ENGAGEMENT_SETTINGS.endTime),
@@ -73,6 +108,7 @@ export class EngagementService {
       endTime: settings.endTime,
     };
     validateSchedule(clean.startTime, clean.endTime);
+    if (clean.confirmationMinutes > 120 || clean.xpPerMinute > 10000) throw new Error('Use até 120 minutos por confirmação e até 10.000 XP por minuto.');
     const now = new Date().toISOString();
     const { error } = await (supabase as any).from("app_settings").upsert([
       { key: SETTINGS_KEYS.xpPerMinute, value: String(clean.xpPerMinute), updated_at: now },
@@ -85,34 +121,20 @@ export class EngagementService {
   }
 
   /** Starts a server-side attendance session. The SQL migration defines this RPC. */
-  static async startSession(studentId: string): Promise<{ sessionId?: string; reason?: string; activeUntil?: string }> {
-    if (!isSupabaseConfigured) return { sessionId: `local_${studentId}` };
-    const { data, error } = await (supabase as any).rpc("start_login_xp_session", { p_student_id: studentId });
-    if (error) throw error;
-    // Compatibility with the first SQL version, which returned the session UUID as text.
-    if (typeof data === "string") return { sessionId: data };
-    return data as { sessionId?: string; reason?: string; activeUntil?: string };
+  static async startSession(studentId: string): Promise<AttendanceResponse> {
+    return attendanceRpc('start_login_xp_session',{ p_student_id: studentId });
   }
 
-  static async getSessionStatus(studentId: string): Promise<{ locked: boolean; activeUntil?: string }> {
-    if (!isSupabaseConfigured) return { locked: false };
-    const { data, error } = await (supabase as any).rpc("get_login_xp_session_status", { p_student_id: studentId });
-    if (error) throw error;
-    return data as { locked: boolean; activeUntil?: string };
+  static async getSessionStatus(studentId: string): Promise<AttendanceResponse> {
+    return attendanceRpc('get_login_xp_session_status',{ p_student_id: studentId });
   }
 
   /** Claims one minute of XP. The database, not the browser clock, decides whether it is valid. */
-  static async claimMinute(sessionId: string): Promise<{ awarded: boolean; reason?: string }> {
-    if (!isSupabaseConfigured) return { awarded: true };
-    const { data, error } = await (supabase as any).rpc("claim_login_xp", { p_session_id: sessionId });
-    if (error) throw error;
-    return data as { awarded: boolean; reason?: string };
+  static async claimMinute(sessionId: string): Promise<AttendanceResponse> {
+    return attendanceRpc('claim_login_xp',{ p_session_id: sessionId });
   }
 
-  static async confirmActivity(sessionId: string): Promise<{ allowed: boolean; reason?: string }> {
-    if (!isSupabaseConfigured) return { allowed: true };
-    const { data, error } = await (supabase as any).rpc("confirm_login_xp_activity", { p_session_id: sessionId });
-    if (error) throw error;
-    return data as { allowed: boolean; reason?: string };
+  static async confirmActivity(sessionId: string): Promise<AttendanceResponse> {
+    return attendanceRpc('confirm_login_xp_activity',{ p_session_id: sessionId });
   }
 }
