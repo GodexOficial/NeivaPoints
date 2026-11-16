@@ -30,6 +30,7 @@ import { runTableCommand, type TableCommand } from '../../../utils/wordTableComm
 import { FindReplaceModal } from './FindReplaceModal';
 import { WordContextMenu } from './WordContextMenu';
 import { WordViewportRulers } from './WordViewportRulers';
+import { WordPageChrome } from './WordPageChrome';
 import { WordInkPad, WordPanels, type WordPanel } from './WordPanels';
 import { cleanWordHtml, escapeWordText, importWordFile } from '../../../utils/wordImport';
 import { deleteTableContent, insertTableRow, rectangularCells, tableMap, type TableCell } from '../../../utils/wordTable';
@@ -38,6 +39,7 @@ import { useWordTableResize } from '../../../hooks/useWordTableResize';
 interface WordEditorProps {
   initialDocument: WordDocument;
   onBackToHub: () => void;
+  importNotice?: string;
 }
 
 const EMPTY_PAGE_HTML = '<p><br></p>';
@@ -46,7 +48,7 @@ const LEGACY_EDITOR_PROMPT_HTML = '<p>Comece a digitar seu texto aqui...</p>';
 const hasNewerDraft = (doc: WordDocument, draft: ReturnType<typeof getAutoSaveDraft>): boolean => {
   if (!draft || Date.parse(draft.savedAt) <= Date.parse(doc.updatedAt)) return false;
   if (draft.content !== doc.content || draft.title !== doc.title) return true;
-  const fields: (keyof WordDocument)[] = ['paperTheme', 'paperMargin', 'leftMarginCm', 'rightMarginCm', 'topMarginCm', 'bottomMarginCm', 'firstLineIndentCm', 'watermarkText', 'orientation', 'pageSize', 'comments', 'headerText', 'footerText', 'pageNumbers'];
+  const fields: (keyof WordDocument)[] = ['paperTheme', 'paperMargin', 'leftMarginCm', 'rightMarginCm', 'topMarginCm', 'bottomMarginCm', 'firstLineIndentCm', 'watermarkText', 'orientation', 'pageSize', 'comments', 'headerText', 'footerText', 'headerHtml', 'footerHtml', 'pageNumbers'];
   return Boolean(draft.document && fields.some(key => JSON.stringify(draft.document?.[key]) !== JSON.stringify(doc[key])));
 };
 
@@ -77,7 +79,7 @@ const rgbToHex = (rgbStr: string): string => {
   return '#' + hex(match[1]) + hex(match[2]) + hex(match[3]);
 };
 
-export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackToHub }) => {
+export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackToHub, importNotice = '' }) => {
   const [wordDoc, setWordDoc] = useState<WordDocument>(initialDocument);
   const [docTitle, setDocTitle] = useState<string>(initialDocument.title);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -127,6 +129,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const [comments, setComments] = useState<NonNullable<WordDocument['comments']>>(initialDocument.comments || []);
   const [headerText, setHeaderText] = useState(initialDocument.headerText || '');
   const [footerText, setFooterText] = useState(initialDocument.footerText || '');
+  const [headerHtml,setHeaderHtml]=useState(initialDocument.headerHtml||'');
+  const [footerHtml,setFooterHtml]=useState(initialDocument.footerHtml||'');
   const [pageNumbers, setPageNumbers] = useState(initialDocument.pageNumbers || false);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(initialDocument.orientation || 'portrait');
   const [pageSize, setPageSize] = useState<'a4' | 'letter'>(initialDocument.pageSize || 'a4');
@@ -138,7 +142,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const [autoSave, setAutoSave] = useState(true);
   const [panel, setPanel] = useState<WordPanel>(null);
   const [inkOpen, setInkOpen] = useState(false);
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(importNotice);
   const [commandSearch, setCommandSearch] = useState('');
   const [dictating, setDictating] = useState(false);
   const recognitionRef = useRef<{ start: () => void; stop: () => void; onresult: ((event: any) => void) | null; onend: (() => void) | null; onerror: ((event: any) => void) | null; lang: string; continuous: boolean; interimResults: boolean } | null>(null);
@@ -444,7 +448,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     return { ...wordDoc, title: docTitle.trim() || 'Documento sem título', pages: currentPages,
       content: currentPages.join('<div class="a4-page-break" style="break-before:page"></div>'),
       paperTheme, paperMargin, leftMarginCm, rightMarginCm, topMarginCm, bottomMarginCm,
-      firstLineIndentCm, watermarkText, comments, headerText, footerText, pageNumbers, orientation, pageSize, updatedAt: new Date().toISOString() };
+      firstLineIndentCm, watermarkText, comments, headerText, footerText, headerHtml, footerHtml, pageNumbers, orientation, pageSize, updatedAt: new Date().toISOString() };
   };
 
   function applyDocument(input: WordDocument) {
@@ -453,7 +457,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     const doc = recovered && draft ? draft.document || { ...input, title: draft.title, content: draft.content, pages: undefined } : input;
     initializedSave.current = recovered; selectionRef.current = null;
     setNotice(''); setShowDraftRestoredBanner(recovered); setScopeMode('all'); setSelectedBlockElements([]); setSelectedTable(null); setActiveTableCell(null); setTableCells([]); setTableDrawMode('none');
-    tableHistory.current = { undo: [], redo: [] };
+    tableHistory.current = { undo: [], redo: [] }; setReadOnly(false);
     setWordDoc(doc); setDocTitle(doc.title);
     const importedPages = doc.pages?.length ? doc.pages : doc.content.split(/<div[^>]*class="[^"]*a4-page-break[^"]*"[^>]*>[\s\S]*?<\/div>/gi);
     setPages(importedPages.map(normalizePageHtml)); setActivePageIndex(0);
@@ -463,6 +467,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     setPaperTheme(doc.paperTheme || 'white'); setPaperMargin(doc.paperMargin || 'normal');
     setOrientation(doc.orientation || 'portrait'); setPageSize(doc.pageSize || 'a4'); setComments(doc.comments || []);
     setHeaderText(doc.headerText || ''); setFooterText(doc.footerText || ''); setPageNumbers(doc.pageNumbers || false);
+    setHeaderHtml(doc.headerHtml||'');setFooterHtml(doc.footerHtml||'');
     setHasUnsavedChanges(recovered); setSaveStatus(recovered ? 'draft_restored' : 'saved');
     requestAnimationFrame(() => {
       editorContainerRef.current?.scrollTo({ top: 0, left: 0 });
@@ -495,7 +500,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       } catch { setSaveStatus('error'); setNotice('Não foi possível salvar. Verifique o espaço do navegador ou baixe uma cópia do documento.'); }
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [pages, docTitle, paperTheme, paperMargin, leftMarginCm, rightMarginCm, topMarginCm, bottomMarginCm, firstLineIndentCm, watermarkText, comments, headerText, footerText, pageNumbers, orientation, pageSize, autoSave, wordDoc.id]);
+  }, [pages, docTitle, paperTheme, paperMargin, leftMarginCm, rightMarginCm, topMarginCm, bottomMarginCm, firstLineIndentCm, watermarkText, comments, headerText, footerText, headerHtml, footerHtml, pageNumbers, orientation, pageSize, autoSave, wordDoc.id]);
 
   const handleContentInput = () => {
     const updatedPages = pages.map((html, index) => pageRefs.current[index]?.innerHTML || html);
@@ -1050,7 +1055,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       } else if (action === 'header-footer') {
         const header = window.prompt('Cabeçalho (deixe vazio para omitir):'); if (header === null) return;
         const footer = window.prompt('Rodapé (deixe vazio para omitir):'); if (footer === null) return;
-        setHeaderText(header); setFooterText(footer);
+        setHeaderText(header); setFooterText(footer);setHeaderHtml('');setFooterHtml('');
       } else if (action === 'language') {
         pageRefs.current.forEach(editor => { if (editor) { editor.lang = value || 'pt-BR'; editor.spellcheck = true; } }); setNotice('Idioma de revisão alterado.');
       } else if (action === 'dictate') {
@@ -1082,7 +1087,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   };
 
   return createPortal(
-    <div data-motion="off" className={`word-workspace ${rulerVisible ? 'word-rulers-visible' : ''} ${focusMode ? 'word-focus' : ''} ${marksVisible ? 'word-show-marks' : ''}`} onKeyDown={event => {
+    <div data-motion="off" style={{'--word-page-height':`${pageHeightCm}cm`} as React.CSSProperties} className={`word-workspace ${rulerVisible ? 'word-rulers-visible' : ''} ${focusMode ? 'word-focus' : ''} ${marksVisible ? 'word-show-marks' : ''}`} onKeyDown={event => {
+      if((event.target as HTMLElement).closest('.word-imported-page-header,.word-imported-page-footer')&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()!=='s')return;
       if (event.key === 'Escape') { setFocusMode(false); setPanel(null); setTableDrawMode('none'); setExtendTableSelection(false); }
       if ((event.ctrlKey || event.metaKey) && ['z','y'].includes(event.key.toLowerCase()) && !(event.target as HTMLElement).closest('input,textarea,select')) { event.preventDefault(); handleExecCommand(event.key.toLowerCase() === 'y' || event.shiftKey ? 'redo' : 'undo'); return; }
       if (event.ctrlKey || event.metaKey) { const key = event.key.toLowerCase(); if (['s','f','h','b','i','u'].includes(key) || event.key === 'Enter') { event.preventDefault(); if (key === 's') handleSaveToBackend(); else if (['f','h'].includes(key)) setIsFindReplaceOpen(true); else if (event.key === 'Enter') handlePageBreak(); else handleExecCommand(key === 'b' ? 'bold' : key === 'i' ? 'italic' : 'underline'); } }
@@ -1228,8 +1234,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                   paddingBottom: `${bottomMarginCm}cm`,
                 }}
               >
-                {headerText && <div className="word-page-header">{headerText}</div>}
-                {(footerText || pageNumbers) && <div className="word-page-footer"><span>{footerText}</span>{pageNumbers && <span>Página {pageIndex + 1} de {pages.length}</span>}</div>}
+                {headerHtml ? <WordPageChrome html={headerHtml} kind="header" page={pageIndex+1} readOnly={readOnly} left={leftMarginCm} right={rightMarginCm} distance={wordDoc.headerDistanceCm??.5} onChange={html=>{setHeaderHtml(html);setHasUnsavedChanges(true);setSaveStatus('unsaved');}}/> : headerText && <div className="word-page-header">{headerText}</div>}
+                {footerHtml ? <WordPageChrome html={footerHtml} kind="footer" page={pageIndex+1} readOnly={readOnly} left={leftMarginCm} right={rightMarginCm} distance={wordDoc.footerDistanceCm??.7} onChange={html=>{setFooterHtml(html);setHasUnsavedChanges(true);setSaveStatus('unsaved');}}/> : (footerText || pageNumbers) && <div className="word-page-footer"><span>{footerText}</span>{pageNumbers && <span>Página {pageIndex + 1} de {pages.length}</span>}</div>}
                 {/* Watermark Overlay if active */}
                 {watermarkText && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 opacity-15 rotate-[-35deg]">
@@ -1323,15 +1329,15 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       </main>
 
       <footer className="word-statusbar"><div><span>Página {activePageIndex + 1} de {pages.length}</span><span>{wordCount} palavras</span><span className="word-status-optional">{charCount} caracteres</span><span className="word-status-optional">Português (Brasil)</span></div><div><button onClick={() => setFocusMode(v => !v)} aria-pressed={focusMode}>Foco</button><button onClick={() => setReadOnly(v => !v)} aria-pressed={readOnly}>{readOnly ? 'Editar' : 'Leitura'}</button><button aria-label="Diminuir zoom" onClick={() => setZoom(z => Math.max(40, z - 10))}>−</button><input type="range" min={40} max={160} step={5} aria-label="Zoom do documento" value={zoom} onChange={e => setZoom(Number(e.target.value))} /><button aria-label="Aumentar zoom" onClick={() => setZoom(z => Math.min(160, z + 10))}>+</button><span>{zoom}%</span></div></footer>
-      <button className="word-back-button" aria-label="Voltar para aplicativos" title="Voltar para aplicativos" onClick={() => { if (!hasUnsavedChanges || handleSaveToBackend()) onBackToHub(); }}><ArrowLeft size={19} /></button>
+      <button className="word-back-button" aria-label="Voltar para documentos" title="Voltar para documentos" onClick={() => { if (!hasUnsavedChanges || handleSaveToBackend()) onBackToHub(); }}><ArrowLeft size={19} /></button>
       {notice && <div className="word-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Fechar aviso"><X size={16} /></button></div>}
-      <input ref={inputFileRef} type="file" accept=".docx,.html,.htm,.txt" hidden onChange={async e => {
+      <input ref={inputFileRef} type="file" accept=".docx,.dotx,.docm,.dotm,.doc,.html,.htm,.txt" hidden onChange={async e => {
         const file = e.target.files?.[0]; if (!file) return;
         try {
           if (hasUnsavedChanges && !handleSaveToBackend()) return;
           const result = await importWordFile(file);
           const doc = createNewDocument(result.title);
-          const imported = saveLocalDocument({ ...doc, content: result.html, pages: [result.html] });
+          const imported = saveLocalDocument({ ...doc, ...result.settings, content: result.html, pages: [result.html] });
           applyDocument(imported);
           setNotice(result.warnings ? 'Documento importado. Alguns recursos avançados do arquivo podem ter sido simplificados.' : 'Documento importado.');
         } catch (error) { setNotice(error instanceof Error ? error.message : 'Não foi possível importar o arquivo.'); }

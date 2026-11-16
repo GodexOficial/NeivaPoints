@@ -62,6 +62,10 @@ export interface WordDocument {
   pageSize?: 'a4' | 'letter';
   headerText?: string;
   footerText?: string;
+  headerHtml?: string;
+  footerHtml?: string;
+  headerDistanceCm?: number;
+  footerDistanceCm?: number;
   pageNumbers?: boolean;
   comments?: { id: string; text: string; quote: string; createdAt: string }[];
 }

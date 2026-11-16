@@ -288,6 +288,17 @@ button > svg { flex-shrink: 0; transition: transform 0.3s ease-in-out; }
 
 /* Actions remain visible on touch devices and slide into view with a mouse. */
 .app-grid-slot [draggable="true"] { user-select: none; -webkit-user-select: none; }
+.app-hub-grid { grid-template-columns: repeat(var(--app-columns, 6), minmax(0, 1fr)); }
+@media (max-width: 639px) {
+  .app-hub-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .app-hub-grid .app-grid-slot { aspect-ratio: auto; min-height: 160px; }
+  .app-hub-grid .app-tile-icon { width: 76px; height: 76px; flex-shrink: 0; }
+  .app-hub-grid .app-tile-icon > div > svg { width: 40px; height: 40px; }
+  .app-hub-grid .app-grid-slot > :is(button,a), .app-hub-grid .app-grid-slot > .group > button { padding: 12px 6px; gap: 8px; }
+  .app-hub-grid .app-grid-slot :is(button,a) > span.w-full { white-space: normal; font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .app-hub-grid .app-tile-actions > button { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
+  .app-hub-grid .app-grid-slot:has(.app-tile-actions) { min-height: 192px; }
+}
 .app-grid-slot [draggable="true"] img { -webkit-user-drag: none; }
 .app-grid-slot[data-dragging="true"] { opacity: .45; }
 .app-grid-slot[data-drop-target="true"] { outline: 2px solid #6366f1; outline-offset: -2px; background-color: #818cf81a; }

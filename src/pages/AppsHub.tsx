@@ -6,9 +6,8 @@ import { AppWindow, Check, ExternalLink, FileText, GripVertical, ImagePlus, Link
 import { useAuth } from '../context/AuthContext';
 import { AppsService, type AppsGridSettings } from '../services/appsService';
 import type { ExternalApp } from '../types';
-import type { WordDocument } from '../types/doc';
-import { createNewDocument, getLocalDocuments } from '../services/docService';
-import { WordEditor } from '../components/apps/word/WordEditor';
+const WordHome = React.lazy(() => import('../components/apps/word/WordHome').then(module => ({ default: module.WordHome })));
+const ExcelApp = React.lazy(() => import('../components/apps/excel/ExcelApp').then(module => ({ default: module.ExcelApp })));
 
 const STANDARD_APPS_COUNT = 3;
 const MAX_COVER_SIZE = 1_500_000;
@@ -33,7 +32,7 @@ type StandardApp = {
 type HubApp = (ExternalApp & { source: 'custom'; displayPosition: number }) | StandardApp;
 const STANDARD_APPS: StandardApp[] = [
   { id: 'word', name: 'Word', description: 'Editor de texto', displayPosition: 0, source: 'standard', available: true },
-  { id: 'excel', name: 'Excel', description: 'Planilhas', displayPosition: 1, source: 'standard', available: false },
+  { id: 'excel', name: 'Excel', description: 'Planilhas', displayPosition: 1, source: 'standard', available: true },
   { id: 'powerpoint', name: 'PowerPoint', description: 'Apresentações', displayPosition: 2, source: 'standard', available: false },
 ];
 
@@ -57,7 +56,8 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   const [form, setForm] = useState<AppForm>(emptyForm);
   const [formError, setFormError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<WordDocument | null>(null);
+  const [wordOpen, setWordOpen] = useState(false);
+  const [excelOpen, setExcelOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const appGridRef = useAnimatedList<HTMLDivElement>(apps.map(app => app.id + ':' + app.position).join('|') + ':' + gridSettings.columns + ':' + isLoading);
   const gridSize = gridSettings.columns * gridSettings.rows;
@@ -161,15 +161,14 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   const slots = Array.from({ length: gridSize }, (_, index) => ({ index, app: displayedApps.find((app) => app.displayPosition === index) }));
 
   const openStandardApp = (app: StandardApp) => {
+    if (app.id === 'excel') { setExcelOpen(true); onWordEditorChange(true); return; }
     if (app.id !== 'word') return;
-    const recent = getLocalDocuments().filter(doc => !doc.id.startsWith('doc-sample-')).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-    setSelectedDocument(recent || createNewDocument('Novo Documento Word'));
+    setWordOpen(true);
     onWordEditorChange(true);
   };
 
-  if (selectedDocument) {
-    return <WordEditor initialDocument={selectedDocument} onBackToHub={() => { setSelectedDocument(null); onWordEditorChange(false); }} />;
-  }
+  if (wordOpen) return <React.Suspense fallback={<p>Carregando documentos…</p>}><WordHome onBack={() => { setWordOpen(false); onWordEditorChange(false); }} /></React.Suspense>;
+  if (excelOpen) return <React.Suspense fallback={<p>Carregando planilhas…</p>}><ExcelApp onBack={() => { setExcelOpen(false); onWordEditorChange(false); }} /></React.Suspense>;
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -195,7 +194,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
         {isTeacher && <p role="status" aria-live="polite" className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-300">{isOrderSaving ? 'Salvando nova ordem…' : orderMessage || 'Arraste os atalhos para reorganizar. Para editar ou organizar por cliques, use “Editar grade”.'}</p>}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1"><div><h2 className="text-base font-extrabold text-slate-900 dark:text-white">Aplicativos</h2><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{displayedApps.length} de {gridSize}</span></div>{isTeacher && isManaging && <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300"><label>Colunas<select value={gridSettings.columns} onChange={(event) => updateGridSettings({ columns: Number(event.target.value) as AppsGridSettings['columns'] })} className="ml-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option></select></label><label>Linhas<select value={gridSettings.rows} onChange={(event) => updateGridSettings({ rows: Number(event.target.value) as AppsGridSettings['rows'] })} className="ml-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option></select></label></div>}</div>
         {isLoading ? <div className="flex min-h-72 items-center justify-center text-sm font-semibold text-slate-500"><LoaderCircle className="mr-2 animate-spin" size={18} /> Carregando aplicativos…</div> : <>
-          <div ref={appGridRef} className="relative grid gap-2 sm:gap-3" style={{ gridTemplateColumns: `repeat(${gridSettings.columns}, minmax(0, 1fr))` }}>
+          <div ref={appGridRef} className="app-hub-grid relative grid gap-2 sm:gap-3" style={{ '--app-columns': gridSettings.columns } as React.CSSProperties}>
             {slots.map(({ index, app }) => <div key={app?.id || `slot-${index}`} data-motion-id={app?.id}
               role={!app && isManaging && index >= STANDARD_APPS_COUNT ? 'button' : undefined}
               tabIndex={!app && isManaging && index >= STANDARD_APPS_COUNT ? 0 : undefined}
@@ -247,13 +246,13 @@ interface AppTileProps { app: HubApp; colorIndex: number; editable: boolean; reo
 const AppTile: React.FC<AppTileProps> = ({ app, colorIndex, editable, reorderable, selected, onOpenStandard, onEdit, onDelete, onManageClick, onDragStart, onDragEnd }) => {
   const defaultIcon = app.source === 'standard' ? (app.id === 'word' ? <FileText size={36} strokeWidth={2.3} className="text-white" /> : app.id === 'excel' ? <TableIcon size={36} strokeWidth={2.3} className="text-white" /> : <Presentation size={36} strokeWidth={2.3} className="text-white" />) : <LinkIcon size={36} strokeWidth={2.3} className="text-white" />;
   const icon = <div className={`flex h-full w-full items-center justify-center overflow-hidden rounded-[1.1rem] bg-gradient-to-br shadow-md ring-1 ring-black/5 ${APP_COLORS[colorIndex % APP_COLORS.length]}`}>{'coverUrl' in app && app.coverUrl ? <img src={app.coverUrl} alt="" draggable={false} className="h-full w-full object-cover" /> : defaultIcon}</div>;
-  if (app.source === 'standard') return <button type="button" onClick={onOpenStandard} disabled={!app.available} className={`group flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none ${app.available ? 'cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500' : 'cursor-not-allowed opacity-60'}`} title={app.available ? `Abrir ${app.name}` : `${app.name}: em breve`}><div className="relative h-[min(62%,7.5rem)] w-[min(62%,7.5rem)] transition-transform duration-300 group-hover:scale-105">{icon}</div><span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span><span className={`-mt-1 text-[10px] font-bold ${app.available ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>{app.available ? 'Padrão' : 'Em breve'}</span></button>;
-  if (!editable) return <a href={app.url} target="_blank" rel="noopener noreferrer" draggable={reorderable} onDragStart={onDragStart} onDragEnd={onDragEnd} className={`group flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${reorderable ? 'cursor-grab active:cursor-grabbing' : ''}`} title={reorderable ? `Abrir ${app.name} ou arrastar para reorganizar` : `Abrir ${app.name} em uma nova aba`}><div className="relative h-[min(62%,7.5rem)] w-[min(62%,7.5rem)] transition-transform duration-300 group-hover:scale-105 group-focus-visible:scale-105">{icon}<ExternalLink size={12} className="absolute -right-1 -top-1 rounded-full bg-white p-0.5 text-slate-700 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 dark:bg-slate-800 dark:text-slate-200" /></div><span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span></a>;
+  if (app.source === 'standard') return <button type="button" onClick={onOpenStandard} disabled={!app.available} className={`group flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none ${app.available ? 'cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500' : 'cursor-not-allowed opacity-60'}`} title={app.available ? `Abrir ${app.name}` : `${app.name}: em breve`}><div className="app-tile-icon relative h-[min(62%,7.5rem)] w-[min(62%,7.5rem)] transition-transform duration-300 group-hover:scale-105">{icon}</div><span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span><span className={`-mt-1 text-[10px] font-bold ${app.available ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>{app.available ? 'Padrão' : 'Em breve'}</span></button>;
+  if (!editable) return <a href={app.url} target="_blank" rel="noopener noreferrer" draggable={reorderable} onDragStart={onDragStart} onDragEnd={onDragEnd} className={`group flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${reorderable ? 'cursor-grab active:cursor-grabbing' : ''}`} title={reorderable ? `Abrir ${app.name} ou arrastar para reorganizar` : `Abrir ${app.name} em uma nova aba`}><div className="app-tile-icon relative h-[min(62%,7.5rem)] w-[min(62%,7.5rem)] transition-transform duration-300 group-hover:scale-105 group-focus-visible:scale-105">{icon}<ExternalLink size={12} className="absolute -right-1 -top-1 rounded-full bg-white p-0.5 text-slate-700 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 dark:bg-slate-800 dark:text-slate-200" /></div><span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span></a>;
   return <div className="group relative h-full w-full">
     <button type="button" draggable={reorderable} aria-pressed={selected} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onManageClick}
       className={`flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl p-1.5 text-center outline-none cursor-grab active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-blue-500 ${selected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900' : ''}`}
       title="Arraste ou clique para escolher este aplicativo">
-      <div className="h-[min(62%,7.5rem)] w-[min(62%,7.5rem)]">{icon}</div>
+      <div className="app-tile-icon h-[min(62%,7.5rem)] w-[min(62%,7.5rem)]">{icon}</div>
       <span className="w-full truncate px-1 text-xs font-bold text-slate-700 dark:text-slate-200">{app.name}</span>
       <span className="absolute left-1 top-1 rounded-md bg-white/90 p-1 text-slate-500 shadow-sm dark:bg-slate-800/90"><GripVertical size={13} /></span>
     </button>

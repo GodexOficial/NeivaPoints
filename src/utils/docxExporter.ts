@@ -2,6 +2,7 @@ import { AlignmentType, BorderStyle, CommentRangeEnd, CommentRangeStart, Comment
 import type { IBorderOptions, IRunOptions, ParagraphChild } from 'docx';
 import type { WordDocument } from '../types/doc';
 import { tableMap } from './wordTable';
+import { WpsShapeRun, HorizontalPositionRelativeFrom, VerticalPositionRelativeFrom, TextWrappingType } from 'docx';
 
 type Block = Paragraph | Table;
 const cm = (value: number) => Math.round(value * 567);
@@ -31,7 +32,10 @@ async function imageRun(element: HTMLElement | SVGElement): Promise<ImageRun> {
   const context = canvas.getContext('2d'); if (!context) throw new Error('Não foi possível converter a imagem.');
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   const encoded = canvas.toDataURL('image/png').split(',')[1];
-  return new ImageRun({ type: 'png', data: Uint8Array.from(atob(encoded), c => c.charCodeAt(0)), transformation: { width, height }, altText: { name: element.getAttribute('alt') || 'Ilustração', title: 'Ilustração', description: element.getAttribute('alt') || '' } });
+  const positioned = (element as HTMLElement).dataset.wordHeaderImage;
+  return new ImageRun({ type: 'png', data: Uint8Array.from(atob(encoded), c => c.charCodeAt(0)), transformation: { width, height },
+    floating: positioned ? { horizontalPosition: {relative:HorizontalPositionRelativeFrom.MARGIN,align:positioned==='right'?'right':'left'},verticalPosition:{relative:VerticalPositionRelativeFrom.PARAGRAPH,offset:Math.round(points((element as HTMLElement).style.top)*12700)},allowOverlap:true,wrap:{type:TextWrappingType.NONE} } : undefined,
+    altText: { name: element.getAttribute('alt') || 'Ilustração', title: 'Ilustração', description: element.getAttribute('alt') || '' } });
 }
 async function runs(nodes: NodeListOf<ChildNode> | ChildNode[], inherited: IRunOptions = {}, commentMap = new Map<string, number>()): Promise<ParagraphChild[]> {
   const result: ParagraphChild[] = [];
@@ -40,7 +44,7 @@ async function runs(nodes: NodeListOf<ChildNode> | ChildNode[], inherited: IRunO
     if (!(node instanceof Element)) continue;
     const el = node as HTMLElement; const tag = el.tagName.toLowerCase();
     if (tag === 'img' || tag === 'svg') { result.push(await imageRun(el)); continue; }
-    if (tag === 'br') { result.push(new TextRun({ break: 1 })); continue; }
+    if (tag === 'br') { result.push(new TextRun({ ...inherited, break: 1 })); continue; }
     const size = points(el.style.fontSize || '') * 2 || (el.getAttribute('size') ? [0, 16, 20, 24, 28, 36, 48, 72][Number(el.getAttribute('size'))] : undefined);
     const fill = color(el.style.backgroundColor) || (tag === 'mark' ? 'FEF08A' : undefined);
     const style: IRunOptions = { ...inherited,
@@ -63,14 +67,27 @@ async function runs(nodes: NodeListOf<ChildNode> | ChildNode[], inherited: IRunO
   return result;
 }
 let listSequence = 0;
-async function blocks(parent: HTMLElement, numbering: { reference: string; levels: any[] }[], list?: { ordered: boolean; reference: string; level: number }, commentMap = new Map<string, number>()): Promise<Block[]> {
+async function blocks(parent: HTMLElement, numbering: { reference: string; levels: any[] }[], list?: { ordered: boolean; reference: string; level: number }, commentMap = new Map<string, number>(), availableWidth = cm(16)): Promise<Block[]> {
   const result: Block[] = [];
   let inline: ChildNode[] = [];
   const flush = async () => { if (inline.some(n => n.nodeType !== Node.TEXT_NODE || n.textContent?.trim())) result.push(new Paragraph({ children: await runs(inline, {}, commentMap) })); inline = []; };
   for (const node of parent.childNodes) {
     if (!(node instanceof HTMLElement) && !(node instanceof SVGElement)) { inline.push(node); continue; }
     const el = node as HTMLElement, tag = el.tagName.toLowerCase();
-    if (tag === 'table') {
+    if(el.dataset.wordAnchorGroup){
+      await flush();
+      const floating=el.querySelector<HTMLElement>(':scope > [data-word-floating]');
+      if(floating){
+        const boxBlocks=await blocks(floating,numbering,undefined,commentMap,Math.round(points(floating.style.width)*20));
+        const shape=new WpsShapeRun({type:'wps',children:boxBlocks.filter((b):b is Paragraph=>b instanceof Paragraph),transformation:{width:points(floating.style.width)/.75,height:points(floating.style.minHeight)/.75},
+          floating:{horizontalPosition:{relative:HorizontalPositionRelativeFrom.COLUMN,offset:Math.round(points(floating.style.left)*12700)},verticalPosition:{relative:VerticalPositionRelativeFrom.PARAGRAPH,offset:Math.round(points(floating.style.top)*12700)},allowOverlap:true,wrap:{type:TextWrappingType.NONE}},
+          bodyProperties:{margins:{top:3*12700,bottom:3*12700,left:5*12700,right:5*12700}},outline:{type:'solidFill',solidFillType:'rgb',value:'333333',width:6350},solidFill:{type:'rgb',value:'FFFFFF'}});
+        result.push(new Paragraph({children:[shape],spacing:{before:0,after:0,line:1}}));
+      }
+      const clone=el.cloneNode(true) as HTMLElement;clone.querySelector(':scope > [data-word-floating]')?.remove();
+      if(floating){const ps=Array.from(clone.querySelectorAll<HTMLElement>(':scope > p'));const height=ps.reduce((sum,p)=>sum+(points(p.style.fontSize)||12)*(Number(p.style.lineHeight)||1.15)+points(p.style.marginTop)+points(p.style.marginBottom),0);const last=ps.at(-1);if(last)last.style.marginBottom=`${points(last.style.marginBottom)+Math.max(0,points(el.style.minHeight)-height)}pt`;}
+      result.push(...await blocks(clone,numbering,list,commentMap,availableWidth));
+    } else if (tag === 'table') {
       await flush(); const rows: TableRow[] = [];
       const logical = tableMap(el as HTMLTableElement);
       for (const row of (el as HTMLTableElement).rows) {
@@ -79,7 +96,7 @@ async function blocks(parent: HTMLElement, numbering: { reference: string; level
           const clone = cell.cloneNode(true) as HTMLElement;
           if (!clone.querySelector('p,h1,h2,h3,div,table,ul,ol')) { const p = document.createElement('p'); p.append(...clone.childNodes); clone.append(p); }
           clone.querySelectorAll<HTMLElement>('p,h1,h2,h3,li').forEach(p => { if (!p.style.textAlign) p.style.textAlign = cell.style.textAlign; if (!p.style.color) p.style.color = cell.style.color; if (!p.style.fontWeight && (cell.tagName === 'TH' || cell.style.fontWeight)) p.style.fontWeight = cell.style.fontWeight || 'bold'; });
-          const children = await blocks(clone, numbering, undefined, commentMap);
+          const children = await blocks(clone, numbering, undefined, commentMap, availableWidth / logical.width * cell.colSpan);
           cells.push(new TableCell({ children: children.length ? children : [new Paragraph('')], columnSpan: cell.colSpan > 1 ? cell.colSpan : undefined, rowSpan: cell.rowSpan > 1 ? cell.rowSpan : undefined,
             shading: color(cell.style.backgroundColor) ? { fill: color(cell.style.backgroundColor) } : undefined,
             verticalAlign: cell.style.verticalAlign === 'middle' ? VerticalAlignTable.CENTER : cell.style.verticalAlign === 'bottom' ? VerticalAlignTable.BOTTOM : VerticalAlignTable.TOP,
@@ -91,22 +108,26 @@ async function blocks(parent: HTMLElement, numbering: { reference: string; level
         rows.push(new TableRow({ children: cells, tableHeader: row.parentElement?.tagName === 'THEAD', cantSplit: row.dataset.wordCantSplit === 'true', height: row.style.height ? { value: Math.round(points(row.style.height) * 20), rule: HeightRule.ATLEAST } : undefined }));
       }
       const columns = Array.from(el.querySelectorAll<HTMLTableColElement>(':scope > colgroup > col'));
-      const fixedWidths = columns.length === logical.width && columns.every(col => points(col.style.width) > 0) ? columns.map(col => Math.round(points(col.style.width) * 20)) : undefined;
+      const tableWidth = el.style.width.endsWith('%') ? availableWidth * parseFloat(el.style.width) / 100 : points(el.style.width) * 20 || availableWidth;
+      const fixedWidths = columns.length === logical.width && columns.every(col => points(col.style.width) > 0) ? columns.map(col => Math.round(col.style.width.endsWith('%') ? tableWidth * parseFloat(col.style.width) / 100 : points(col.style.width) * 20)) : undefined;
       if (rows.length) result.push(new Table({ rows, columnWidths: fixedWidths, layout: el.style.tableLayout === 'fixed' ? TableLayoutType.FIXED : TableLayoutType.AUTOFIT,
+        indent: el.style.marginLeft && el.style.marginLeft!=='auto' ? {size:Math.round(points(el.style.marginLeft)*20),type:WidthType.DXA}:undefined,
         alignment: el.style.marginLeft === 'auto' ? el.style.marginRight === 'auto' ? AlignmentType.CENTER : AlignmentType.RIGHT : AlignmentType.LEFT,
         width: el.style.width === 'auto' || el.dataset.wordFit === 'content' ? { size: 0, type: WidthType.AUTO } : el.style.width && !el.style.width.endsWith('%') ? { size: Math.round(points(el.style.width) * 20), type: WidthType.DXA } : { size: 100, type: WidthType.PERCENTAGE },
       }));
     } else if (tag === 'ul' || tag === 'ol') {
       await flush(); const reference = `ordered-${listSequence++}`;
       if (tag === 'ol') numbering.push({ reference, levels: Array.from({ length: 9 }, (_, level) => ({ level, format: LevelFormat.DECIMAL, text: `%${level + 1}.`, alignment: AlignmentType.LEFT, style: { paragraph: { indent: { left: 720 * (level + 1), hanging: 260 } } } })) });
-      result.push(...await blocks(el, numbering, { ordered: tag === 'ol', reference, level: Math.min(8, list ? list.level + 1 : 0) }, commentMap));
+      result.push(...await blocks(el, numbering, { ordered: tag === 'ol', reference, level: Math.min(8, list ? list.level + 1 : 0) }, commentMap, availableWidth));
     } else if (el.classList.contains('a4-page-break')) {
       await flush(); result.push(new Paragraph({ pageBreakBefore: true }));
     } else if (/^(p|h[1-6]|blockquote|li)$/.test(tag)) {
       await flush(); const alignment = el.style.textAlign || el.getAttribute('align');
       const heading = tag === 'h1' ? HeadingLevel.HEADING_1 : tag === 'h2' ? HeadingLevel.HEADING_2 : tag === 'h3' ? HeadingLevel.HEADING_3 : undefined;
-      const children = await runs([...el.childNodes].filter(child => !(child instanceof Element && ['UL', 'OL', 'TABLE'].includes(child.tagName))), { font: el.style.fontFamily?.split(',')[0].replace(/['"]/g, '') || 'Calibri', size: points(el.style.fontSize) * 2 || undefined, color: color(el.style.color), bold: heading ? true : tag === 'th' }, commentMap);
+      const empty=!el.textContent?.trim()&&!el.querySelector('img,svg');
+      const children = empty ? [] : await runs([...el.childNodes].filter(child => !(child instanceof Element && ['UL', 'OL', 'TABLE'].includes(child.tagName))), { font: el.style.fontFamily?.split(',')[0].replace(/['"]/g, '') || 'Calibri', size: points(el.style.fontSize) * 2 || undefined, color: color(el.style.color), bold: heading ? true : tag === 'th'||el.style.fontWeight==='bold' }, commentMap);
       result.push(new Paragraph({ children, heading,
+        run:{size:points(el.style.fontSize)*2||undefined,font:el.style.fontFamily||undefined},
         alignment: alignment === 'center' ? AlignmentType.CENTER : alignment === 'right' ? AlignmentType.RIGHT : alignment === 'justify' ? AlignmentType.BOTH : AlignmentType.LEFT,
         bullet: tag === 'li' && list && !list.ordered ? { level: list.level } : undefined,
         numbering: tag === 'li' && list?.ordered ? { reference: list.reference, level: list.level } : undefined,
@@ -115,15 +136,18 @@ async function blocks(parent: HTMLElement, numbering: { reference: string; level
         shading: color(el.style.backgroundColor) ? { fill: color(el.style.backgroundColor) } : undefined,
         border: el.style.borderBottom ? { bottom: { color: '64748B', style: BorderStyle.SINGLE, size: 6 } } : undefined,
       }));
-      for (const child of el.children) if (['UL', 'OL', 'TABLE'].includes(child.tagName)) { const holder = document.createElement('div'); holder.append(child.cloneNode(true)); result.push(...await blocks(holder, numbering, list, commentMap)); }
+      for (const child of el.children) if (['UL', 'OL', 'TABLE'].includes(child.tagName)) { const holder = document.createElement('div'); holder.append(child.cloneNode(true)); result.push(...await blocks(holder, numbering, list, commentMap, availableWidth)); }
     } else if (['div', 'section', 'figure', 'header', 'footer'].includes(tag)) {
-      await flush(); result.push(...await blocks(el, numbering, list, commentMap));
+      await flush(); result.push(...await blocks(el, numbering, list, commentMap, availableWidth));
     } else inline.push(node);
   }
   await flush(); return result;
 }
 
 export async function createDocxBlob(doc: WordDocument): Promise<Blob> {
+  const width = doc.pageSize === 'letter' ? 21.59 : 21, height = doc.pageSize === 'letter' ? 27.94 : 29.7;
+  const landscape = doc.orientation === 'landscape';
+  const availableWidth = cm((landscape ? height : width) - (doc.leftMarginCm ?? 2.5) - (doc.rightMarginCm ?? 2.5));
   const numbering: { reference: string; levels: any[] }[] = [];
   const children: Block[] = [];
   const commentMap = new Map((doc.comments || []).map((comment, index) => [comment.id, index]));
@@ -132,11 +156,10 @@ export async function createDocxBlob(doc: WordDocument): Promise<Blob> {
     if (index > 0) children.push(new Paragraph({ pageBreakBefore: true }));
     const dom = new DOMParser().parseFromString(html, 'text/html');
     if (doc.firstLineIndentCm) dom.body.querySelectorAll<HTMLElement>('p').forEach(p => { if (!p.style.textIndent) p.style.textIndent = `${doc.firstLineIndentCm}cm`; });
-    children.push(...await blocks(dom.body, numbering, undefined, commentMap));
+    children.push(...await blocks(dom.body, numbering, undefined, commentMap, availableWidth));
   }
-  const width = doc.pageSize === 'letter' ? 21.59 : 21, height = doc.pageSize === 'letter' ? 27.94 : 29.7;
-  const landscape = doc.orientation === 'landscape';
-  const headerContent: Paragraph[] = [];
+  const headerContent: Block[] = [];
+  if(doc.headerHtml){const dom=new DOMParser().parseFromString(doc.headerHtml,'text/html');headerContent.push(...await blocks(dom.body,numbering,undefined,commentMap,availableWidth));}
   if (doc.headerText) headerContent.push(new Paragraph({ children: [new TextRun({ text: doc.headerText, size: 20, color: '64748B' })] }));
   if (doc.watermarkText) {
     const canvas = document.createElement('canvas'); canvas.width = 900; canvas.height = 900;
@@ -149,6 +172,8 @@ export async function createDocxBlob(doc: WordDocument): Promise<Blob> {
     }
   }
   const footerContent: ParagraphChild[] = [];
+  const footerBlocks:Block[]=[];
+  if(doc.footerHtml){const dom=new DOMParser().parseFromString(doc.footerHtml,'text/html');footerBlocks.push(...await blocks(dom.body,numbering,undefined,commentMap,availableWidth));}
   if (doc.footerText) footerContent.push(new TextRun({ text: doc.footerText, size: 20, color: '64748B' }));
   if (doc.pageNumbers) footerContent.push(new TextRun({ children: ['   Página ', PageNumber.CURRENT, ' de ', PageNumber.TOTAL_PAGES], size: 20, color: '64748B' }));
   return Packer.toBlob(new DocxDocument({
@@ -156,7 +181,7 @@ export async function createDocxBlob(doc: WordDocument): Promise<Blob> {
     styles: { default: { document: { run: { font: 'Calibri', size: 24 }, paragraph: { spacing: { after: 160 } } } } },
     numbering: { config: numbering },
     comments: { children: (doc.comments || []).map((comment, id) => ({ id, author: 'Neiva Points', date: new Date(comment.createdAt), children: [new Paragraph(comment.text)] })) },
-    sections: [{ headers: headerContent.length ? { default: new Header({ children: headerContent }) } : undefined, footers: footerContent.length ? { default: new Footer({ children: [new Paragraph({ children: footerContent })] }) } : undefined, properties: { page: { size: { width: cm(width), height: cm(height), orientation: landscape ? 'landscape' : 'portrait' }, margin: { left: cm(doc.leftMarginCm ?? 2.5), right: cm(doc.rightMarginCm ?? 2.5), top: cm(doc.topMarginCm ?? 2.5), bottom: cm(doc.bottomMarginCm ?? 2.5) } } }, children: children.length ? children : [new Paragraph('')] }],
+    sections: [{ headers: headerContent.length ? { default: new Header({ children: headerContent }) } : undefined, footers: footerContent.length||footerBlocks.length ? { default: new Footer({ children: [...footerBlocks,...(footerContent.length?[new Paragraph({ children: footerContent })]:[])] }) } : undefined, properties: { page: { size: { width: cm(width), height: cm(height), orientation: landscape ? 'landscape' : 'portrait' }, margin: { left: cm(doc.leftMarginCm ?? 2.5), right: cm(doc.rightMarginCm ?? 2.5), top: cm(doc.topMarginCm ?? 2.5), bottom: cm(doc.bottomMarginCm ?? 2.5),header:cm(doc.headerDistanceCm??.7),footer:cm(doc.footerDistanceCm??.7) } } }, children: children.length ? children : [new Paragraph('')] }],
   }));
 }
 export async function exportToDocx(doc: WordDocument): Promise<void> {
