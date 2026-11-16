@@ -156,6 +156,9 @@
 .word-workspace .a4-page-content blockquote { border-left: 3px solid #818cf8; padding-left: 12pt; font-style: italic; margin: 12pt; }
 .word-workspace .a4-page-content a { color: #2563eb; text-decoration: underline; }
 .word-workspace .a4-page-content img { max-width: 100%; }
+.word-editable img,.word-page-chrome[data-active=true] img { cursor:pointer; }
+.word-image-selection { position:fixed;z-index:95;pointer-events:none;outline:2px solid #2563eb;outline-offset:3px; }
+.word-image-selection span { position:absolute;left:0;top:-25px;white-space:nowrap;background:#1d4ed8;color:white;padding:3px 7px;border-radius:4px;font:11px/16px 'Segoe UI',sans-serif; }
 .word-workspace .a4-page-content table { border-collapse: collapse; max-width: 100%; }
 .word-workspace .a4-page-content td, .word-workspace .a4-page-content th { min-width: 24px; border: 1px solid #9ca3af; padding: 5px; }
 .word-workspace .a4-page-content mark[data-comment-id] { background: #fef08a; color: #1f2937; border-bottom: 2px solid #d97706; }
@@ -308,6 +311,7 @@
   .word-ribbon-panel > .word-ribbon-note { display: none; }
 }
 @media print {
+  .word-image-selection { display:none !important; }
   .word-workspace .word-page-chrome,.word-workspace .word-body-region { opacity:1 !important;outline:none !important;transition:none !important; }
   .word-workspace .word-chrome-focusbar,.word-workspace .word-page-label { display:none !important; }
   .word-popover, .word-context-menu, .word-table-selection-overlay { display: none !important; }

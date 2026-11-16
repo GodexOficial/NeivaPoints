@@ -31,6 +31,7 @@ import { FindReplaceModal } from './FindReplaceModal';
 import { WordContextMenu } from './WordContextMenu';
 import { WordViewportRulers } from './WordViewportRulers';
 import { WordPageChrome } from './WordPageChrome';
+import { WordImageSelection } from './WordImageSelection';
 import { paginateWordHtml } from '../../../utils/wordPagination';
 import { WordInkPad, WordPanels, type WordPanel } from './WordPanels';
 import { cleanWordHtml, escapeWordText, importWordFile } from '../../../utils/wordImport';
@@ -1188,6 +1189,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       {/* Main Canvas Container (Multi-Page A4 Physical View) */}
       {chromeFocus&&<div className="word-chrome-focusbar" role="toolbar" aria-label="Edição de cabeçalho e rodapé"><span>Editando {chromeFocus.kind==='header'?'cabeçalho':'rodapé'} · Página {chromeFocus.page+1}</span><button onClick={()=>{setChromeFocus(null);requestAnimationFrame(()=>pageRefs.current[activePageIndex]?.focus({preventScroll:true}));}}><X size={15}/>Fechar cabeçalho e rodapé</button></div>}
       <WordTableSelection cells={tableCells} canvasRef={editorContainerRef} />
+      <WordImageSelection key={`${wordDoc.id}-${chromeFocus?.kind||'body'}-${chromeFocus?.page??0}`} readOnly={readOnly}/>
       <main
         ref={editorContainerRef}
         className={`word-canvas ${tableGrid ? 'word-gridlines-visible' : ''}`}

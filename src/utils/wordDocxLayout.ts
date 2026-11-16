@@ -35,7 +35,17 @@ export async function restoreDocxLayout(buffer: ArrayBuffer, html: string): Prom
     const family = attr(font, 'ascii') || attr(font, 'hAnsi');
     if (family) target.style.fontFamily = family;
     const ink = color(attr(child(props, 'color'))); if (ink) target.style.color = ink;
-    if (child(props, 'b')) target.style.fontWeight = attr(child(props, 'b')) === '0' ? 'normal' : 'bold';
+    const enabled = (name: string) => !['0', 'false', 'off'].includes(attr(child(props, name)));
+    if (child(props, 'b')) target.style.fontWeight = enabled('b') ? 'bold' : 'normal';
+    if (child(props, 'i')) target.style.fontStyle = enabled('i') ? 'italic' : 'normal';
+    const decoration: string[] = [];
+    if (child(props, 'u') && !['none', '0', 'false'].includes(attr(child(props, 'u')))) decoration.push('underline');
+    if (child(props, 'strike') && enabled('strike')) decoration.push('line-through');
+    if (decoration.length) target.style.textDecoration = decoration.join(' ');
+    const fill = color(attr(child(props, 'shd'), 'fill'));
+    if (fill) target.style.backgroundColor = fill;
+    const vertical = attr(child(props, 'vertAlign'));
+    if (vertical === 'superscript' || vertical === 'subscript') target.style.verticalAlign = vertical === 'superscript' ? 'super' : 'sub';
   }
   function paragraphStyle(target: HTMLElement, p: Element) {
     const props = child(p, 'pPr');
@@ -50,6 +60,11 @@ export async function restoreDocxLayout(buffer: ArrayBuffer, html: string): Prom
     function spacing(pr?: Element) {
       const align = attr(child(pr, 'jc'));
       if (['left', 'right', 'center', 'both'].includes(align)) target.style.textAlign = align === 'both' ? 'justify' : align;
+      const indent = child(pr, 'ind');
+      for (const [name, css] of [['left', 'marginLeft'], ['right', 'marginRight'], ['firstLine', 'textIndent']] as const) {
+        const value = attr(indent, name); if (value) target.style[css] = `${Number(value) / 20}pt`;
+      }
+      if (attr(indent, 'hanging')) target.style.textIndent = `${-Number(attr(indent, 'hanging')) / 20}pt`;
       const sp = child(pr, 'spacing');
       if (sp) {
         for (const [key, css] of [['before', 'marginTop'], ['after', 'marginBottom']] as const) {
@@ -61,12 +76,37 @@ export async function restoreDocxLayout(buffer: ArrayBuffer, html: string): Prom
     }
     target.style.marginTop = '0'; target.style.marginBottom = '0'; target.style.lineHeight = '1.15';
     runStyle(target, child(child(defaults, 'rPrDefault'), 'rPr'));
+    spacing(child(child(defaults, 'pPrDefault'), 'pPr'));
     inherited('Normal'); inherited(attr(child(props, 'pStyle')));
     spacing(props);
     // Direct run sizes also cover form templates that do not use named styles.
     runStyle(target, child(props, 'rPr'));
-    const runs = children(p, 'r').filter(r => text(r).trim());
-    runStyle(target, child(runs[0] || children(p,'r')[0], 'rPr'));
+    // Apply direct formatting only to the corresponding text, preserving links
+    // and semantic elements already produced by Mammoth.
+    const runs = Array.from(p.getElementsByTagNameNS(W, 'r')).filter(r => r.closest('p') === p);
+    const segments = runs.flatMap(r => children(r, 't').map(t => ({ value: t.textContent || '', props: child(r, 'rPr') })));
+    if (segments.map(s => s.value).join('') === target.textContent) {
+      const walker = dom.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+      const nodes: Text[] = []; let node = walker.nextNode();
+      while (node) { nodes.push(node as Text); node = walker.nextNode(); }
+      let offset = 0;
+      for (const original of nodes) {
+        const value = original.data; const fragment = dom.createDocumentFragment(); let start = 0;
+        let segmentOffset = 0;
+        for (const segment of segments) {
+          const end = segmentOffset + segment.value.length;
+          const from = Math.max(offset, segmentOffset), to = Math.min(offset + value.length, end);
+          if (to > from) {
+            const span = dom.createElement('span'); runStyle(span, segment.props);
+            span.textContent = value.slice(from - offset, to - offset);
+            fragment.append(span); start += to - from;
+          }
+          segmentOffset = end;
+        }
+        if (start === value.length) original.replaceWith(fragment);
+        offset += value.length;
+      }
+    }
     target.style.whiteSpace = 'pre-wrap';
   }
   // Match by text rather than index: empty paragraphs and floating text boxes
@@ -75,7 +115,8 @@ export async function restoreDocxLayout(buffer: ArrayBuffer, html: string): Prom
   const queues = new Map<string, Element[]>();
   const paragraphTargets = new Map<Element, HTMLElement>();
   for (const p of paragraphs) { const key = normalize(text(p)); if (key) queues.set(key, [...(queues.get(key) || []), p]); }
-  dom.body.querySelectorAll<HTMLElement>('p,h1,h2,h3,h4,h5,h6').forEach(p => {
+  dom.body.querySelectorAll<HTMLElement>('p,h1,h2,h3,h4,h5,h6,li').forEach(p => {
+    if (p.tagName === 'LI' && p.querySelector('p,li')) return;
     const src = queues.get(normalize(p.textContent || ''))?.shift(); if (src) { paragraphStyle(p, src); paragraphTargets.set(src,p); }
   });
   for(const [original,target] of paragraphTargets){

@@ -55,6 +55,22 @@ export function paginateWordHtml(html:string, doc:Partial<WordDocument>):string[
     const hadContent=measure.childNodes.length>0;measure.append(node);if(fits())return;
     node.parentNode?.removeChild(node);if(hadContent)flush();measure.append(node);if(fits())return;node.parentNode?.removeChild(node);
     if(node instanceof HTMLTableElement){splitTable(node);return;}
+    if(node instanceof HTMLOListElement || node instanceof HTMLUListElement){
+      const items = Array.from(node.children);
+      let current = node.cloneNode(false) as HTMLOListElement | HTMLUListElement;
+      const start = node instanceof HTMLOListElement ? node.start : 1;
+      measure.append(current);
+      items.forEach((item, index) => {
+        current.append(item);
+        if (!fits() && current.children.length > 1) {
+          item.remove(); flush();
+          current = node.cloneNode(false) as HTMLOListElement | HTMLUListElement;
+          if (current instanceof HTMLOListElement) current.start = start + index;
+          measure.append(current); current.append(item);
+        }
+      });
+      return;
+    }
     if(node instanceof HTMLElement&&/^(P|H[1-6]|BLOCKQUOTE)$/.test(node.tagName)&&node.textContent){splitParagraph(node);return;}
     // Decompose ordinary containers, retaining anchored groups as a unit.
     if(node instanceof HTMLElement&&!node.dataset.wordAnchorGroup&&node.children.length){Array.from(node.childNodes).forEach(place);return;}
