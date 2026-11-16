@@ -1,0 +1,65 @@
+{
+  "version": 5,
+  "name": "NeivaPoints",
+  "request": "no momento só quero que analise o projeto sem fazer nenhuma alteração ou edição, entenda como ele funciona e como ele está rodando atualmente.",
+  "target": {
+    "kind": "none"
+  },
+  "stack": "React + TypeScript (Vite)",
+  "status": "ready",
+  "note": "Ready: all 2 checks pass.",
+  "created_ms": 1794838957850,
+  "updated_ms": 1794839096867,
+  "checks": [
+    {
+      "round": 1,
+      "check": "build",
+      "passed": true,
+      "similarity": null,
+      "note": "`npm run build --if-present` passed.",
+      "artifacts": [],
+      "at_ms": 1794839095099
+    },
+    {
+      "round": 1,
+      "check": "own-tests",
+      "passed": true,
+      "similarity": null,
+      "note": "No tests ran: package.json has no `test` script to run.",
+      "artifacts": [],
+      "at_ms": 1794839095106
+    }
+  ],
+  "agent_session": "01a1e4bd-2426-7580-a723-c36c20c203e6",
+  "agent_session_by": "codex",
+  "agent_session_deep": true,
+  "capture_deep": true,
+  "allowed_actions": [],
+  "last_reply": "Vou analisar a estrutura, a documentação e as evidências de execução, sem editar arquivos nem iniciar serviços. Depois explico como o projeto funciona e o que for possível confirmar sobre como está rodando hoje.\n\nO projeto reúne gestão de turmas, alunos, pontos, níveis e recompensas, além de editores de texto e planilhas. O código usa o Supabase para dados compartilhados e prevê armazenamento no navegador em vários fluxos; agora estou conferindo a configuração local e os sinais de execução para separar o que está previsto do que está ativo.\n\nO projeto reúne gestão de turmas, alunos, pontos, níveis e recompensas, além de editores de texto e planilhas. O código usa o Supabase para dados compartilhados e prevê armazenamento no navegador em vários fluxos; estou conferindo a configuração local e os sinais de execução para separar o que está previsto do que está ativo.\n\nAnalisei o projeto sem editar arquivos, gerar uma nova versão ou iniciar serviços: o NeivaPoints é um sistema escolar com áreas de professor e aluno, gestão de turmas, pontos, rankings, níveis a cada 100 pontos, recompensas e XP por presença.\n\nEle roda no navegador com React e TypeScript, usa Supabase para dados compartilhados e armazenamento local em vários fluxos; também inclui editores de texto e planilhas, enquanto apresentações aparece como “em breve”.\n\nConfirmei que já existe um servidor de desenvolvimento respondendo em **http://127.0.0.1:5173/NeivaPoints/**, uma versão compilada local e configuração de publicação pelo GitHub Pages, mas não confirmei a publicação atual nem quais atualizações estão aplicadas no banco remoto.\n\nO login é próprio, com sessão salva no navegador e comparação direta de senhas, e os arquivos de banco preveem permissões públicas amplas — um ponto relevante para uma próxima análise de segurança e confiabilidade, ainda sem alterações.",
+  "asset_budget_usd": 5.0,
+  "generate_assets": false,
+  "app_in_root": true,
+  "start_files": [
+    ".env",
+    ".env.example",
+    ".git",
+    ".github",
+    ".gitignore",
+    ".oxlintrc.json",
+    ".playwright-cli",
+    "README.md",
+    "dist",
+    "index.html",
+    "node_modules",
+    "output",
+    "package-lock.json",
+    "package.json",
+    "public",
+    "src",
+    "supabase",
+    "tsconfig.app.json",
+    "tsconfig.json",
+    "tsconfig.node.json",
+    "vite.config.ts"
+  ]
+}

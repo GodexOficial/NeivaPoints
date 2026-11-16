@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify';
 import type { WordDocument } from '../types/doc';
+import {paginateWordHtml} from './wordPagination';
 
 export function cleanWordHtml(html: string): string {
   return DOMPurify.sanitize(html, {
@@ -17,10 +18,11 @@ export async function importWordFile(file: File): Promise<{ html: string; title:
     if (signature[0]===0xd0 && signature[1]===0xcf && signature[2]===0x11 && signature[3]===0xe0) throw new Error('Este documento está criptografado ou protegido por senha. Abra-o no Word com a senha e salve uma cópia DOCX sem criptografia para importá-la.');
     const mammoth = await import('mammoth');
     try {
-      const result = await mammoth.convertToHtml({ arrayBuffer: buffer });
+      const result = await mammoth.convertToHtml({ arrayBuffer: buffer },{styleMap:["br[type='page'] => hr.a4-page-break"]});
       const { restoreDocxLayout } = await import('./wordDocxLayout');
       const layout = await restoreDocxLayout(buffer, editableCopy(result.value));
-      return { html: editableCopy(layout.html), settings: layout.settings, title, warnings: layout.warnings || result.messages.length > 0 || /\.do[ct]m$/i.test(file.name) };
+      const html=editableCopy(layout.html);
+      return { html, settings: {...layout.settings,pages:paginateWordHtml(html,layout.settings)}, title, warnings: layout.warnings || result.messages.length > 0 || /\.do[ct]m$/i.test(file.name) };
     } catch { throw new Error('Não foi possível abrir este documento. Verifique se ele abre no Word e salve uma nova cópia no formato DOCX.'); }
   }
   const text = await file.text();

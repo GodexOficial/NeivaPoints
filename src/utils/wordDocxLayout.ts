@@ -71,13 +71,20 @@ export async function restoreDocxLayout(buffer: ArrayBuffer, html: string): Prom
   }
   // Match by text rather than index: empty paragraphs and floating text boxes
   // are handled differently by Word and the semantic converter.
-  const paragraphs = Array.from(source.getElementsByTagNameNS(W, 'p'));
+  const paragraphs = Array.from(source.getElementsByTagNameNS(W, 'p')).filter(p=>{let parent=p.parentElement;while(parent){if(parent.localName==='Fallback'&&parent.namespaceURI==='http://schemas.openxmlformats.org/markup-compatibility/2006')return false;parent=parent.parentElement;}return true;});
   const queues = new Map<string, Element[]>();
   const paragraphTargets = new Map<Element, HTMLElement>();
   for (const p of paragraphs) { const key = normalize(text(p)); if (key) queues.set(key, [...(queues.get(key) || []), p]); }
   dom.body.querySelectorAll<HTMLElement>('p,h1,h2,h3,h4,h5,h6').forEach(p => {
     const src = queues.get(normalize(p.textContent || ''))?.shift(); if (src) { paragraphStyle(p, src); paragraphTargets.set(src,p); }
   });
+  for(const [original,target] of paragraphTargets){
+    const before=child(child(original,'pPr'),'pageBreakBefore');
+    if(before&&attr(before)!=='0'&&attr(before)!=='false'){
+      let block:Element=target;while(block.parentElement&&block.parentElement!==dom.body)block=block.parentElement;
+      const marker=dom.createElement('div');marker.className='a4-page-break';block.before(marker);
+    }
+  }
   const emptySource=paragraphs.filter(p=>p.parentElement?.localName==='body'&&!normalize(text(p))&&!p.getElementsByTagNameNS(W,'drawing').length);
   Array.from(dom.body.children).filter((p):p is HTMLElement=>p instanceof HTMLElement&&p.tagName==='P'&&!normalize(p.textContent||'')).forEach((p,i)=>{if(emptySource[i])paragraphStyle(p,emptySource[i]);});
   const section = Array.from(source.getElementsByTagNameNS(W, 'sectPr')).at(-1);
@@ -92,7 +99,7 @@ export async function restoreDocxLayout(buffer: ArrayBuffer, html: string): Prom
     const boxParagraphs = children(box,'p');
     const rendered = boxParagraphs.map(p=>paragraphTargets.get(p)).filter((p):p is HTMLElement=>Boolean(p));
     // A semantic converter may have chosen the VML fallback; match its text too.
-    const matched = rendered.length ? rendered : boxParagraphs.filter(p=>text(p).trim()).map(p=>{const existing=Array.from(dom.body.querySelectorAll<HTMLElement>('p')).find(n=>normalize(n.textContent||'')===normalize(text(p)));if(existing)return existing;const created=dom.createElement('p');created.textContent=text(p);paragraphStyle(created,p);return created;});
+    const matched = rendered.length ? rendered : boxParagraphs.filter(p=>text(p).trim()).map(p=>{const existing=Array.from(dom.body.querySelectorAll<HTMLElement>('p')).find(n=>!n.closest('[data-word-floating]')&&normalize(n.textContent||'')===normalize(text(p)));if(existing)return existing;const created=dom.createElement('p');created.textContent=text(p);paragraphStyle(created,p);return created;});
     if (!matched.length) continue;
     const extent=anchor.getElementsByTagNameNS(WP,'extent')[0];
     const width=Number(extent?.getAttribute('cx'))/12700, height=Number(extent?.getAttribute('cy'))/12700;
@@ -107,7 +114,7 @@ export async function restoreDocxLayout(buffer: ArrayBuffer, html: string): Prom
     // using only its own runs instead of the textbox's descendant text.
     let ownText=anchorP?children(anchorP,'r').flatMap(r=>children(r,'t')).map(t=>t.textContent).join(''):'';
     if(!ownText.trim()){let following=anchorP?.nextElementSibling;while(following&&!ownText.trim()&&following.localName==='p'){ownText=children(following,'r').flatMap(r=>children(r,'t')).map(t=>t.textContent).join('');if(ownText.trim())anchorP=following;following=following.nextElementSibling;}}
-    const target=Array.from(dom.body.querySelectorAll<HTMLElement>('p')).find(p=>normalize(p.textContent||'')===normalize(ownText));
+    const target=Array.from(dom.body.querySelectorAll<HTMLElement>('p')).find(p=>!p.closest('[data-word-anchor-group]')&&normalize(p.textContent||'')===normalize(ownText));
     if(!target)continue;
     if(anchorP)paragraphStyle(target,anchorP);
     const holder=dom.createElement('div');holder.dataset.wordAnchorGroup='true';holder.style.position='relative';holder.style.minHeight=`${height+Math.max(0,y)}pt`;

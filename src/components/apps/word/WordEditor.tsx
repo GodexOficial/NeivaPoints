@@ -31,6 +31,7 @@ import { FindReplaceModal } from './FindReplaceModal';
 import { WordContextMenu } from './WordContextMenu';
 import { WordViewportRulers } from './WordViewportRulers';
 import { WordPageChrome } from './WordPageChrome';
+import { paginateWordHtml } from '../../../utils/wordPagination';
 import { WordInkPad, WordPanels, type WordPanel } from './WordPanels';
 import { cleanWordHtml, escapeWordText, importWordFile } from '../../../utils/wordImport';
 import { deleteTableContent, insertTableRow, rectangularCells, tableMap, type TableCell } from '../../../utils/wordTable';
@@ -90,14 +91,14 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   // Multi-Page A4 state
   const initializePages = (): string[] => {
     if (initialDocument.pages && initialDocument.pages.length > 0) {
-      return initialDocument.pages.map(normalizePageHtml);
+      return initialDocument.pages.flatMap(html=>paginateWordHtml(normalizePageHtml(html),initialDocument));
     }
     if (initialDocument.content && initialDocument.content.includes('a4-page-break')) {
       const parts = initialDocument.content.split(/<div[^>]*class="[^"]*a4-page-break[^"]*"[^>]*>[\s\S]*?<\/div>/gi);
       const validParts = parts.map((part) => part.trim()).filter((part) => part.length > 0);
       return validParts.length > 0 ? validParts.map(normalizePageHtml) : [EMPTY_PAGE_HTML];
     }
-    return [normalizePageHtml(initialDocument.content)];
+    return paginateWordHtml(normalizePageHtml(initialDocument.content),initialDocument);
   };
 
   const [pages, setPages] = useState<string[]>(initializePages);
@@ -131,6 +132,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const [footerText, setFooterText] = useState(initialDocument.footerText || '');
   const [headerHtml,setHeaderHtml]=useState(initialDocument.headerHtml||'');
   const [footerHtml,setFooterHtml]=useState(initialDocument.footerHtml||'');
+  const [chromeFocus,setChromeFocus]=useState<{kind:'header'|'footer';page:number}|null>(null);
   const [pageNumbers, setPageNumbers] = useState(initialDocument.pageNumbers || false);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(initialDocument.orientation || 'portrait');
   const [pageSize, setPageSize] = useState<'a4' | 'letter'>(initialDocument.pageSize || 'a4');
@@ -460,7 +462,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     tableHistory.current = { undo: [], redo: [] }; setReadOnly(false);
     setWordDoc(doc); setDocTitle(doc.title);
     const importedPages = doc.pages?.length ? doc.pages : doc.content.split(/<div[^>]*class="[^"]*a4-page-break[^"]*"[^>]*>[\s\S]*?<\/div>/gi);
-    setPages(importedPages.map(normalizePageHtml)); setActivePageIndex(0);
+    setPages(importedPages.flatMap(html=>paginateWordHtml(normalizePageHtml(html),doc))); setActivePageIndex(0);setChromeFocus(null);
     setLeftMarginCm(doc.leftMarginCm ?? 2.5); setRightMarginCm(doc.rightMarginCm ?? 2.5);
     setTopMarginCm(doc.topMarginCm ?? 2.5); setBottomMarginCm(doc.bottomMarginCm ?? 2.5);
     setFirstLineIndentCm(doc.firstLineIndentCm ?? 0); setWatermarkText(doc.watermarkText || '');
@@ -504,6 +506,17 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
 
   const handleContentInput = () => {
     const updatedPages = pages.map((html, index) => pageRefs.current[index]?.innerHTML || html);
+    const capacity=(pageHeightCm-topMarginCm-bottomMarginCm)*96/2.54;
+    if(pageRefs.current.some(page=>page&&page.scrollHeight>capacity+2)){
+      const selection=getSelection();let marker:HTMLElement|null=null;
+      if(selection?.isCollapsed&&selection.rangeCount){const range=selection.getRangeAt(0);if(pageRefs.current.some(page=>page?.contains(range.startContainer))){marker=document.createElement('span');marker.dataset.wordCaret='true';range.insertNode(marker);}}
+      const next=pages.flatMap((html,index)=>paginateWordHtml(pageRefs.current[index]?.innerHTML||html,{...wordDoc,orientation,pageSize,leftMarginCm,rightMarginCm,topMarginCm,bottomMarginCm}));
+      let caretPage=-1;
+      const cleaned=next.map((html,index)=>{const dom=new DOMParser().parseFromString(html,'text/html');const caret=dom.querySelector('[data-word-caret]');if(caret){caretPage=index;}return dom.body.innerHTML;});
+      marker?.remove();selectionRef.current=null;setPages(cleaned);setHasUnsavedChanges(true);setSaveStatus('unsaved');
+      requestAnimationFrame(()=>{if(caretPage<0)return;const page=pageRefs.current[caretPage],caret=page?.querySelector('[data-word-caret]');if(page&&caret){const range=document.createRange();range.setStartBefore(caret);range.collapse(true);caret.remove();page.focus({preventScroll:true});selection?.removeAllRanges();selection?.addRange(range);selectionRef.current=range;setActivePageIndex(caretPage);setPages(current=>current.map((html,i)=>i===caretPage?page.innerHTML:html));}});
+      return;
+    }
     setPages(updatedPages); setHasUnsavedChanges(true); setSaveStatus('unsaved');
   };
   const tableResize = useWordTableResize(readOnly, handleContentInput);
@@ -1087,9 +1100,9 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   };
 
   return createPortal(
-    <div data-motion="off" style={{'--word-page-height':`${pageHeightCm}cm`} as React.CSSProperties} className={`word-workspace ${rulerVisible ? 'word-rulers-visible' : ''} ${focusMode ? 'word-focus' : ''} ${marksVisible ? 'word-show-marks' : ''}`} onKeyDown={event => {
+    <div data-motion="off" style={{'--word-page-height':`${pageHeightCm}cm`} as React.CSSProperties} className={`word-workspace ${chromeFocus?'word-chrome-editing':''} ${rulerVisible ? 'word-rulers-visible' : ''} ${focusMode ? 'word-focus' : ''} ${marksVisible ? 'word-show-marks' : ''}`} onKeyDown={event => {
       if((event.target as HTMLElement).closest('.word-imported-page-header,.word-imported-page-footer')&&(event.ctrlKey||event.metaKey)&&event.key.toLowerCase()!=='s')return;
-      if (event.key === 'Escape') { setFocusMode(false); setPanel(null); setTableDrawMode('none'); setExtendTableSelection(false); }
+      if (event.key === 'Escape') { if(chromeFocus)requestAnimationFrame(()=>{const body=pageRefs.current[activePageIndex];body?.focus({preventScroll:true});const saved=selectionRef.current;if(body&&saved&&body.contains(saved.startContainer)){const selection=getSelection();selection?.removeAllRanges();selection?.addRange(saved);}});setChromeFocus(null);setFocusMode(false); setPanel(null); setTableDrawMode('none'); setExtendTableSelection(false); }
       if ((event.ctrlKey || event.metaKey) && ['z','y'].includes(event.key.toLowerCase()) && !(event.target as HTMLElement).closest('input,textarea,select')) { event.preventDefault(); handleExecCommand(event.key.toLowerCase() === 'y' || event.shiftKey ? 'redo' : 'undo'); return; }
       if (event.ctrlKey || event.metaKey) { const key = event.key.toLowerCase(); if (['s','f','h','b','i','u'].includes(key) || event.key === 'Enter') { event.preventDefault(); if (key === 's') handleSaveToBackend(); else if (['f','h'].includes(key)) setIsFindReplaceOpen(true); else if (event.key === 'Enter') handlePageBreak(); else handleExecCommand(key === 'b' ? 'bold' : key === 'i' ? 'italic' : 'underline'); } }
     }}><div className="flex h-full min-h-0 w-full flex-col bg-slate-200 dark:bg-slate-950 overflow-hidden relative">
@@ -1173,6 +1186,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
         changeLeft={value => handleRulerLeftMargin(scopeMode === 'paragraph' ? Math.max(0,value-leftMarginCm) : value)} changeRight={value => handleRulerRightMargin(scopeMode === 'paragraph' ? Math.max(0,value-rightMarginCm) : value)} changeIndent={handleRulerFirstLineIndent} changeTop={setTopMarginCm} changeBottom={setBottomMarginCm} />}
 
       {/* Main Canvas Container (Multi-Page A4 Physical View) */}
+      {chromeFocus&&<div className="word-chrome-focusbar" role="toolbar" aria-label="Edição de cabeçalho e rodapé"><span>Editando {chromeFocus.kind==='header'?'cabeçalho':'rodapé'} · Página {chromeFocus.page+1}</span><button onClick={()=>{setChromeFocus(null);requestAnimationFrame(()=>pageRefs.current[activePageIndex]?.focus({preventScroll:true}));}}><X size={15}/>Fechar cabeçalho e rodapé</button></div>}
       <WordTableSelection cells={tableCells} canvasRef={editorContainerRef} />
       <main
         ref={editorContainerRef}
@@ -1186,6 +1200,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
             style={{ width: `${pageWidthCm}cm`, minHeight: `${pageHeightCm}cm` }}
             onClick={() => setActivePageIndex(pageIndex)}
           >
+            <span className="word-page-label" aria-hidden="true">Página {pageIndex+1} de {pages.length}</span>
             {/* A4 Sheet Box */}
             <div className="flex-1 flex flex-col items-center relative">
               {/* Floating Page Header Banner */}
@@ -1227,15 +1242,16 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                 className={`w-full rounded-2xl border transition-all duration-300 relative overflow-hidden a4-page-sheet ${getPaperBgStyle()} ${activePageIndex === pageIndex ? 'ring-2 ring-blue-500/40 shadow-2xl' : 'shadow-md'}`}
                 style={{
                   width: `${pageWidthCm}cm`,
-                  minHeight: `${pageHeightCm}cm`,
+                  height: `${pageHeightCm}cm`,
                   paddingLeft: `${leftMarginCm}cm`,
                   paddingRight: `${rightMarginCm}cm`,
                   paddingTop: `${topMarginCm}cm`,
                   paddingBottom: `${bottomMarginCm}cm`,
                 }}
               >
-                {headerHtml ? <WordPageChrome html={headerHtml} kind="header" page={pageIndex+1} readOnly={readOnly} left={leftMarginCm} right={rightMarginCm} distance={wordDoc.headerDistanceCm??.5} onChange={html=>{setHeaderHtml(html);setHasUnsavedChanges(true);setSaveStatus('unsaved');}}/> : headerText && <div className="word-page-header">{headerText}</div>}
-                {footerHtml ? <WordPageChrome html={footerHtml} kind="footer" page={pageIndex+1} readOnly={readOnly} left={leftMarginCm} right={rightMarginCm} distance={wordDoc.footerDistanceCm??.7} onChange={html=>{setFooterHtml(html);setHasUnsavedChanges(true);setSaveStatus('unsaved');}}/> : (footerText || pageNumbers) && <div className="word-page-footer"><span>{footerText}</span>{pageNumbers && <span>Página {pageIndex + 1} de {pages.length}</span>}</div>}
+                <WordPageChrome html={headerHtml||`<p>${escapeWordText(headerText).replace(/\n/g,'<br>')||'<br>'}</p>`} kind="header" page={pageIndex+1} readOnly={readOnly} active={chromeFocus?.kind==='header'&&chromeFocus.page===pageIndex} left={leftMarginCm} right={rightMarginCm} distance={wordDoc.headerDistanceCm??.5} onActivate={()=>{setChromeFocus({kind:'header',page:pageIndex});setActivePageIndex(pageIndex);}} onChange={html=>{setHeaderHtml(html);setHeaderText('');setHasUnsavedChanges(true);setSaveStatus('unsaved');}}/>
+                <WordPageChrome html={footerHtml||`<p>${escapeWordText(footerText).replace(/\n/g,'<br>')||'<br>'}</p>`} kind="footer" page={pageIndex+1} readOnly={readOnly} active={chromeFocus?.kind==='footer'&&chromeFocus.page===pageIndex} left={leftMarginCm} right={rightMarginCm} distance={wordDoc.footerDistanceCm??.7} onActivate={()=>{setChromeFocus({kind:'footer',page:pageIndex});setActivePageIndex(pageIndex);}} onChange={html=>{setFooterHtml(html);setFooterText('');setHasUnsavedChanges(true);setSaveStatus('unsaved');}}/>
+                {pageNumbers&&<span className="word-page-number">Página {pageIndex+1} de {pages.length}</span>}
                 {/* Watermark Overlay if active */}
                 {watermarkText && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 opacity-15 rotate-[-35deg]">
@@ -1246,7 +1262,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                 )}
 
                 {/* Page ContentEditable Area */}
-                <div className="relative z-10">
+                <div className="relative z-10 word-body-region" onDoubleClick={()=>{if(chromeFocus){setChromeFocus(null);requestAnimationFrame(()=>pageRefs.current[pageIndex]?.focus({preventScroll:true}));}}}>
                   {isPageEmpty(pageHtml) && editingPageIndex !== pageIndex && (
                     <span
                       aria-hidden="true"
@@ -1264,7 +1280,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                         el.innerHTML = pageHtml;
                       }
                     }}
-                    contentEditable={!readOnly}
+                    contentEditable={!readOnly&&!chromeFocus}
                     role="textbox" aria-label={`Conteúdo da página ${pageIndex + 1}`} aria-multiline="true" spellCheck lang="pt-BR"
                     suppressContentEditableWarning
                     onFocus={() => {
@@ -1337,7 +1353,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
           if (hasUnsavedChanges && !handleSaveToBackend()) return;
           const result = await importWordFile(file);
           const doc = createNewDocument(result.title);
-          const imported = saveLocalDocument({ ...doc, ...result.settings, content: result.html, pages: [result.html] });
+          const imported = saveLocalDocument({ ...doc, ...result.settings, content: result.html, pages: result.settings?.pages||[result.html] });
           applyDocument(imported);
           setNotice(result.warnings ? 'Documento importado. Alguns recursos avançados do arquivo podem ter sido simplificados.' : 'Documento importado.');
         } catch (error) { setNotice(error instanceof Error ? error.message : 'Não foi possível importar o arquivo.'); }

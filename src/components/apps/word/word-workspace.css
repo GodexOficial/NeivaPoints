@@ -138,8 +138,9 @@
 .word-ruler-row[hidden] { display: none; }
 .word-ruler-row > div, .word-ruler-row > div > div { background-color: #303030; border-color: #444; color: #ddd; }
 .word-canvas { flex: 1; min-height: 0; overflow: auto; background: #151515; padding: 28px 42px 70px; overscroll-behavior: contain; }
-.word-page-stack { display: flex; flex-direction: column; align-items: center; gap: 28px; min-width: min-content; width: 100%; }
+.word-page-stack { display: flex; flex-direction: column; align-items: center; gap: 44px; min-width: min-content; width: 100%; }
 .word-page-wrap { flex-shrink: 0; margin-inline: auto; }
+.word-page-label { position:absolute;top:-22px;left:0;color:#c4c4c4;font:11px/16px 'Segoe UI',sans-serif;user-select:none; }
 .word-vertical-ruler { position: absolute; left: -30px; top: 0; }
 .word-vertical-ruler[hidden] { display: none; }
 .word-page-controls { display: none; }
@@ -213,7 +214,16 @@
 .word-editable table :is(td,th) > :is(p,div) { margin: 0; }
 .word-editable thead { display: table-header-group; }
 .word-imported-page-header,.word-imported-page-footer { position:absolute;z-index:12;color:#111;background:transparent;outline:none; }
-.word-imported-page-header:focus,.word-imported-page-footer:focus { outline:1px dashed #6366f1;outline-offset:3px; }
+.word-page-chrome { min-height:.65cm;opacity:.42;cursor:default;transition:opacity .15s ease; }
+.word-page-chrome[data-active=true] { opacity:1;cursor:text;outline:1px dashed #6366f1;outline-offset:4px; }
+.word-chrome-editing .word-body-region { opacity:.4; }
+.word-chrome-editing .word-page-chrome { opacity:1; }
+.word-chrome-focusbar { display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:7px 16px;background:#26334d;color:#e5e7eb;font-size:12px; }
+.word-chrome-focusbar button { display:flex;align-items:center;gap:6px;min-height:28px;padding:3px 8px;border:1px solid #64748b;border-radius:4px;background:#334155; }
+.word-page-number { position:absolute;bottom:.3cm;right:1cm;font:9pt Calibri,sans-serif;color:#555; }
+.word-body-region .a4-page-content { display:flow-root; }
+.word-pagination-measure .a4-page-content { display:flow-root; }
+.word-page-chrome[data-active=true]:focus { outline:1px dashed #6366f1;outline-offset:3px; }
 .word-workspace .a4-page-content [data-word-floating] p { margin:0; }
 .word-workspace [data-word-floating] { overflow-wrap:normal;word-break:normal;text-indent:0; }
 @media (max-width: 700px) { .word-table-sections { grid-template-columns: 1fr; } .word-table-context span { display: none; } .word-dialog.word-table-editor { padding: 14px; } }
@@ -298,6 +308,8 @@
   .word-ribbon-panel > .word-ribbon-note { display: none; }
 }
 @media print {
+  .word-workspace .word-page-chrome,.word-workspace .word-body-region { opacity:1 !important;outline:none !important;transition:none !important; }
+  .word-workspace .word-chrome-focusbar,.word-workspace .word-page-label { display:none !important; }
   .word-popover, .word-context-menu, .word-table-selection-overlay { display: none !important; }
   .word-gridlines-visible .word-editable :is(td,th) { outline: none; }
   .word-workspace.word-rulers-visible { padding: 0 !important; }
@@ -306,7 +318,8 @@
   .word-workspace, .word-workspace > div:first-child { position: static !important; height: auto !important; width: auto !important; overflow: visible !important; display: block !important; background: white !important; }
   .word-workspace .word-toolbar-shell, .word-workspace .word-statusbar, .word-workspace .word-back-button, .word-workspace .word-notice, .word-workspace .word-add-page, .word-workspace .word-vertical-ruler, .word-workspace .word-dialog-backdrop { display: none !important; }
   .word-workspace .word-canvas, .word-workspace .word-page-stack { overflow: visible !important; display: block !important; padding: 0 !important; zoom: 1 !important; background: white !important; }
-  .word-workspace .word-page-wrap { display: block !important; width: auto !important; min-height: 0 !important; margin: 0 !important; }
-  .word-workspace .a4-page-sheet { width: 100% !important; min-height: var(--word-page-height,29.7cm) !important; break-after: page !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; }
+  .word-workspace .word-page-wrap { display: block !important; width: auto !important; height:var(--word-page-height,29.7cm) !important;min-height:0 !important; margin: 0 !important;break-after:page !important;break-inside:avoid !important; }
+  .word-workspace .word-page-wrap:last-child { break-after:auto !important; }
+  .word-workspace .a4-page-sheet { width: 100% !important;height:var(--word-page-height,29.7cm) !important;min-height:0 !important;break-after:auto !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; }
   .word-workspace .a4-page-content { min-height: 0 !important; }
 }
