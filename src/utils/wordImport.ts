@@ -18,7 +18,9 @@ export async function importWordFile(file: File): Promise<{ html: string; title:
     if (signature[0]===0xd0 && signature[1]===0xcf && signature[2]===0x11 && signature[3]===0xe0) throw new Error('Este documento está criptografado ou protegido por senha. Abra-o no Word com a senha e salve uma cópia DOCX sem criptografia para importá-la.');
     const mammoth = await import('mammoth');
     try {
-      const result = await mammoth.convertToHtml({ arrayBuffer: buffer },{styleMap:["br[type='page'] => hr.a4-page-break"]});
+      // A block <hr> inside a converted paragraph makes the HTML parser invent
+      // empty paragraphs. Keep a valid inline marker until layout restoration.
+      const result = await mammoth.convertToHtml({ arrayBuffer: buffer },{ignoreEmptyParagraphs:false,styleMap:["br[type='page'] => br.word-import-page-break:fresh"]});
       const { restoreDocxLayout } = await import('./wordDocxLayout');
       const layout = await restoreDocxLayout(buffer, editableCopy(result.value));
       const html=editableCopy(layout.html);

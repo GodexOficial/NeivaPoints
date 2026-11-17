@@ -31,7 +31,7 @@ import { FindReplaceModal } from './FindReplaceModal';
 import { WordContextMenu } from './WordContextMenu';
 import { WordViewportRulers } from './WordViewportRulers';
 import { WordPageChrome } from './WordPageChrome';
-import { WordImageSelection } from './WordImageSelection';
+import { WordObjectControls } from './WordObjectControls';
 import { paginateWordHtml } from '../../../utils/wordPagination';
 import { WordInkPad, WordPanels, type WordPanel } from './WordPanels';
 import { cleanWordHtml, escapeWordText, importWordFile } from '../../../utils/wordImport';
@@ -1189,7 +1189,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       {/* Main Canvas Container (Multi-Page A4 Physical View) */}
       {chromeFocus&&<div className="word-chrome-focusbar" role="toolbar" aria-label="Edição de cabeçalho e rodapé"><span>Editando {chromeFocus.kind==='header'?'cabeçalho':'rodapé'} · Página {chromeFocus.page+1}</span><button onClick={()=>{setChromeFocus(null);requestAnimationFrame(()=>pageRefs.current[activePageIndex]?.focus({preventScroll:true}));}}><X size={15}/>Fechar cabeçalho e rodapé</button></div>}
       <WordTableSelection cells={tableCells} canvasRef={editorContainerRef} />
-      <WordImageSelection key={`${wordDoc.id}-${chromeFocus?.kind||'body'}-${chromeFocus?.page??0}`} readOnly={readOnly}/>
+      <WordObjectControls key={`${wordDoc.id}-${chromeFocus?.kind||'body'}-${chromeFocus?.page??0}`} readOnly={readOnly} onSelectTable={table=>selectTableCells(tableMap(table).positions.map(p=>p.cell))}/>
       <main
         ref={editorContainerRef}
         className={`word-canvas ${tableGrid ? 'word-gridlines-visible' : ''}`}
@@ -1304,14 +1304,35 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                     onKeyDown={e => {
                       if (!readOnly && tableCells.length > 1 && (e.key === 'Delete' || e.key === 'Backspace')) { e.preventDefault(); handleTableCommand({ action: 'clear' }); return; }
                       if (!readOnly && (e.key === 'Delete' || e.key === 'Backspace') && deleteTableContent(e.currentTarget, e.key === 'Backspace')) { e.preventDefault(); handleContentInput(); return; }
-                      if (readOnly || e.key !== 'Tab') return;
-                      const cell = (e.target as HTMLElement).closest<HTMLTableCellElement>('td,th') || (getSelection()?.anchorNode?.parentElement?.closest<HTMLTableCellElement>('td,th'));
-                      const table = cell?.closest('table'); if (!cell || !table) return;
+                      if (readOnly || chromeFocus || e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) return;
+                      const anchorNode=getSelection()?.anchorNode;
+                      const cell = (e.target as HTMLElement).closest<HTMLTableCellElement>('td,th') || (anchorNode instanceof Element?anchorNode:anchorNode?.parentElement)?.closest<HTMLTableCellElement>('td,th');
                       e.preventDefault();
+                      const table = cell?.closest('table');
+                      if (!cell || !table) {
+                        const selection=getSelection();if(!selection?.rangeCount)return;
+                        const owner=e.currentTarget,range=selection.getRangeAt(0);
+                        if(!owner.contains(range.commonAncestorContainer))return;
+                        const anchor=selection.anchorNode;
+                        let block=(anchor instanceof Element?anchor:anchor?.parentElement)?.closest<HTMLElement>('p,h1,h2,h3,h4,h5,h6,li,blockquote');
+                        // Browsers may leave text directly in contenteditable after a paste.
+                        if(!block||!owner.contains(block)){
+                          document.execCommand('formatBlock',false,'p');
+                          const node=getSelection()?.anchorNode;
+                          block=(node instanceof Element?node:node?.parentElement)?.closest<HTMLElement>('p,h1,h2,h3,h4,h5,h6,li,blockquote');
+                        }
+                        if(!block||!owner.contains(block))return;
+                        const current=parseFloat(getComputedStyle(block).textIndent)*2.54/96||0;
+                        const limit=Math.max(0,pageWidthCm-leftMarginCm-rightMarginCm-1);
+                        block.style.textIndent=`${Math.max(0,Math.min(limit,Math.round((current+(e.shiftKey?-1.25:1.25))*100)/100))}cm`;
+                        selectionRef.current=getSelection()?.getRangeAt(0).cloneRange()||null;
+                        handleContentInput();analyzeSelection();return;
+                      }
                       let all = tableMap(table).positions.map(p => p.cell), index = all.indexOf(cell), next = index + (e.shiftKey ? -1 : 1);
                       if (next >= all.length) { if (table.rows.length >= 200) return; insertTableRow(table, table.rows.length); handleContentInput(); all = tableMap(table).positions.map(p => p.cell); }
                       if (next < 0) return;
-                      const range = document.createRange(); range.selectNodeContents(all[next]); range.collapse(true); const selection = getSelection(); selection?.removeAllRanges(); selection?.addRange(range); selectionRef.current = range.cloneRange();
+                      setTableCells([]);setActiveTableCell(all[next]);setSelectedTable(table);
+                      const range = document.createRange(); range.selectNodeContents(all[next]); const selection = getSelection(); selection?.removeAllRanges(); selection?.addRange(range); selectionRef.current = range.cloneRange();
                     }}
                     onKeyUp={analyzeSelection}
                     onMouseUp={analyzeSelection}

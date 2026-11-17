@@ -16,6 +16,7 @@ export function paginateWordHtml(html:string, doc:Partial<WordDocument>):string[
   shell.append(measure);document.body.append(shell);
   const source=new DOMParser().parseFromString(html,'text/html');
   const pages:string[]=[];
+  let contentSinceBreak=false;
   const fits=()=>measure.getBoundingClientRect().height<=height+1;
   const flush=()=>{if(measure.childNodes.length){pages.push(measure.innerHTML);measure.replaceChildren();}};
   function splitParagraph(node:HTMLElement){
@@ -51,8 +52,13 @@ export function paginateWordHtml(html:string, doc:Partial<WordDocument>):string[
     }
   }
   function place(node:Node){
-    if(node instanceof HTMLElement&&node.classList.contains('a4-page-break')){flush();return;}
-    const hadContent=measure.childNodes.length>0;measure.append(node);if(fits())return;
+    if(node instanceof HTMLElement&&node.classList.contains('a4-page-break')){
+      const meaningful=Boolean(measure.textContent?.trim()||measure.querySelector('table,img,svg,[data-word-floating]'));
+      if(meaningful)flush();else{measure.replaceChildren();if(!contentSinceBreak&&node.dataset.wordExplicitBreak==='true')pages.push('<p><br></p>');}
+      contentSinceBreak=false;return;
+    }
+    if(node.textContent?.trim()||node instanceof Element&&(node.matches('table,img,svg,[data-word-floating]')||node.querySelector('table,img,svg,[data-word-floating]')))contentSinceBreak=true;
+    const hadContent=Boolean(measure.textContent?.trim()||measure.querySelector('img,svg,table,[data-word-floating]'));measure.append(node);if(fits())return;
     node.parentNode?.removeChild(node);if(hadContent)flush();measure.append(node);if(fits())return;node.parentNode?.removeChild(node);
     if(node instanceof HTMLTableElement){splitTable(node);return;}
     if(node instanceof HTMLOListElement || node instanceof HTMLUListElement){

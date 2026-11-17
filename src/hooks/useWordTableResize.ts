@@ -8,10 +8,10 @@ export function useWordTableResize(readOnly: boolean, changed: () => void) {
   useEffect(() => () => cleanup.current?.(), []);
   const edge = (e: ReactPointerEvent<HTMLElement>) => {
     const cell = (e.target as HTMLElement).closest<HTMLTableCellElement>('td,th');
-    if (readOnly || !cell) return null;
+    if (readOnly || !cell || !cell.isContentEditable) return null;
     const box = cell.getBoundingClientRect(), distance = e.pointerType === 'touch' ? 8 : 5;
-    const axis = Math.abs(e.clientX - box.right) < distance ? 'x' : Math.abs(e.clientY - box.bottom) < distance ? 'y' : null;
-    return axis ? { cell, axis } : null;
+    const side = Math.abs(e.clientX-box.left)<distance?'left':Math.abs(e.clientX-box.right)<distance?'right':Math.abs(e.clientY-box.top)<distance?'top':Math.abs(e.clientY-box.bottom)<distance?'bottom':null;
+    return side ? { cell, axis:side==='left'||side==='right'?'x':'y',side } : null;
   };
   return {
     onPointerMove: (e: ReactPointerEvent<HTMLElement>) => { if (!cleanup.current) e.currentTarget.style.cursor = edge(e)?.axis === 'x' ? 'col-resize' : edge(e)?.axis === 'y' ? 'row-resize' : ''; },
@@ -21,8 +21,10 @@ export function useWordTableResize(readOnly: boolean, changed: () => void) {
       const map = tableMap(table), position = map.positions.find(p => p.cell === hit.cell)!;
       const scale = table.getBoundingClientRect().width / table.offsetWidth || 1;
       const start = hit.axis === 'x' ? e.clientX : e.clientY;
-      const row = table.rows[position.row + position.rows - 1];
+      const row = table.rows[hit.side==='top'?Math.max(0,position.row-1):position.row + position.rows - 1];
       const oldHeight = row.getBoundingClientRect().height / scale;
+      const outerLeft=hit.side==='left'&&position.col===0,outerTop=hit.side==='top'&&position.row===0;
+      const oldLeft=parseFloat(getComputedStyle(table).marginLeft)||0,oldTop=parseFloat(getComputedStyle(table).marginTop)||0;
       let columns: HTMLTableColElement[] = [], sizes: number[] = [];
       if (hit.axis === 'x') {
         sizes = Array.from({ length: map.width }, (_, col) => {
@@ -41,11 +43,13 @@ export function useWordTableResize(readOnly: boolean, changed: () => void) {
       const paint = () => {
         frame = 0; const delta = (latest - start) / scale;
         if (hit.axis === 'x') {
-          const col = position.col + position.cols - 1, total = sizes.reduce((a, b) => a + b, 0);
-          const available = (table.parentElement?.getBoundingClientRect().width || total * scale) / scale;
-          const width = Math.max(24, Math.min(sizes[col] + delta, Math.max(24, available - total + sizes[col])));
+          const col = hit.side==='left'?Math.max(0,position.col-1):position.col + position.cols - 1, total = sizes.reduce((a, b) => a + b, 0);
+          const sheet=table.closest('.a4-page-sheet')?.getBoundingClientRect();
+          const available = sheet?(sheet.right-table.getBoundingClientRect().left-4)/scale:Math.max(total,(table.parentElement?.getBoundingClientRect().width||total*scale)/scale);
+          const width = Math.max(24, Math.min(sizes[col] + (outerLeft?-delta:delta), Math.max(24, available - total + sizes[col])));
           columns[col].style.width = `${width}px`; table.style.width = `${total - sizes[col] + width}px`;
-        } else row.style.height = `${Math.max(20, oldHeight + delta)}px`;
+          if(outerLeft)table.style.marginLeft=`${oldLeft+sizes[col]-width}px`;
+        } else {const height=Math.max(20,oldHeight+(outerTop?-delta:delta));row.style.height=`${height}px`;if(outerTop)table.style.marginTop=`${oldTop+oldHeight-height}px`;}
       };
       const move = (event: PointerEvent) => { if (event.pointerId !== pointerId) return; latest = hit.axis === 'x' ? event.clientX : event.clientY; if (!frame) frame = requestAnimationFrame(paint); };
       const end = (event: PointerEvent) => { if (event.pointerId !== pointerId) return; if (frame) { cancelAnimationFrame(frame); paint(); } cleanup.current?.(); changed(); };

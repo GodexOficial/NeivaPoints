@@ -26,15 +26,21 @@ async function imageRun(element: HTMLElement | SVGElement): Promise<ImageRun> {
   const image = new window.Image(); image.crossOrigin = 'anonymous'; image.src = src;
   await Promise.race([image.decode(), new Promise((_, reject) => setTimeout(() => reject(new Error('Tempo excedido ao carregar imagem.')), 10000))]);
   const requestedWidth = points((element as HTMLElement).style.width || '') / .75 || parseFloat(element.getAttribute('width') || '') || image.naturalWidth || 400;
-  const width = Math.max(1, Math.min(650, requestedWidth));
-  const height = width * (image.naturalHeight || 200) / (image.naturalWidth || 400);
+  const width = Math.max(1, Math.min(4000, requestedWidth));
+  const requestedHeight=points((element as HTMLElement).style.height||'')/.75||parseFloat(element.getAttribute('height')||'');
+  const height = Math.max(1,Math.min(4000,requestedHeight||width * (image.naturalHeight || 200) / (image.naturalWidth || 400)));
   const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(width * 2)); canvas.height = Math.max(1, Math.round(height * 2));
   const context = canvas.getContext('2d'); if (!context) throw new Error('Não foi possível converter a imagem.');
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   const encoded = canvas.toDataURL('image/png').split(',')[1];
   const positioned = (element as HTMLElement).dataset.wordHeaderImage;
+  const object=(element as HTMLElement).closest<HTMLElement>('[data-word-object]')||element as HTMLElement;
+  const mode=(element as HTMLElement).dataset.wordWrap||object.dataset.wordWrap;
+  const floating=positioned||['front','behind','square'].includes(mode||'');
+  const header=(element as HTMLElement).dataset;
+  const pageAnchor=positioned==='positioned'&&header.wordHeaderOrigin!==undefined;
   return new ImageRun({ type: 'png', data: Uint8Array.from(atob(encoded), c => c.charCodeAt(0)), transformation: { width, height },
-    floating: positioned ? { horizontalPosition: {relative:HorizontalPositionRelativeFrom.MARGIN,align:positioned==='right'?'right':'left'},verticalPosition:{relative:VerticalPositionRelativeFrom.PARAGRAPH,offset:Math.round(points((element as HTMLElement).style.top)*12700)},allowOverlap:true,wrap:{type:TextWrappingType.NONE} } : undefined,
+    floating: floating ? { horizontalPosition: pageAnchor?{relative:HorizontalPositionRelativeFrom.PAGE,offset:Math.round(Number(header.wordHeaderLeft)*360000+points(object.style.left||'0px')*12700)}:positioned?{relative:HorizontalPositionRelativeFrom.MARGIN,align:positioned==='right'?'right':'left'}:{relative:HorizontalPositionRelativeFrom.COLUMN,offset:Math.round(points(object.style.left||'0px')*12700)},verticalPosition:pageAnchor?{relative:VerticalPositionRelativeFrom.PAGE,offset:Math.round(Number(header.wordHeaderOrigin)*360000+points(object.style.top||'0px')*12700)}:{relative:VerticalPositionRelativeFrom.PARAGRAPH,offset:Math.round(points(object.style.top||'0px')*12700)},behindDocument:mode==='behind'||header.wordHeaderBehind==='1',allowOverlap:true,wrap:{type:mode==='square'?TextWrappingType.SQUARE:TextWrappingType.NONE} } : undefined,
     altText: { name: element.getAttribute('alt') || 'Ilustração', title: 'Ilustração', description: element.getAttribute('alt') || '' } });
 }
 async function runs(nodes: NodeListOf<ChildNode> | ChildNode[], inherited: IRunOptions = {}, commentMap = new Map<string, number>()): Promise<ParagraphChild[]> {
@@ -43,8 +49,9 @@ async function runs(nodes: NodeListOf<ChildNode> | ChildNode[], inherited: IRunO
     if (node.nodeType === Node.TEXT_NODE) { if (node.textContent) result.push(new TextRun({ ...inherited, text: node.textContent })); continue; }
     if (!(node instanceof Element)) continue;
     const el = node as HTMLElement; const tag = el.tagName.toLowerCase();
-    if (tag === 'img' || tag === 'svg') { result.push(await imageRun(el)); continue; }
-    if (tag === 'br') { result.push(new TextRun({ ...inherited, break: 1 })); continue; }
+    if(el.dataset.wordFloating){result.push(await textBoxRun(el,[],commentMap));continue;}
+    if (tag === 'img' || tag === 'svg') { const mode=el.dataset.wordWrap||el.closest<HTMLElement>('[data-word-object]')?.dataset.wordWrap;if(mode==='block')result.push(new TextRun({break:1}));result.push(await imageRun(el));if(mode==='block')result.push(new TextRun({break:1}));continue; }
+    if (tag === 'br') { if(!el.dataset.wordStrut)result.push(new TextRun({ ...inherited, break: 1 })); continue; }
     const size = points(el.style.fontSize || '') * 2 || (el.getAttribute('size') ? [0, 16, 20, 24, 28, 36, 48, 72][Number(el.getAttribute('size'))] : undefined);
     const fill = color(el.style.backgroundColor) || (tag === 'mark' ? 'FEF08A' : undefined);
     const style: IRunOptions = { ...inherited,
@@ -67,6 +74,13 @@ async function runs(nodes: NodeListOf<ChildNode> | ChildNode[], inherited: IRunO
   return result;
 }
 let listSequence = 0;
+async function textBoxRun(el:HTMLElement,numbering:{reference:string;levels:any[]}[],commentMap:Map<string,number>){
+  const content=await blocks(el,numbering,undefined,commentMap,Math.round(points(el.style.width)*20));
+  const mode=el.dataset.wordWrap||'front';
+  return new WpsShapeRun({type:'wps',children:content.filter((b):b is Paragraph=>b instanceof Paragraph),transformation:{width:Math.max(16,points(el.style.width)/.75),height:Math.max(16,points(el.style.height||el.style.minHeight)/.75)},
+    floating:['inline','block'].includes(mode)?undefined:{horizontalPosition:{relative:HorizontalPositionRelativeFrom.COLUMN,offset:Math.round(points(el.style.left)*12700)},verticalPosition:{relative:VerticalPositionRelativeFrom.PARAGRAPH,offset:Math.round(points(el.style.top)*12700)},allowOverlap:true,behindDocument:mode==='behind',wrap:{type:mode==='square'?TextWrappingType.SQUARE:TextWrappingType.NONE}},
+    bodyProperties:{margins:{top:3*12700,bottom:3*12700,left:5*12700,right:5*12700}},outline:{type:'solidFill',solidFillType:'rgb',value:color(el.style.borderColor)||'333333',width:6350},solidFill:{type:'rgb',value:color(el.style.backgroundColor)||'FFFFFF'}});
+}
 async function blocks(parent: HTMLElement, numbering: { reference: string; levels: any[] }[], list?: { ordered: boolean; reference: string; level: number }, commentMap = new Map<string, number>(), availableWidth = cm(16)): Promise<Block[]> {
   const result: Block[] = [];
   let inline: ChildNode[] = [];
@@ -74,17 +88,13 @@ async function blocks(parent: HTMLElement, numbering: { reference: string; level
   for (const node of parent.childNodes) {
     if (!(node instanceof HTMLElement) && !(node instanceof SVGElement)) { inline.push(node); continue; }
     const el = node as HTMLElement, tag = el.tagName.toLowerCase();
-    if(el.dataset.wordAnchorGroup){
+    if(el.dataset.wordFloating){
+      await flush();result.push(new Paragraph({children:[await textBoxRun(el,numbering,commentMap)],spacing:{before:0,after:0,line:1}}));
+    }else if(el.dataset.wordAnchorGroup){
       await flush();
       const floating=el.querySelector<HTMLElement>(':scope > [data-word-floating]');
-      if(floating){
-        const boxBlocks=await blocks(floating,numbering,undefined,commentMap,Math.round(points(floating.style.width)*20));
-        const shape=new WpsShapeRun({type:'wps',children:boxBlocks.filter((b):b is Paragraph=>b instanceof Paragraph),transformation:{width:points(floating.style.width)/.75,height:points(floating.style.minHeight)/.75},
-          floating:{horizontalPosition:{relative:HorizontalPositionRelativeFrom.COLUMN,offset:Math.round(points(floating.style.left)*12700)},verticalPosition:{relative:VerticalPositionRelativeFrom.PARAGRAPH,offset:Math.round(points(floating.style.top)*12700)},allowOverlap:true,wrap:{type:TextWrappingType.NONE}},
-          bodyProperties:{margins:{top:3*12700,bottom:3*12700,left:5*12700,right:5*12700}},outline:{type:'solidFill',solidFillType:'rgb',value:'333333',width:6350},solidFill:{type:'rgb',value:'FFFFFF'}});
-        result.push(new Paragraph({children:[shape],spacing:{before:0,after:0,line:1}}));
-      }
-      const clone=el.cloneNode(true) as HTMLElement;clone.querySelector(':scope > [data-word-floating]')?.remove();
+      for(const box of el.querySelectorAll<HTMLElement>(':scope > [data-word-floating]'))result.push(new Paragraph({children:[await textBoxRun(box,numbering,commentMap)],spacing:{before:0,after:0,line:1}}));
+      const clone=el.cloneNode(true) as HTMLElement;clone.querySelectorAll(':scope > [data-word-floating]').forEach(n=>n.remove());
       if(floating){const ps=Array.from(clone.querySelectorAll<HTMLElement>(':scope > p'));const height=ps.reduce((sum,p)=>sum+(points(p.style.fontSize)||12)*(Number(p.style.lineHeight)||1.15)+points(p.style.marginTop)+points(p.style.marginBottom),0);const last=ps.at(-1);if(last)last.style.marginBottom=`${points(last.style.marginBottom)+Math.max(0,points(el.style.minHeight)-height)}pt`;}
       result.push(...await blocks(clone,numbering,list,commentMap,availableWidth));
     } else if (tag === 'table') {
@@ -105,7 +115,7 @@ async function blocks(parent: HTMLElement, numbering: { reference: string; level
             borders: { top: cellBorder(cell.style, 'Top'), bottom: cellBorder(cell.style, 'Bottom'), left: cellBorder(cell.style, 'Left'), right: cellBorder(cell.style, 'Right') },
           }));
         }
-        rows.push(new TableRow({ children: cells, tableHeader: row.parentElement?.tagName === 'THEAD', cantSplit: row.dataset.wordCantSplit === 'true', height: row.style.height ? { value: Math.round(points(row.style.height) * 20), rule: HeightRule.ATLEAST } : undefined }));
+        rows.push(new TableRow({ children: cells, tableHeader: row.parentElement?.tagName === 'THEAD', cantSplit: row.dataset.wordCantSplit === 'true', height: row.style.height ? { value: Math.round(points(row.style.height) * 20), rule: row.dataset.wordHeightRule==='exact'?HeightRule.EXACT:HeightRule.ATLEAST } : undefined }));
       }
       const columns = Array.from(el.querySelectorAll<HTMLTableColElement>(':scope > colgroup > col'));
       const tableWidth = el.style.width.endsWith('%') ? availableWidth * parseFloat(el.style.width) / 100 : points(el.style.width) * 20 || availableWidth;
@@ -129,9 +139,9 @@ async function blocks(parent: HTMLElement, numbering: { reference: string; level
       result.push(new Paragraph({ children, heading,
         run:{size:points(el.style.fontSize)*2||undefined,font:el.style.fontFamily||undefined},
         alignment: alignment === 'center' ? AlignmentType.CENTER : alignment === 'right' ? AlignmentType.RIGHT : alignment === 'justify' ? AlignmentType.BOTH : AlignmentType.LEFT,
-        bullet: tag === 'li' && list && !list.ordered ? { level: list.level } : undefined,
-        numbering: tag === 'li' && list?.ordered ? { reference: list.reference, level: list.level } : undefined,
-        spacing: { before: Math.round(points(el.style.marginTop) * 20), after: el.style.marginBottom ? Math.round(points(el.style.marginBottom) * 20) : 160, line: el.style.lineHeight ? Math.round(Number(el.style.lineHeight) * 240) || undefined : undefined },
+        bullet: tag === 'li' && list && !list.ordered && !el.dataset.wordListId ? { level: list.level } : undefined,
+        numbering: tag === 'li' && list?.ordered && !el.dataset.wordListId ? { reference: list.reference, level: list.level } : undefined,
+        spacing: { before: Math.round(points(el.style.marginTop) * 20), after: el.style.marginBottom ? Math.round(points(el.style.marginBottom) * 20) : 160, line: Number(el.dataset.wordLine)||(el.style.lineHeight?Math.round(Number(el.style.lineHeight)*240)||undefined:undefined),lineRule:el.dataset.wordLineRule==='exact'?'exact':el.dataset.wordLineRule==='atLeast'?'atLeast':undefined },
         indent: { left: Math.round(points(el.style.marginLeft) * 20), right: Math.round(points(el.style.marginRight) * 20), firstLine: Math.max(0, Math.round(points(el.style.textIndent) * 20)) },
         shading: color(el.style.backgroundColor) ? { fill: color(el.style.backgroundColor) } : undefined,
         border: el.style.borderBottom ? { bottom: { color: '64748B', style: BorderStyle.SINGLE, size: 6 } } : undefined,
@@ -153,7 +163,7 @@ export async function createDocxBlob(doc: WordDocument): Promise<Blob> {
   const commentMap = new Map((doc.comments || []).map((comment, index) => [comment.id, index]));
   const pages = doc.pages?.length ? doc.pages : [doc.content];
   for (const [index, html] of pages.entries()) {
-    if (index > 0) children.push(new Paragraph({ pageBreakBefore: true }));
+    if (index > 0) children.push(new Paragraph({ pageBreakBefore: true,spacing:{before:0,after:0,line:1,lineRule:'exact'},run:{size:2} }));
     const dom = new DOMParser().parseFromString(html, 'text/html');
     if (doc.firstLineIndentCm) dom.body.querySelectorAll<HTMLElement>('p').forEach(p => { if (!p.style.textIndent) p.style.textIndent = `${doc.firstLineIndentCm}cm`; });
     children.push(...await blocks(dom.body, numbering, undefined, commentMap, availableWidth));
