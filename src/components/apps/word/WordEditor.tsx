@@ -3,7 +3,7 @@ import './word-workspace.css';
 import { createPortal } from 'react-dom';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  FileText,
+  FileText, FolderOpen, History,
   Save,
   ArrowLeft,
   Sparkles,
@@ -15,7 +15,7 @@ import {
 import type { WordDocument, SaveStatus, VectorShape, BitmapImage, ActiveFormatting } from '../../../types/doc';
 import {
   saveLocalDocument,
-  saveAutoSaveDraft,
+  chooseDocumentFolder, documentStorageError, getWordStorageState, getDocumentHistory, readDocumentVersion, type WordVersion,
   getAutoSaveDraft,
   createNewDocument,
 } from '../../../services/docService';
@@ -84,7 +84,10 @@ const rgbToHex = (rgbStr: string): string => {
 export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackToHub, importNotice = '' }) => {
   const [wordDoc, setWordDoc] = useState<WordDocument>(initialDocument);
   const [docTitle, setDocTitle] = useState<string>(initialDocument.title);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
+  const [historyOpen,setHistoryOpen]=useState(false);
+  const [historyVersions,setHistoryVersions]=useState<WordVersion[]>([]);
+  const [historyBusy,setHistoryBusy]=useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>(getWordStorageState().ready?'saved':'unsaved');
   const [lastSavedTime, setLastSavedTime] = useState<string>('agora');
   const [showDraftRestoredBanner, setShowDraftRestoredBanner] = useState<boolean>(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
@@ -153,6 +156,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const selectionRef = useRef<Range | null>(null);
   const formatPainterRef = useRef<ActiveFormatting | null>(null);
   const initializedSave = useRef(false);
+  const saveRevision = useRef(0);
   const latestDocument = useRef<() => WordDocument>(() => initialDocument);
   const canDictate = typeof window !== 'undefined' && Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
   const portraitWidth = pageSize === 'a4' ? 21 : 21.59;
@@ -471,7 +475,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     setOrientation(doc.orientation || 'portrait'); setPageSize(doc.pageSize || 'a4'); setComments(doc.comments || []);
     setHeaderText(doc.headerText || ''); setFooterText(doc.footerText || ''); setPageNumbers(doc.pageNumbers || false);
     setHeaderHtml(doc.headerHtml||'');setFooterHtml(doc.footerHtml||'');
-    setHasUnsavedChanges(recovered); setSaveStatus(recovered ? 'draft_restored' : 'saved');
+    setHasUnsavedChanges(recovered); setSaveStatus(recovered ? 'draft_restored' : getWordStorageState().ready?'saved':'unsaved');
     requestAnimationFrame(() => {
       editorContainerRef.current?.scrollTo({ top: 0, left: 0 });
       const page = pageRefs.current[0];
@@ -489,20 +493,21 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   }, [initialDocument.id]);
 
   useEffect(() => {
+    const revision = ++saveRevision.current;
     if (!initializedSave.current) { initializedSave.current = true; return; }
+    let active = true;
     setHasUnsavedChanges(true); setSaveStatus('unsaved');
     if (!autoSave) return;
-    const timer = window.setTimeout(() => {
+    const timer = window.setTimeout(async () => {
       try {
         setSaveStatus('saving');
-        const doc = latestDocument.current();
-        saveAutoSaveDraft(doc.id, doc.content, doc.title, doc);
-        const saved = saveLocalDocument(doc); setWordDoc(saved);
-        setSaveStatus('saved'); setHasUnsavedChanges(false);
+        const saved = await saveLocalDocument(latestDocument.current());
+        if (!active || revision !== saveRevision.current) return;
+        setWordDoc(saved); setSaveStatus('saved'); setHasUnsavedChanges(false);
         setLastSavedTime(new Date().toLocaleTimeString('pt-BR'));
-      } catch { setSaveStatus('error'); setNotice('Não foi possível salvar. Verifique o espaço do navegador ou baixe uma cópia do documento.'); }
+      } catch (error) { if(active){setSaveStatus('error'); setNotice(documentStorageError(error));} }
     }, 1200);
-    return () => window.clearTimeout(timer);
+    return () => {active=false;window.clearTimeout(timer);};
   }, [pages, docTitle, paperTheme, paperMargin, leftMarginCm, rightMarginCm, topMarginCm, bottomMarginCm, firstLineIndentCm, watermarkText, comments, headerText, footerText, headerHtml, footerHtml, pageNumbers, orientation, pageSize, autoSave, wordDoc.id]);
 
   const handleContentInput = () => {
@@ -674,13 +679,16 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   };
 
   // Explicit save and export always include the current DOM and page layout.
-  const handleSaveToBackend = () => {
+  const handleSaveToBackend = async () => {
+    const revision=saveRevision.current;
+    const snapshot=latestDocument.current();
     try {
-      const doc = latestDocument.current();
-      const saved = saveLocalDocument(doc); saveAutoSaveDraft(doc.id, doc.content, doc.title, doc);
+      setSaveStatus('saving');
+      const saved = await saveLocalDocument(snapshot,{checkpoint:true});
+      if(revision!==saveRevision.current&&JSON.stringify({...latestDocument.current(),updatedAt:''})!==JSON.stringify({...snapshot,updatedAt:''})){setNotice('Há alterações mais recentes. Aguarde o salvamento ou salve novamente antes de sair.');return false;}
       setWordDoc(saved); setSaveStatus('saved'); setHasUnsavedChanges(false);
       setLastSavedTime(new Date().toLocaleTimeString('pt-BR')); return true;
-    } catch { setSaveStatus('error'); setNotice('Não foi possível salvar neste navegador. Baixe uma cópia do documento.'); return false; }
+    } catch (error) { setSaveStatus('error'); setNotice(documentStorageError(error)); return false; }
   };
   const handleExportDocx = async () => {
     try { await exportToDocx(latestDocument.current()); setNotice('Arquivo DOCX exportado.'); }
@@ -945,9 +953,9 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     handleContentInput();
   };
 
-  const handleCreateNewDoc = () => {
-    if (hasUnsavedChanges && !handleSaveToBackend()) return;
-    try { applyDocument(createNewDocument('Documento sem título')); } catch { setNotice('Não foi possível criar o documento neste navegador.'); }
+  const handleCreateNewDoc = async () => {
+    if (hasUnsavedChanges && !await handleSaveToBackend()) return;
+    try { applyDocument(await saveLocalDocument(createNewDocument('Documento sem título'))); } catch(error) { setNotice(documentStorageError(error)); }
   };
 
   const downloadText = (extension: string, content: string, type: string) => {
@@ -965,26 +973,28 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     if (selection.isCollapsed) return [node?.closest<HTMLElement>('p,h1,h2,h3,h4,li,blockquote') || page];
     return [...page.querySelectorAll<HTMLElement>('p,h1,h2,h3,h4,li,blockquote')].filter(block => range.intersectsNode(block));
   };
-  const handleMerge = (rows: Record<string, string>[]) => {
+  const handleMerge = async (rows: Record<string, string>[]) => {
+    let created=0;
     try {
       const template = latestDocument.current();
-      rows.forEach((row, index) => {
+      for (const [index,row] of rows.entries()) {
         const mergedPages = (template.pages || [template.content]).map(html => {
           const dom = new DOMParser().parseFromString(html, 'text/html');
           const walker = document.createTreeWalker(dom.body, NodeFilter.SHOW_TEXT); let node: Node | null;
           while ((node = walker.nextNode())) node.textContent = (node.textContent || '').replace(/\{\{\s*([^{}]+?)\s*\}\}/g, (match, field) => Object.hasOwn(row, field) ? String(row[field]) : match);
           return dom.body.innerHTML;
         });
-        saveLocalDocument({ ...template, id: `merge-${Date.now()}-${index}`, title: `${template.title} — ${String(row.nome || index + 1)}`, pages: mergedPages, content: mergedPages.join('<div class="a4-page-break"></div>') });
-      });
+        await saveLocalDocument({ ...template, id: `merge-${Date.now()}-${index}`, title: `${template.title} — ${String(row.nome || index + 1)}`, pages: mergedPages, content: mergedPages.join('<div class="a4-page-break"></div>') });
+        created++;
+      }
       setNotice(`${rows.length} correspondência(s) criada(s). Abra em Arquivo → Abrir documentos.`);
-    } catch { setNotice('Não foi possível gerar todas as correspondências. Verifique o espaço disponível no navegador.'); }
+    } catch(error) { setNotice(`${created} correspondência(s) salva(s). ${documentStorageError(error)}`); }
   };
 
   const handleAction = async (action: string, value?: string) => {
     try {
-      if (action === 'new') { handleCreateNewDoc(); return; }
-      if (action === 'save') { handleSaveToBackend(); return; }
+      if (action === 'new') { await handleCreateNewDoc(); return; }
+      if (action === 'save') { await handleSaveToBackend(); return; }
       if (action === 'docx') { await handleExportDocx(); return; }
       if (action === 'share') {
         const file = new File([await createDocxBlob(latestDocument.current())], `${docTitle.replace(/[\\/:*?"<>|]/g, '') || 'documento'}.docx`, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
@@ -1110,8 +1120,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       {/* Sticky Fixed Toolbar & Controls Block */}
       <div className="word-toolbar-shell shrink-0 z-30 bg-white dark:bg-slate-900 shadow-md border-b border-slate-200/80 dark:border-slate-800">
         <header className="word-titlebar">
-          <div className="word-quick-actions"><FileText size={20} /><label className="word-autosave">Salvamento automático <input type="checkbox" checked={autoSave} onChange={e => setAutoSave(e.target.checked)} aria-label="Salvamento automático" /></label><button title="Salvar (Ctrl+S)" aria-label="Salvar documento" onMouseDown={e => e.preventDefault()} onClick={handleSaveToBackend}><Save size={17} /></button><button title="Desfazer" onMouseDown={e => e.preventDefault()} onClick={() => handleExecCommand('undo')}><Undo2 size={17} /></button><button title="Refazer" onMouseDown={e => e.preventDefault()} onClick={() => handleExecCommand('redo')}><Redo2 size={17} /></button></div>
-          <div className="word-document-title"><input aria-label="Nome do documento" value={docTitle} onChange={e => setDocTitle(e.target.value)} /><small role="status">{saveStatus === 'saved' ? 'Salvo neste navegador · ' + lastSavedTime : saveStatus === 'saving' ? 'Salvando…' : saveStatus === 'error' ? 'Erro ao salvar' : 'Alterações não salvas'}</small></div>
+          <div className="word-quick-actions"><FileText size={20} /><label className="word-autosave">Salvamento automático <input type="checkbox" checked={autoSave} onChange={e => setAutoSave(e.target.checked)} aria-label="Salvamento automático" /></label><button title="Salvar (Ctrl+S)" aria-label="Salvar documento" onMouseDown={e => e.preventDefault()} onClick={handleSaveToBackend}><Save size={17} /></button><button title="Pasta de documentos" aria-label="Pasta de documentos" onClick={async()=>{try{await chooseDocumentFolder();setNotice(`Pasta conectada: ${getWordStorageState().folder}`);}catch(error){setNotice(documentStorageError(error));}}}><FolderOpen size={17}/></button><button title="Histórico de versões" aria-label="Histórico de versões" onClick={async()=>{setHistoryOpen(true);setHistoryBusy(true);try{setHistoryVersions(await getDocumentHistory(wordDoc.id));}catch(error){setNotice(documentStorageError(error));}finally{setHistoryBusy(false);}}}><History size={17}/></button><button title="Desfazer" onMouseDown={e => e.preventDefault()} onClick={() => handleExecCommand('undo')}><Undo2 size={17} /></button><button title="Refazer" onMouseDown={e => e.preventDefault()} onClick={() => handleExecCommand('redo')}><Redo2 size={17} /></button></div>
+          <div className="word-document-title"><input aria-label="Nome do documento" value={docTitle} onChange={e => setDocTitle(e.target.value)} /><small role="status">{saveStatus === 'saved' ? 'Salvo no computador · ' + lastSavedTime : saveStatus === 'saving' ? 'Salvando…' : saveStatus === 'error' ? 'Erro ao salvar' : 'Alterações não salvas'}</small></div>
           <div className="word-command-search"><Search size={16} /><input aria-label="Pesquisar comandos" placeholder="Pesquisar comandos e ajuda" value={commandSearch} onChange={e => setCommandSearch(e.target.value)} />{commandSearch && <div className="word-command-results">{[['save','Salvar documento'],['docx','Baixar DOCX'],['open','Abrir documentos'],['import','Importar arquivo'],['find','Localizar e substituir'],['comment','Novo comentário'],['print','Imprimir / PDF'],['help','Ajuda e atalhos']].filter(([, label]) => label.toLowerCase().includes(commandSearch.toLowerCase())).map(([action, label]) => <button key={action} onMouseDown={e => e.preventDefault()} onClick={() => { handleAction(action); setCommandSearch(''); }}>{label}</button>)}</div>}</div>
           <button className="word-comments-button" onClick={() => setPanel('comments')}><MessageSquare size={17} /><span>Comentários</span></button>
           <select aria-label="Modo de edição" value={readOnly ? 'read' : 'edit'} onChange={e => setReadOnly(e.target.value === 'read')}><option value="edit">Editando</option><option value="read">Leitura</option></select>
@@ -1368,21 +1378,22 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       </main>
 
       <footer className="word-statusbar"><div><span>Página {activePageIndex + 1} de {pages.length}</span><span>{wordCount} palavras</span><span className="word-status-optional">{charCount} caracteres</span><span className="word-status-optional">Português (Brasil)</span></div><div><button onClick={() => setFocusMode(v => !v)} aria-pressed={focusMode}>Foco</button><button onClick={() => setReadOnly(v => !v)} aria-pressed={readOnly}>{readOnly ? 'Editar' : 'Leitura'}</button><button aria-label="Diminuir zoom" onClick={() => setZoom(z => Math.max(40, z - 10))}>−</button><input type="range" min={40} max={160} step={5} aria-label="Zoom do documento" value={zoom} onChange={e => setZoom(Number(e.target.value))} /><button aria-label="Aumentar zoom" onClick={() => setZoom(z => Math.min(160, z + 10))}>+</button><span>{zoom}%</span></div></footer>
-      <button className="word-back-button" aria-label="Voltar para documentos" title="Voltar para documentos" onClick={() => { if (!hasUnsavedChanges || handleSaveToBackend()) onBackToHub(); }}><ArrowLeft size={19} /></button>
+      <button className="word-back-button" aria-label="Voltar para documentos" title="Voltar para documentos" onClick={async () => { if (!hasUnsavedChanges || await handleSaveToBackend()) onBackToHub(); }}><ArrowLeft size={19} /></button>
+      {historyOpen&&<div className="word-dialog-backdrop" role="dialog" aria-modal="true" aria-label="Histórico de versões"><section className="word-dialog"><header><h2>Histórico de versões</h2><button aria-label="Fechar histórico" disabled={historyBusy} onClick={()=>setHistoryOpen(false)}><X size={20}/></button></header><p>Versões anteriores ficam na subpasta Historico-Word. São guardadas ao salvar manualmente ou a cada cinco minutos de alterações. Restaurar preserva a versão atual no histórico.</p>{historyBusy?<p role="status">Carregando…</p>:!historyVersions.length?<p>Nenhuma versão anterior. O histórico começa depois da primeira alteração salva.</p>:<div className="word-document-list">{historyVersions.map(version=><button key={version.name} disabled={historyBusy} onClick={async()=>{setHistoryBusy(true);try{const versionDoc=await readDocumentVersion(wordDoc.id,version.name);if(!await handleSaveToBackend())return;const restored=await saveLocalDocument(versionDoc,{checkpoint:true});applyDocument(restored);setHistoryOpen(false);setNotice('Versão restaurada. A versão anterior foi preservada no histórico.');}catch(error){setNotice(documentStorageError(error));}finally{setHistoryBusy(false);}}}><History size={20}/><span><strong>{version.title}</strong><small>{new Date(version.savedAt).toLocaleString('pt-BR')} · Restaurar</small></span></button>)}</div>}</section></div>}
       {notice && <div className="word-notice" role="status">{notice}<button onClick={() => setNotice('')} aria-label="Fechar aviso"><X size={16} /></button></div>}
       <input ref={inputFileRef} type="file" accept=".docx,.dotx,.docm,.dotm,.doc,.html,.htm,.txt" hidden onChange={async e => {
         const file = e.target.files?.[0]; if (!file) return;
         try {
-          if (hasUnsavedChanges && !handleSaveToBackend()) return;
+          if (hasUnsavedChanges && !await handleSaveToBackend()) return;
           const result = await importWordFile(file);
           const doc = createNewDocument(result.title);
-          const imported = saveLocalDocument({ ...doc, ...result.settings, content: result.html, pages: result.settings?.pages||[result.html] });
+          const imported = await saveLocalDocument({ ...doc, ...result.settings, content: result.html, pages: result.settings?.pages||[result.html] });
           applyDocument(imported);
           setNotice(result.warnings ? 'Documento importado. Alguns recursos avançados do arquivo podem ter sido simplificados.' : 'Documento importado.');
         } catch (error) { setNotice(error instanceof Error ? error.message : 'Não foi possível importar o arquivo.'); }
         finally { e.target.value = ''; }
       }} />
-      <WordPanels panel={panel} close={() => setPanel(null)} current={latestDocument.current()} open={doc => { if (!hasUnsavedChanges || handleSaveToBackend()) applyDocument(doc); }} source={pages[activePageIndex] || ''} applySource={html => { const page = pageRefs.current[activePageIndex]; if (page) { page.innerHTML = cleanWordHtml(html); handleContentInput(); } }} merge={handleMerge} removeComment={id => { document.querySelectorAll<HTMLElement>('[data-comment-id]').forEach(node => { if (node.dataset.commentId === id) node.replaceWith(...node.childNodes); }); setComments(items => items.filter(item => item.id !== id)); handleContentInput(); }} />
+      <WordPanels panel={panel} close={() => setPanel(null)} current={latestDocument.current()} open={async doc => { if (!hasUnsavedChanges || await handleSaveToBackend()) applyDocument(doc); }} source={pages[activePageIndex] || ''} applySource={html => { const page = pageRefs.current[activePageIndex]; if (page) { page.innerHTML = cleanWordHtml(html); handleContentInput(); } }} merge={handleMerge} removeComment={id => { document.querySelectorAll<HTMLElement>('[data-comment-id]').forEach(node => { if (node.dataset.commentId === id) node.replaceWith(...node.childNodes); }); setComments(items => items.filter(item => item.id !== id)); handleContentInput(); }} />
       {inkOpen && <WordInkPad close={() => setInkOpen(false)} insert={handleInsertImage} />}
 
       {/* Context Menu on Right Click */}

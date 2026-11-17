@@ -1,0 +1,53 @@
+import {createNewDocument,getLocalDocuments,initializeDocumentStorage,chooseDocumentFolder,getWordStorageState,getAutoSaveDraft,importNeivaWordFile,saveLocalDocument,documentStorageError,getDocumentHistory,readDocumentVersion} from '../src/services/docService';
+const results:{name:string;passed:boolean}[]=[];
+const check=(name:string,passed:boolean)=>{results.push({name,passed});if(!passed)throw new Error(name);};
+// A simulated directory isolates these checks from the user's files and permissions.
+const files=new Map<string,string>();let failWrite=false,failReadback=false,failPermission=false,cancel=false;
+const handle=(name:string)=>({kind:'file',name,async getFile(){return new File([files.get(name)||''],name);},async createWritable(){let pending='';return {async write(value:string){if(failWrite)throw new DOMException('Disk full','QuotaExceededError');pending=value;},async close(){files.set(name,failReadback?pending+' ':pending);},async abort(){}};}});
+const subfolders=new Map<string,Map<string,string>>();
+const subfolder=(path:string):any=>({name:path,kind:'directory',async *entries(){for(const name of subfolders.get(path)!.keys())yield[name,subfile(path,name)];},async getFileHandle(name:string,options?:{create?:boolean}){if(!subfolders.get(path)!.has(name)&&!options?.create)throw new DOMException('Missing','NotFoundError');return subfile(path,name);},async getDirectoryHandle(name:string,options?:{create?:boolean}){return directoryAt(path+'/'+name,options);}});
+const subfile=(path:string,name:string)=>({kind:'file',name,async getFile(){return new File([subfolders.get(path)!.get(name)||''],name);},async createWritable(){let pending='';return {async write(value:string){if(failWrite)throw new DOMException('Disk full','QuotaExceededError');pending=value;},async close(){subfolders.get(path)!.set(name,pending);},async abort(){}};}});
+function directoryAt(path:string,options?:{create?:boolean}){if(!subfolders.has(path)){if(!options?.create)throw new DOMException('Missing','NotFoundError');subfolders.set(path,new Map());}return subfolder(path);}
+const folder={async getDirectoryHandle(name:string,options?:{create?:boolean}){return directoryAt(name,options);},name:'Pasta de testes',kind:'directory',async queryPermission(){return 'granted';},async *entries(){for(const name of files.keys())yield[name,handle(name)];},async getFileHandle(name:string,options?:{create?:boolean}){if(failPermission)throw new DOMException('Denied','NotAllowedError');if(!files.has(name)&&!options?.create)throw new DOMException('Not found','NotFoundError');return handle(name);}};
+Object.defineProperty(window,'showDirectoryPicker',{configurable:true,value:async()=>{if(cancel)throw new DOMException('Cancel','AbortError');return folder;}});
+const KEY='sistema_pontos_word_documents_v1',PREFIX='sistema_pontos_word_draft_';
+async function run(){
+  check('Constructor does not persist phantom blank files',getLocalDocuments().length===0&&!!createNewDocument().id);
+  const old={...createNewDocument('Documento antigo'),content:'<p>Conteúdo original</p>',pages:['<p>Conteúdo original</p>'],headerHtml:'<p>Cabeçalho</p>',footerHtml:'<p>Rodapé</p>'};
+  const newer={...old,content:'<p>Última edição</p>',pages:['<p>Última edição</p>'],updatedAt:'2090-01-01T00:00:00.000Z'};
+  const draft={docId:old.id,title:old.title,content:newer.content,document:newer,savedAt:newer.updatedAt};
+  localStorage.setItem(KEY,JSON.stringify([old]));localStorage.setItem(PREFIX+old.id,JSON.stringify(draft));
+  await initializeDocumentStorage();check('Legacy documents remain readable before folder selection',getLocalDocuments()[0].content===old.content);
+  failWrite=true;try{await chooseDocumentFolder();}catch{}check('Failed migration preserves document and draft',!!localStorage.getItem(KEY)&&!!localStorage.getItem(PREFIX+old.id)&&!getWordStorageState().ready);
+  failWrite=false;failReadback=true;try{await chooseDocumentFolder();}catch{}check('Readback failure preserves both legacy keys',!!localStorage.getItem(KEY)&&!!localStorage.getItem(PREFIX+old.id));
+  files.clear();failReadback=false;await chooseDocumentFolder();
+  const migrated=JSON.parse([...files.values()][0]);check('Migration preserves content, pages, header and footer',migrated.document.content===old.content&&migrated.document.pages[0]===old.pages[0]&&migrated.document.headerHtml===old.headerHtml&&migrated.document.footerHtml===old.footerHtml);
+  check('Migration preserves the complete newer draft',migrated.draft.document.content===newer.content&&getAutoSaveDraft(old.id)?.content===newer.content);
+  check('Old browser copies removed only after confirmed disk write',localStorage.getItem(KEY)===null&&localStorage.getItem(PREFIX+old.id)===null);
+  const recovered=await importNeivaWordFile(new File([JSON.stringify(migrated)],'copy.neiva-word.json'));check('Opening migrated project recovers newest draft',recovered.content===newer.content);
+  const large={...createNewDocument('Mais de seis MB'),content:'<p>'+('x'.repeat(6*1024*1024))+'</p>'};
+  const nativeSet=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new DOMException('Browser full','QuotaExceededError');};
+  const saved=await saveLocalDocument(large);Storage.prototype.setItem=nativeSet;
+  check('Large document saves with browser storage unavailable',getLocalDocuments().some(d=>d.id===saved.id)&&[...files.values()].some(raw=>raw.length>6*1024*1024));
+  const before=getLocalDocuments().find(d=>d.id===saved.id)!;failWrite=true;let failed=false;try{await saveLocalDocument({...saved,content:'<p>Must not appear saved</p>'});}catch{failed=true;}failWrite=false;
+  check('Failed write does not advance saved content or timestamp',failed&&getLocalDocuments().find(d=>d.id===saved.id)?.content===before.content&&getLocalDocuments().find(d=>d.id===saved.id)?.updatedAt===before.updatedAt);
+  await Promise.all([saveLocalDocument({...saved,content:'<p>First</p>'}),saveLocalDocument({...saved,content:'<p>Second</p>'})]);
+  check('Concurrent writes are serialized, newest edit wins',getLocalDocuments().find(d=>d.id===saved.id)?.content==='<p>Second</p>');
+  const versions=await getDocumentHistory(saved.id);check('Changed documents retain a previous version on disk',versions.length===1);
+  const previous=await readDocumentVersion(saved.id,versions[0].name);check('History preserves full previous content',previous.content===large.content);
+  await saveLocalDocument({...saved,content:'<p>Manual checkpoint</p>'},{checkpoint:true});
+  const manualVersions=await getDocumentHistory(saved.id);check('Explicit save adds checkpoint without duplicating each autosave',manualVersions.length===2);
+  const restore=await readDocumentVersion(saved.id,manualVersions[0].name);await saveLocalDocument(restore,{checkpoint:true});
+  check('Restoring history keeps the replaced current version',getLocalDocuments().find(d=>d.id===saved.id)?.content==='<p>Second</p>'&&(await getDocumentHistory(saved.id)).length===3);
+  const name=[...files.keys()].find(n=>JSON.parse(files.get(n)!).document.id===saved.id)!;
+  const external=JSON.parse(files.get(name)!);external.document.updatedAt='2099-01-01T00:00:00.000Z';external.document.content='<p>Another window</p>';files.set(name,JSON.stringify(external));
+  let conflict=false;try{await saveLocalDocument({...saved,content:'Overwrite'});}catch{conflict=true;}check('External edits are protected against silent overwrite',conflict&&JSON.parse(files.get(name)!).document.content==='<p>Another window</p>');
+  files.set('broken.neiva-word.json','invalid JSON');await chooseDocumentFolder();check('Corrupt file is preserved and reported',files.has('broken.neiva-word.json')&&getWordStorageState().warning.includes('inválido'));
+  failPermission=true;let denied=false;try{await saveLocalDocument(createNewDocument());}catch(error){denied=documentStorageError(error).includes('reconectar');}failPermission=false;check('Permission revocation produces actionable message',denied);
+  cancel=true;let cancelled=false;try{await chooseDocumentFolder();}catch(error){cancelled=documentStorageError(error).includes('cancelada');}check('Cancelled folder selection preserves current documents',cancelled&&getWordStorageState().ready&&getLocalDocuments().length===2);
+  const malicious={...createNewDocument('Teste'),content:'<p onclick="alert(1)">Seguro</p><script>alert(1)</script>',headerHtml:'<img src="x" onerror="alert(1)">'};
+  const safe=await importNeivaWordFile(new File([JSON.stringify({format:'neiva-word',version:1,document:malicious})],'safe.neiva-word.json'));
+  check('Imported project HTML cannot execute document scripts',!safe.content.includes('onclick')&&!safe.content.includes('<script')&&!safe.headerHtml?.includes('onerror'));
+  document.querySelector('#result')!.textContent=JSON.stringify({passed:true,results},null,2);
+}
+run().catch(error=>{document.querySelector('#result')!.textContent=JSON.stringify({passed:false,error:String(error),results},null,2);});
