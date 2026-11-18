@@ -1,0 +1,31 @@
+const{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),fs=require('node:fs'),assert=require('node:assert/strict');
+const base=process.env.WORD_TEST_URL||'http://127.0.0.1:4186';
+const eventually=async action=>{const end=Date.now()+90000;while(Date.now()<end){try{if(await action())return;}catch{}await new Promise(resolve=>setTimeout(resolve,100));}throw Error('Header test timed out');};
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true}),checks=[];try{
+ const page=await browser.newPage({viewport:{width:1600,height:1000}}),errors=[];page.on('pageerror',error=>errors.push(String(error)));
+ const check=(name,value)=>{assert.ok(value,name);checks.push(name);};
+ await page.goto(base+'/tests/wordcraft-regression.html');await page.getByRole('button',{name:'Documento em branco',exact:true}).click();
+ const execute=(command,params={})=>page.evaluate(({command,params})=>document.querySelector('iframe').contentWindow.wordcraft.execute(command,params),{command,params});
+ const inspect=()=>page.evaluate(()=>document.querySelector('iframe').contentWindow.wordcraft.docInspect());
+ const close=page.getByRole('button',{name:'Fechar cabeçalho e rodapé',exact:true});
+ await eventually(async()=>(await inspect()).pages>0);
+ check('Close action is hidden during body editing',await close.count()===0);
+ await execute('text.insert',{text:'CORPO ORIGINAL'});await execute('insert.editHeader',{page:0});await execute('text.insert',{text:'CABEÇALHO PRESERVADO'});
+ await close.waitFor();const header=await inspect();check('Close action appears when editing the header',true);
+ await page.screenshot({path:'output/playwright/wordcraft-close-header.png'});await close.click();
+ await eventually(async()=>(await execute('document.selection')).anchor.story==='body');check('Clicking close invokes the native return to body',true);
+ check('Closing preserves header content and undo history',JSON.stringify((await inspect()).parts)===JSON.stringify(header.parts)&&(await inspect()).canUndo===header.canUndo);
+ await page.keyboard.type(' TEXTO NO CORPO');await eventually(async()=>JSON.stringify((await inspect()).blocks).includes('TEXTO NO CORPO'));const body=await inspect();check('Keyboard focus returns to the document body',!JSON.stringify(body.parts).includes('TEXTO NO CORPO'));
+ await eventually(async()=>await close.count()===0);
+ await execute('insert.editFooter',{page:0});await execute('text.insert',{text:'RODAPÉ PRESERVADO'});await close.waitFor();const footer=await inspect();await close.click();
+ await eventually(async()=>(await execute('document.selection')).anchor.story==='body');check('The same action closes the footer without changing either part',JSON.stringify((await inspect()).parts)===JSON.stringify(footer.parts));
+ // Open the existing header through the canvas with the real mouse.
+ await execute('caret.docStart');await page.getByRole('button',{name:'Salvar',exact:true}).click();await eventually(()=>page.evaluate(()=>document.querySelector('.craft-status')?.textContent==='Salvo neste navegador'));await page.getByText(/^Salvo neste navegador ·/).waitFor();await page.waitForTimeout(200);
+ const geometry=await page.evaluate(async()=>{const frame=document.querySelector('iframe'),ui=await frame.contentWindow.wordcraft.uiInspect(),bounds=frame.getBoundingClientRect();return{page:ui.pages[0],x:bounds.x,y:bounds.y};});
+ console.log('HEADER GEOMETRY',geometry);
+ await page.screenshot({path:'output/playwright/wordcraft-header-before-double.png'});
+ await page.mouse.dblclick(geometry.x+geometry.page[0]+120,geometry.y+geometry.page[1]+40);
+ await close.waitFor({timeout:10000});check('Double-clicking the header also exposes the close button',true);await close.click();await eventually(async()=>(await execute('document.selection')).anchor.story==='body');
+ check('Body text, header and footer remain intact',JSON.stringify((await inspect()).parts)===JSON.stringify(footer.parts)&&JSON.stringify((await inspect()).blocks).includes('CORPO ORIGINAL'));
+ check('No unhandled browser errors',errors.length===0);const report={passed:true,checks};fs.writeFileSync('output/playwright/wordcraft-header-result.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+}finally{await browser.close();}})().catch(error=>{console.error(error);process.exitCode=1});

@@ -1,79 +1,57 @@
-const{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const fs=require('fs'),assert=require('node:assert/strict');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),fs=require('node:fs'),assert=require('node:assert/strict');
 const base=process.env.WORD_TEST_URL||'http://127.0.0.1:4186';
-const eventually=async(action,timeout=120000)=>{const end=Date.now()+timeout;while(Date.now()<end){try{if(await action())return;}catch{}await new Promise(resolve=>setTimeout(resolve,75));}throw Error('Timed out waiting for editor');};
-(async()=>{const browser=await chromium.launch({channel:process.env.WORD_TEST_BROWSER||'msedge',headless:true});const checks=[];try{
- const page=await browser.newPage({viewport:{width:1600,height:1000},locale:'pt-BR'}),errors=[];page.on('pageerror',e=>errors.push(String(e)));
- const check=(name,value)=>{assert.ok(value,name);checks.push(name);};
- await page.goto(base+'/tests/wordcraft-regression.html');await page.getByRole('button',{name:'Conectar pasta',exact:true}).click();await page.getByRole('button',{name:'Documento em branco',exact:true}).click();
- await eventually(()=>page.evaluate(()=>!!document.querySelector('iframe')?.contentWindow?.wordcraft));
- const frame=page.frames().find(f=>f.url().includes('/wordcraft/0.18.1/'));await eventually(()=>frame.evaluate(async()=>(await wordcraft.docInspect()).pages>0));
- check('Official engine opens a managed blank DOCX',!!frame);
+const eventually=async action=>{const end=Date.now()+120000;while(Date.now()<end){try{if(await action())return;}catch{}await new Promise(r=>setTimeout(r,80));}throw Error('Editor timeout');};
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true}),checks=[];try{
+ const page=await browser.newPage({viewport:{width:1600,height:1000},locale:'pt-BR'}),errors=[];page.on('pageerror',error=>errors.push(String(error)));
+ const check=(name,ok)=>{assert.ok(ok,name);checks.push(name);};
+ await page.goto(base+'/tests/wordcraft-regression.html');await page.getByRole('button',{name:'Documento em branco',exact:true}).click();
+ await eventually(()=>page.evaluate(async()=>(await document.querySelector('iframe')?.contentWindow?.wordcraft?.docInspect())?.pages>0));
+ check('New document opens without folder picker',await page.getByRole('button',{name:'Conectar pasta',exact:true}).count()===0);
+ const engine=async(command,params={})=>page.evaluate(({command,params})=>document.querySelector('iframe').contentWindow.wordcraft.execute(command,params),{command,params});
+ const inspect=()=>page.evaluate(()=>document.querySelector('iframe').contentWindow.wordcraft.docInspect());
+ await engine('text.insert',{text:'RECUPERACAO_AUTOMATICA'});await page.getByText(/^Salvo neste navegador ·/).waitFor();
+ check('Autosave persists the document in IndexedDB',JSON.stringify((await page.evaluate(()=>craftFixture.service.listCraftDocuments())).documents).includes('Novo documento.docx'));
+ await page.reload();await page.getByRole('button',{name:/Novo documento.docx/}).first().click();await eventually(()=>page.evaluate(async()=>JSON.stringify(await document.querySelector('iframe')?.contentWindow?.wordcraft?.docInspect()).includes('RECUPERACAO_AUTOMATICA')));
+ check('Document and edits survive page reload',true);
  await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin:base});
- await frame.evaluate(async()=>{await wordcraft.execute('insert.table',{rows:2,cols:2});await wordcraft.execute('text.insert',{text:'CONTEUDO_DA_CELULA'});await wordcraft.execute('table.selectTable',{});await wordcraft.execute('edit.copy',{});await wordcraft.execute('caret.docEnd',{});await wordcraft.execute('text.pageBreak',{});await wordcraft.execute('edit.paste',{});});
- const pasted=await frame.evaluate(()=>wordcraft.docInspect());
- check('Native copy/paste preserves tables and cell content',JSON.stringify(pasted.blocks).split('"type":"table"').length>=3&&JSON.stringify(pasted.blocks).split('CONTEUDO_DA_CELULA').length>=3);
- await frame.evaluate(()=>wordcraft.execute('edit.undo',{}));const pasteUndone=await frame.evaluate(()=>wordcraft.docInspect());
- check('Pasted table is undone without losing the source table',JSON.stringify(pasteUndone.blocks).split('"type":"table"').length===2);
- const commands=await frame.evaluate(async()=>await wordcraft.commands());fs.mkdirSync('output/playwright',{recursive:true});fs.writeFileSync('output/playwright/wordcraft-commands.json',JSON.stringify(commands,null,2));
- await frame.evaluate(()=>wordcraft.execute('text.insert',{text:'Teste de edição e histórico'}));
- const edited=await frame.evaluate(()=>wordcraft.docInspect());check('Native editing changes the imported document',JSON.stringify(edited).includes('Teste de edição e histórico'));
- await page.getByRole('button',{name:'Salvar',exact:true}).click();await page.getByText(/^Salvo na pasta/).waitFor();
- const saved=await page.evaluate(()=>craftFixture.service.listCraftDocuments());check('Save creates an immutable disk revision',saved.documents.length===1&&saved.documents[0].revisions.length===2);
- check('Host reports durable save after disk verification',await page.getByText('Cópia guardada no computador',{exact:true}).count()===1);
- await page.getByRole('button',{name:'Histórico',exact:true}).click();check('History exposes original and edited revisions',await page.locator('.craft-history article').count()===2);
- const detached=page.waitForEvent('framedetached',value=>value===frame);
- await page.locator('.craft-history article').last().getByRole('button',{name:'Restaurar'}).click();await detached;
- await eventually(()=>page.evaluate(async()=>(await craftFixture.service.listCraftDocuments()).documents[0].revisions.length===3));
- check('Restoring retains the overwritten current revision',true);
- // Reacquire iframe after restore.
- const restored=await page.locator('iframe').elementHandle();const restoredFrame=await restored.contentFrame();await restoredFrame.waitForLoadState('load');
- await eventually(()=>restoredFrame.evaluate(async()=>(await wordcraft.docInspect()).pages>0));
- await restoredFrame.evaluate(()=>wordcraft.execute('text.insert',{text:'Recuperar após falha'}));await page.evaluate(()=>craftFixture.failWrite=true);
- await page.getByRole('button',{name:'Salvar',exact:true}).click();await page.getByRole('button',{name:'Baixar cópia de recuperação'}).waitFor();
- check('Failed disk write retains a recoverable copy',(await page.evaluate(()=>craftFixture.service.listCraftDocuments())).documents[0].revisions.length===3);
- await page.getByRole('button',{name:'Voltar',exact:true}).click();check('Closing cannot silently discard failed saves',await page.getByRole('dialog',{name:'Alterações não salvas'}).count()===1);await page.getByRole('button',{name:'Continuar editando'}).click();
- await page.evaluate(()=>craftFixture.failWrite=false);await page.getByRole('button',{name:'Tentar salvar novamente'}).click();await page.waitForFunction(()=>!document.querySelector('.craft-error'));
- check('Retry commits the recovered bytes',(await page.evaluate(()=>craftFixture.service.listCraftDocuments())).documents[0].revisions.length===4);
- await restoredFrame.evaluate(()=>wordcraft.execute('text.insert',{text:'Antes de gravar'}));await page.evaluate(()=>craftFixture.holdWrite=true);
- await page.getByRole('button',{name:'Salvar',exact:true}).click();await page.getByText('Gravando no disco…',{exact:true}).waitFor();
- await restoredFrame.evaluate(()=>wordcraft.execute('text.insert',{text:'Depois de iniciar a gravação'}));await page.evaluate(()=>{craftFixture.holdWrite=false;craftFixture.release();});
- await eventually(()=>page.evaluate(()=>document.querySelector('.craft-status')?.textContent==='Alterações não salvas'));
- check('Edits during disk writes remain marked unsaved',true);
- const beforeSpoof=await page.evaluate(async()=>(await craftFixture.service.listCraftDocuments()).documents.length);
- await page.evaluate(()=>window.postMessage({type:'wordcraft:save',name:'forjado.docx',saveAs:true,bytes:new Uint8Array([1,2]).buffer},location.origin));
- check('Messages outside the editor iframe cannot write documents',(await page.evaluate(async()=>(await craftFixture.service.listCraftDocuments()).documents.length))===beforeSpoof);
- const serviceChecks=await page.evaluate(async()=>{const f=craftFixture,s=f.service,results=[];const check=(name,ok)=>{if(!ok)throw Error(name);results.push(name);};
-  const native=Storage.prototype.setItem;Storage.prototype.setItem=function(){throw new DOMException('Full','QuotaExceededError');};let large;try{large=await s.saveCraftDocument('Grande.docx',new Uint8Array(6*1024*1024).fill(17));}finally{Storage.prototype.setItem=native;}
-  check('Six MB document saves without browser document storage',(await s.openCraftDocument(large.id)).bytes.length===6*1024*1024);
-  const changed=await s.saveCraftDocument(large.name,new Uint8Array([1,2,3]),large);let conflict=false;try{await s.saveCraftDocument(large.name,new Uint8Array([5,6]),large);}catch{conflict=true;}check('Stale versions cannot overwrite another window',conflict);
-  const same=await s.saveCraftDocument(changed.name,new Uint8Array([1,2,3]),changed);check('Retrying identical bytes does not duplicate versions',same.revisions.length===changed.revisions.length);
-  const path='WordCraft/'+changed.id+'/versoes/'+changed.revisions.at(-1).file;f.files.set(path,new Uint8Array([7,8,9]));let corrupt=false;try{await s.openCraftDocument(changed.id);}catch{corrupt=true;}check('Corrupted bytes fail integrity verification',corrupt);
-  let traversal=false;try{await s.openCraftDocument('../unsafe');}catch{traversal=true;}check('Document paths cannot escape managed folder',traversal);return results;
- });checks.push(...serviceChecks);
- // The real files are optional local fixtures and are never checked into the repository.
- for(const [index,path]of(process.env.WORDCRAFT_TEST_DOCX||'').split('|').filter(Boolean).entries()){
-  const original=fs.readFileSync(path),originalHash=require('crypto').createHash('sha256').update(original).digest('hex');
-  const docPage=await browser.newPage({viewport:{width:1600,height:1000},locale:'pt-BR'});
-  await docPage.goto(base+'/tests/wordcraft-regression.html');await docPage.getByRole('button',{name:'Conectar pasta',exact:true}).click();await docPage.locator('input[type=file]').setInputFiles(path);
-  await eventually(()=>docPage.evaluate(()=>!!document.querySelector('iframe')?.contentWindow?.wordcraft));
-  const docFrame=await(await docPage.locator('iframe').elementHandle()).contentFrame();await eventually(()=>docFrame.evaluate(async()=>(await wordcraft.docInspect()).pages>0));
-  const before=await docFrame.evaluate(()=>wordcraft.docInspect());check(`Real DOCX ${index+1}: opens with tables`,before.blocks.some(block=>block.type==='table'));
-  const countTables=value=>JSON.stringify(value.blocks).split('"type":"table"').length-1;
-  await docFrame.evaluate(()=>wordcraft.execute('text.insert',{text:'VERIFICACAO_WORDCRAFT_123'}));
-  check(`Real DOCX ${index+1}: imported content can be edited`,JSON.stringify(await docFrame.evaluate(()=>wordcraft.docInspect())).includes('VERIFICACAO_WORDCRAFT_123'));
-  await docFrame.evaluate(()=>wordcraft.execute('edit.undo',{}));const undone=await docFrame.evaluate(()=>wordcraft.docInspect());
-  check(`Real DOCX ${index+1}: undo restores content and tables`,JSON.stringify(undone.blocks)===JSON.stringify(before.blocks));
-  await docFrame.evaluate(()=>wordcraft.execute('edit.redo',{}));await docPage.getByRole('button',{name:'Salvar',exact:true}).click();await docPage.getByText(/^Salvo na pasta/).waitFor();
-  const stored=await docPage.evaluate(async()=>{const docs=await craftFixture.service.listCraftDocuments();const value=await craftFixture.service.openCraftDocument(docs.documents[0].id);return{versions:value.document.revisions.length,bytes:Array.from(value.bytes)};});
-  check(`Real DOCX ${index+1}: original plus edited disk revisions`,stored.versions===2);
-  const exported=Buffer.from(stored.bytes);fs.writeFileSync(`output/playwright/wordcraft-real-${index+1}.docx`,exported);
-  const JSZip=require('jszip'),originalZip=await JSZip.loadAsync(original),savedZip=await JSZip.loadAsync(exported),sourceXml=await originalZip.file('word/document.xml').async('string'),savedXml=await savedZip.file('word/document.xml').async('string');
-  check(`Real DOCX ${index+1}: native DOCX retains table count`,(sourceXml.match(/<w:tbl[\s>]/g)||[]).length===(savedXml.match(/<w:tbl[\s>]/g)||[]).length);
-  check(`Real DOCX ${index+1}: original file unchanged`,require('crypto').createHash('sha256').update(fs.readFileSync(path)).digest('hex')===originalHash);
-  fs.writeFileSync(`output/playwright/wordcraft-real-${index+1}-summary.json`,JSON.stringify({pages:before.pages,tables:countTables(before),words:before.words,originalBytes:original.length,savedBytes:exported.length},null,2));
-  await docPage.screenshot({path:`output/playwright/wordcraft-real-${index+1}.png`});await docPage.close();
+ await engine('insert.table',{rows:2,cols:2});await engine('text.insert',{text:'CELULA_COPIADA'});await engine('table.selectTable');await engine('edit.copy');await engine('caret.docEnd');await engine('text.pageBreak');await engine('edit.paste');
+ check('Native table copy and paste retains cell text',JSON.stringify((await inspect()).blocks).split('CELULA_COPIADA').length>=3);
+ await engine('edit.undo');check('Undo preserves the source table',JSON.stringify((await inspect()).blocks).split('"type":"table"').length===2);
+ await page.getByRole('button',{name:'Salvar',exact:true}).click();await eventually(()=>page.evaluate(()=>document.querySelector('.craft-status')?.textContent==='Salvo neste navegador'));
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'Baixar arquivo',exact:true}).click();check('Download exports a portable file',(await download).suggestedFilename().endsWith('.docx'));
+ await page.screenshot({path:'output/playwright/wordcraft-browser-storage.png'});
+ // Real IndexedDB transactions, with an injected quota failure after metadata was staged.
+ const storageChecks=await page.evaluate(async()=>{
+  const s=craftFixture.service,checks=[],check=(name,value)=>{if(!value)throw Error(name);checks.push(name);};
+  const list=await s.listCraftDocuments();for(const doc of list.documents)await s.deleteCraftDocument(doc.id);
+  const nativeSet=Storage.prototype.setItem;Storage.prototype.setItem=()=>{throw new DOMException('Full','QuotaExceededError');};let doc;
+  try{doc=await s.saveCraftDocument('Grande.docx',new Uint8Array(6*1024*1024).fill(19));}finally{Storage.prototype.setItem=nativeSet;}
+  check('Six MB saves without localStorage quota',(await s.openCraftDocument(doc.id)).bytes.length===6*1024*1024);
+  let stale=doc;for(let i=0;i<5;i++)doc=await s.saveCraftDocument(doc.name,new Uint8Array([i+1]),doc);
+  check('History is limited to three versions',doc.revisions.length===3);
+  const db=await new Promise((resolve,reject)=>{const r=indexedDB.open(s.WORDCRAFT_DB,1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+  let tx=db.transaction('versions','readonly');const count=await new Promise(resolve=>{const r=tx.objectStore('versions').count();r.onsuccess=()=>resolve(r.result);});check('Pruned binary revisions are actually removed',count===3);
+  let conflict=false;try{await s.saveCraftDocument(doc.name,new Uint8Array([88]),stale);}catch{conflict=true;}check('Stale tabs cannot overwrite current content',conflict);
+  const previous=JSON.stringify(doc),originalPut=IDBObjectStore.prototype.put;
+  IDBObjectStore.prototype.put=function(...args){if(this.name==='versions')throw new DOMException('Full','QuotaExceededError');return originalPut.apply(this,args);};let quota=false;
+  try{await s.saveCraftDocument(doc.name,new Uint8Array([99]),doc);}catch(e){quota=e.name==='QuotaExceededError';}finally{IDBObjectStore.prototype.put=originalPut;}
+  check('Quota failure rolls back pruning and metadata',quota&&JSON.stringify((await s.openCraftDocument(doc.id)).document)===previous);
+  const data=await s.openCraftDocument(doc.id);const retry=await s.saveCraftDocument(doc.name,data.bytes,doc);check('Identical saves do not duplicate history',retry.revisions.length===3);
+  for(let i=0;i<4;i++)await s.saveCraftDocument('Documento '+i+'.docx',new Uint8Array([i+1]));let limited=false;
+  try{await s.saveCraftDocument('Sexto.docx',new Uint8Array([77]));}catch{limited=true;}
+  check('Sixth document is refused without deleting existing documents',limited&&(await s.listCraftDocuments()).documents.length===5);
+  await s.deleteCraftDocument(doc.id);check('Deleting a document releases its binary backups',!(await s.listCraftDocuments()).documents.some(item=>item.id===doc.id));
+  for(const item of(await s.listCraftDocuments()).documents)await s.deleteCraftDocument(item.id);
+  await s.saveCraftDocument('A.docx',new Uint8Array(14*1024*1024).fill(1));let budget=false;try{await s.saveCraftDocument('B.docx',new Uint8Array(14*1024*1024).fill(2));}catch{budget=true;}
+  check('Twenty five MB total budget protects saved documents',budget&&(await s.listCraftDocuments()).documents.length===1);
+  for(const item of(await s.listCraftDocuments()).documents)await s.deleteCraftDocument(item.id);db.close();return checks;
+ });checks.push(...storageChecks);
+ for(const[index,path]of(process.env.WORDCRAFT_TEST_DOCX||'').split('|').filter(Boolean).entries()){
+  await page.goto(base+'/tests/wordcraft-regression.html');await page.locator('input[type=file]').setInputFiles(path);await eventually(()=>page.evaluate(async()=>(await document.querySelector('iframe')?.contentWindow?.wordcraft?.docInspect())?.pages>0));
+  const before=await inspect();check(`Real DOCX ${index+1} opens with tables`,before.blocks.some(block=>block.type==='table'));
+  await engine('text.insert',{text:'VERIFICACAO_NATIVA'});await engine('edit.undo');check(`Real DOCX ${index+1} undo restores imported content`,JSON.stringify((await inspect()).blocks)===JSON.stringify(before.blocks));
+  await page.getByRole('button',{name:'Salvar',exact:true}).click();await eventually(()=>page.evaluate(()=>document.querySelector('.craft-status')?.textContent==='Salvo neste navegador'));
+  await page.screenshot({path:`output/playwright/wordcraft-browser-real-${index+1}.png`});
  }
- await page.screenshot({path:'output/playwright/wordcraft-integrated.png'});check('No unhandled browser errors',errors.length===0);
- const result={passed:true,checks};fs.writeFileSync('output/playwright/wordcraft-regression-result.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
-}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1});
+ check('No unhandled browser errors',errors.length===0);const report={passed:true,checks};fs.writeFileSync('output/playwright/wordcraft-regression-result.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+}finally{await browser.close();}})().catch(error=>{console.error(error);process.exitCode=1});

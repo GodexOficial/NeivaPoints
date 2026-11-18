@@ -1,0 +1,52 @@
+const{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),fs=require('node:fs'),assert=require('node:assert/strict');
+const base=process.env.WORD_TEST_URL||'http://127.0.0.1:4186';
+const eventually=async(action,timeout=90000)=>{const end=Date.now()+timeout;while(Date.now()<end){try{if(await action())return;}catch{}await new Promise(resolve=>setTimeout(resolve,120));}throw Error('Font test timed out');};
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true});const checks=[];try{
+ const page=await browser.newPage({viewport:{width:1600,height:1000}}),errors=[],downloads=[],fontRequests=[];
+ const check=(name,condition)=>{assert.ok(condition,name);checks.push(name);};
+ page.on('pageerror',error=>errors.push(String(error)));page.on('download',value=>downloads.push(value.suggestedFilename()));page.on('request',request=>{if(/\.(ttf|otf)(\?|$)/i.test(request.url()))fontRequests.push(request.url());});
+ await page.goto(base+'/tests/wordcraft-regression.html');await page.getByRole('button',{name:'Documento em branco',exact:true}).click();
+ const inspect=()=>page.evaluate(()=>document.querySelector('iframe').contentWindow.wordcraft.docInspect());
+ const execute=(command,params={})=>page.evaluate(({command,params})=>document.querySelector('iframe').contentWindow.wordcraft.execute(command,params),{command,params});
+ await eventually(()=>page.evaluate(async()=>(await document.querySelector('iframe')?.contentWindow?.wordcraft?.docInspect())?.pages>0));
+ check('Opening a document does not fetch unused catalog fonts',fontRequests.length===0);
+ await execute('format.font',{name:'Atkinson Hyperlegible'});await execute('text.insert',{text:'Fonte original preservada no documento'});
+ const before=await inspect();
+ await eventually(async()=>{const report=await execute('font.missing');return !report.missing.some(item=>item.font==='Atkinson Hyperlegible');});
+ check('Missing open font is automatically imported into native engine',true);
+ await page.getByRole('button',{name:/^Fontes/}).click();const panel=page.getByRole('complementary',{name:'Fontes por link'});await panel.getByRole('button',{name:'Disponível nesta sessão'}).waitFor();
+ check('All four normal/bold/italic faces load from official links',fontRequests.filter(url=>url.includes('atkinsonhyperlegible')).length===4);
+ check('Font import preserves document blocks and formatting',JSON.stringify((await inspect()).blocks)===JSON.stringify(before.blocks));
+ const listed=await execute('font.list');check('Imported font is usable by WordCraft',listed.fonts.some(item=>item.families.includes('Atkinson Hyperlegible')));
+ const storage=await page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('wordcraft',1);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});const tx=db.transaction('fonts','readonly');const keys=await new Promise((resolve,reject)=>{const r=tx.objectStore('fonts').getAllKeys();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});db.close();return keys;});
+ check('Linked font bytes are not persisted in native font IndexedDB',!storage.some(key=>String(key).startsWith('neiva-session-font-')));
+ check('Font import never triggers a browser file download',downloads.length===0);
+ const firstCount=fontRequests.length;await panel.getByRole('button',{name:'Verificar documento'}).click();await new Promise(resolve=>setTimeout(resolve,500));check('Repeated checks do not refetch installed fonts',fontRequests.length===firstCount);
+ await page.screenshot({path:'output/playwright/wordcraft-linked-fonts.png'});
+ await page.getByRole('button',{name:'Salvar',exact:true}).click();await eventually(()=>page.evaluate(()=>document.querySelector('.craft-status').textContent==='Salvo neste navegador'));
+ await page.reload();await page.getByRole('button',{name:/Novo documento.docx/}).first().click();await eventually(()=>page.evaluate(async()=>(await document.querySelector('iframe')?.contentWindow?.wordcraft?.docInspect())?.pages>0));
+ await eventually(()=>Promise.resolve(fontRequests.length>firstCount));check('A fresh editor session imports again from links rather than a stored font file',true);
+ // Validate catalog rejection and a network failure without changing the original editor.
+ const unit=await page.evaluate(async()=>{const{validateFontCatalog}=await import('/src/services/wordcraftFonts.ts'),tests=[];const rejected=(name,value)=>{let ok=false;try{validateFontCatalog(value,location.origin+'/wordcraft/fontes.json');}catch{ok=true;}if(!ok)throw Error(name);tests.push(name);};
+  rejected('Executable URLs are rejected',{version:1,fonts:[{family:'Test',license:{spdx:'OFL-1.1',url:'https://example.com/OFL.txt'},faces:[{style:'normal',weight:'400',url:'javascript:alert(1)'}]}]});
+  rejected('CSS pages cannot masquerade as direct font URLs',{version:1,fonts:[{family:'Test',license:{spdx:'OFL-1.1',url:'https://example.com/OFL.txt'},faces:[{style:'normal',weight:'400',url:'https://example.com/fonts.css'}]}]});
+  rejected('Catalog requires a font license',{version:1,fonts:[{family:'Test',faces:[{style:'normal',weight:'400',url:'https://example.com/font.ttf'}]}]});return tests;});checks.push(...unit);
+ const catalog=JSON.parse(fs.readFileSync('public/wordcraft/fontes.json','utf8')),testFont=catalog.fonts.find(font=>font.family==='Atkinson Hyperlegible');
+ let failure='html';
+ await page.route('**/wordcraft/fontes.json',route=>route.fulfill({json:{version:1,fonts:[testFont]}}));
+ await page.route(testFont.faces[0].url,async route=>{
+  if(failure==='html')return route.fulfill({status:200,contentType:'text/html',headers:{'Access-Control-Allow-Origin':'*'},body:'<html>Not a font</html>'});
+  if(failure==='network')return route.abort('failed');
+  if(failure==='hash'){const response=await route.fetch(),body=await response.body();body[body.length-1]^=1;return route.fulfill({response,body,headers:{...response.headers(),'access-control-allow-origin':'*'}});}
+  return route.continue();
+ });
+ await page.goto(base+'/tests/wordcraft-regression.html');await page.getByRole('button',{name:'Documento em branco',exact:true}).click();await eventually(()=>page.evaluate(async()=>(await document.querySelector('iframe')?.contentWindow?.wordcraft?.docInspect())?.pages>0));
+ await page.getByRole('button',{name:/^Fontes/}).click();
+ const newPanel=page.getByRole('complementary',{name:'Fontes por link'});await newPanel.getByRole('button',{name:'Carregar fonte'}).click();
+ await newPanel.getByRole('alert').filter({hasText:'TTF ou OTF válida'}).waitFor();check('An HTML error page is rejected before reaching the engine',true);
+ failure='network';await newPanel.getByRole('button',{name:'Tentar novamente'}).click();await newPanel.getByRole('alert').filter({hasText:'CORS'}).waitFor();check('Network/CORS failures are visible and recoverable',true);
+ failure='hash';await newPanel.getByRole('button',{name:'Tentar novamente'}).click();await newPanel.getByRole('alert').filter({hasText:'difere do arquivo'}).waitFor();check('Altered font bytes fail catalog hash verification',true);
+ failure='';await newPanel.getByRole('button',{name:'Tentar novamente'}).click();await newPanel.getByRole('button',{name:'Disponível nesta sessão'}).waitFor();
+ await execute('text.insert',{text:'Documento editável após recuperar a fonte'});check('Retry succeeds and document remains editable',JSON.stringify((await inspect()).blocks).includes('Documento editável após recuperar a fonte'));
+ check('No unhandled browser errors',errors.length===0);const report={passed:true,checks};fs.writeFileSync('output/playwright/wordcraft-fonts-result.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+}finally{await browser.close();}})().catch(error=>{console.error(error);process.exitCode=1});

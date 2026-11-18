@@ -8,7 +8,23 @@
   
 <script type="module">
 import init, * as bindings from './wordcraft-web-bc9cdbc0b42827ee.js';
-const wasm = await init({ module_or_path: './wordcraft-web-bc9cdbc0b42827ee_bg.wasm' });
+// NeivaPoints hosting adaptation: decompress the unchanged official engine in the browser.
+let wasm;
+try {
+  if (!('DecompressionStream' in window)) throw new Error('Atualize o navegador para abrir o WordCraft.');
+  const packed = await fetch('./wordcraft-web-bc9cdbc0b42827ee_bg.wasm.gz');
+  if (!packed.ok || !packed.body) throw new Error('Não foi possível baixar o WordCraft. Tente novamente.');
+  // Some hosts transparently decompress .gz responses; accept either representation.
+  const response = /gzip/i.test(packed.headers.get('Content-Encoding') || '')
+    ? new Response(packed.body, {headers: {'Content-Type': 'application/wasm'}})
+    : new Response(packed.body.pipeThrough(new DecompressionStream('gzip')), {headers: {'Content-Type': 'application/wasm'}});
+  wasm = await init({module_or_path: response});
+} catch (error) {
+  const message = error instanceof Error ? error.message : 'Falha ao iniciar o WordCraft.';
+  document.addEventListener('DOMContentLoaded', () => { document.getElementById('wordcraft_loading').textContent = message; });
+  if (window.parent !== window) window.parent.postMessage({type: 'wordcraft:failed', error: message}, location.origin);
+  throw error;
+}
 
 
 window.wasmBindings = bindings;
@@ -23,7 +39,7 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
     #wordcraft_loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
       color: #555; font: 14px system-ui, sans-serif; pointer-events: none; }
   </style>
-<link rel="modulepreload" href="./wordcraft-web-bc9cdbc0b42827ee.js" crossorigin="anonymous" integrity="sha384-13MWN5y1Te2kPv6FIA79b9XEzVT+kENFnB8jPJCvpsrYr3TVPgTg5N9lA04oXUFM"><link rel="modulepreload" href="./snippets/eframe-d31a8450ea12dfc1/inline0.js" crossorigin="anonymous" integrity="sha384-uPZQ72BwgZ4v7Km6+UIFbkDDlt7ShGEsAVEHVN/+wZSGFhItJZB83iKMFQXauTSs"><link rel="preload" href="./wordcraft-web-bc9cdbc0b42827ee_bg.wasm" crossorigin="anonymous" integrity="sha384-EARP0IigCZ3m7rHNm5K0rSs8pTE8W4WdfZpDQp658vLAD47UKzdJoByJ6MazxTsO" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="./wordcraft-web-bc9cdbc0b42827ee.js" crossorigin="anonymous" integrity="sha384-13MWN5y1Te2kPv6FIA79b9XEzVT+kENFnB8jPJCvpsrYr3TVPgTg5N9lA04oXUFM"><link rel="modulepreload" href="./snippets/eframe-d31a8450ea12dfc1/inline0.js" crossorigin="anonymous" integrity="sha384-uPZQ72BwgZ4v7Km6+UIFbkDDlt7ShGEsAVEHVN/+wZSGFhItJZB83iKMFQXauTSs"></head>
 <body>
   <canvas id="wordcraft_canvas"></canvas>
   <div id="wordcraft_loading">Loading WordCraft&hellip;</div>

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/check-package-size.cjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -13,13 +13,10 @@
     "@supabase/supabase-js": "^2.112.3",
     "@tailwindcss/vite": "^4.3.3",
     "clsx": "^2.1.1",
-    "docx": "^9.7.1",
-    "dompurify": "^3.4.17",
     "exceljs": "^4.4.0",
     "jspreadsheet-ce": "^4.15.0",
     "jszip": "^3.10.2",
     "lucide-react": "^1.31.0",
-    "mammoth": "^1.13.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwind-merge": "^3.6.0"

@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "fonts": [
+    {
+      "family": "Lato",
+      "license": {
+        "spdx": "OFL-1.1",
+        "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/lato/OFL.txt"
+      },
+      "faces": [
+        {
+          "style": "normal",
+          "weight": "700",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/lato/Lato-Bold.ttf",
+          "sha256": "8a0aace75d33794eece4b28187bfc1df0bbd2888b5d8a56e01788c8d65d16be1"
+        },
+        {
+          "style": "italic",
+          "weight": "700",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/lato/Lato-BoldItalic.ttf",
+          "sha256": "62c1b7f0d2e74b45960154c3520efc337b553db0961bfdc950d5618334596cc8"
+        },
+        {
+          "style": "italic",
+          "weight": "400",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/lato/Lato-Italic.ttf",
+          "sha256": "e399c44efe1387100531d26c7e4800c5d12251b890d6654a3098c7c679cb1786"
+        },
+        {
+          "style": "normal",
+          "weight": "400",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/lato/Lato-Regular.ttf",
+          "sha256": "d636e4683231f931eda222d588e944d082bfd3bdba02f928bee461c0f185b251"
+        }
+      ]
+    },
+    {
+      "family": "Open Sans",
+      "license": {
+        "spdx": "OFL-1.1",
+        "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/opensans/OFL.txt"
+      },
+      "faces": [
+        {
+          "style": "italic",
+          "weight": "variable",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/opensans/OpenSans-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "fe269381e992f32e135801740998544d6235061e37c93ec067ad2be3edd5b17b"
+        },
+        {
+          "style": "normal",
+          "weight": "variable",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "36643644f318a812aab2d2ed3bb98f8cf0872527f835fe9398d95fe6b9adb878"
+        }
+      ]
+    },
+    {
+      "family": "Roboto",
+      "license": {
+        "spdx": "OFL-1.1",
+        "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/roboto/OFL.txt"
+      },
+      "faces": [
+        {
+          "style": "italic",
+          "weight": "variable",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/roboto/Roboto-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "9725a847af6b460ffca162ae66d20dad48b01876137947180b42d7dcd7887182"
+        },
+        {
+          "style": "normal",
+          "weight": "variable",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "d7598e12c5dbef095ff8272cfc55da0250bd07fbdecbac8a530b9b277872a134"
+        }
+      ]
+    },
+    {
+      "family": "Montserrat",
+      "license": {
+        "spdx": "OFL-1.1",
+        "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/montserrat/OFL.txt"
+      },
+      "faces": [
+        {
+          "style": "italic",
+          "weight": "variable",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/montserrat/Montserrat-Italic%5Bwght%5D.ttf",
+          "sha256": "51607f316bc020e59f03cbf51543eecffbea501c0b31d73e5b82927c5cca442c"
+        },
+        {
+          "style": "normal",
+          "weight": "variable",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+          "sha256": "0f7b311b2f3279e4eef9b2f968bcdbab6e28f4daeb1f049f4f278a902bcd82f7"
+        }
+      ]
+    },
+    {
+      "family": "Atkinson Hyperlegible",
+      "license": {
+        "spdx": "OFL-1.1",
+        "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/atkinsonhyperlegible/OFL.txt"
+      },
+      "faces": [
+        {
+          "style": "normal",
+          "weight": "700",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Bold.ttf",
+          "sha256": "5a3b0c8cc8ca545155150b4512a1fa248298df121c50d6557e651e61fbdab92f"
+        },
+        {
+          "style": "italic",
+          "weight": "700",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-BoldItalic.ttf",
+          "sha256": "7a46f1b0ef2f64b61065c1a6b5a11fcb9b019b44062d88ba121a083cc39e86bf"
+        },
+        {
+          "style": "italic",
+          "weight": "400",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Italic.ttf",
+          "sha256": "021beda4d3c6edfc78872e436d74009f9a1bcb294331908fe5747c61d3dcc514"
+        },
+        {
+          "style": "normal",
+          "weight": "400",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Regular.ttf",
+          "sha256": "7fb917c89019896d0b52ee84b7cbb3304c18cb90b19a62f5e32712bd23e97669"
+        }
+      ]
+    },
+    {
+      "family": "Lora",
+      "license": {
+        "spdx": "OFL-1.1",
+        "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/lora/OFL.txt"
+      },
+      "faces": [
+        {
+          "style": "italic",
+          "weight": "variable",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/lora/Lora-Italic%5Bwght%5D.ttf",
+          "sha256": "22d8d8854b53807aa664ca34f2031a9ed57a1d0dea296b8b96cdd3aad937a2b3"
+        },
+        {
+          "style": "normal",
+          "weight": "variable",
+          "url": "https://raw.githubusercontent.com/google/fonts/7af0d90b4d532ffa4b041937b560c6df4e7b1e95/ofl/lora/Lora%5Bwght%5D.ttf",
+          "sha256": "822a6621ccbe8d97d20ac88c1c41f5615c9c2c202eaa75f272cd452aac6475a7"
+        }
+      ]
+    }
+  ]
+}
