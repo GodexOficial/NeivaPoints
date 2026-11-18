@@ -33,9 +33,9 @@ type StandardApp = {
 };
 type HubApp = (ExternalApp & { source: 'custom'; displayPosition: number }) | StandardApp;
 const STANDARD_APPS: StandardApp[] = [
-  { id: 'word', name: 'WordCraft', description: 'Editor de documentos', displayPosition: 0, source: 'standard', available: true },
-  { id: 'excel', name: 'GridCraft', description: 'Planilhas e fórmulas', displayPosition: 1, source: 'standard', available: true },
-  { id: 'powerpoint', name: 'DeckCraft', description: 'Apresentações e slides', displayPosition: 2, source: 'standard', available: true },
+  { id: 'word', name: 'Word', description: 'Editor de documentos', displayPosition: 0, source: 'standard', available: true },
+  { id: 'excel', name: 'Excel', description: 'Planilhas e fórmulas', displayPosition: 1, source: 'standard', available: true },
+  { id: 'powerpoint', name: 'PowerPoint', description: 'Apresentações e slides', displayPosition: 2, source: 'standard', available: true },
 ];
 
 interface AppsHubProps {
@@ -194,7 +194,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
       </section>
 
       <AnimatedDisclosure open={isTeacher && isManaging}><section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100 sm:flex sm:items-center sm:justify-between">
-        <div className="text-sm"><strong>Modo de edição:</strong> arraste um atalho para reorganizar ou clique nele e depois no destino. WordCraft, GridCraft e DeckCraft permanecem fixos.</div>
+        <div className="text-sm"><strong>Modo de edição:</strong> arraste um atalho para reorganizar ou clique nele e depois no destino. Word, Excel e PowerPoint permanecem fixos.</div>
         <button type="button" onClick={openCreate} disabled={apps.length >= customCapacity} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-extrabold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 cursor-pointer"><Plus size={16} />Adicionar aplicativo</button>
       </section></AnimatedDisclosure>
 
