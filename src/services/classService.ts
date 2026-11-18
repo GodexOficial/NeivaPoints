@@ -3,6 +3,7 @@ import { DEFAULT_CLASSES } from "../types";
 import { StorageService } from "./storage";
 import { SupabaseService } from "./supabaseService";
 import { isSupabaseConfigured } from "../lib/supabase";
+import { sortClasses } from '../utils/classOrder';
 
 export class ClassService {
   /**
@@ -37,9 +38,9 @@ export class ClassService {
         const stored = StorageService.getClasses<ClassInfo[] | null>(null);
         if (!stored || !Array.isArray(stored) || stored.length === 0) {
           StorageService.setClasses(DEFAULT_CLASSES);
-          return DEFAULT_CLASSES;
+          return sortClasses(DEFAULT_CLASSES);
         }
-        return stored;
+        return sortClasses(stored);
       }
     }
 
@@ -47,9 +48,9 @@ export class ClassService {
     const stored = StorageService.getClasses<ClassInfo[] | null>(null);
     if (!stored || !Array.isArray(stored) || stored.length === 0) {
       StorageService.setClasses(DEFAULT_CLASSES);
-      return DEFAULT_CLASSES;
+      return sortClasses(DEFAULT_CLASSES);
     }
-    return stored;
+    return sortClasses(stored);
   }
 
   /**
@@ -100,7 +101,7 @@ export class ClassService {
 
         const currentClasses = StorageService.getClasses<ClassInfo[]>([]);
         const updated = [...currentClasses.filter((c) => c.id !== createdInSupabase.id), createdInSupabase];
-        StorageService.setClasses(updated);
+        StorageService.setClasses(sortClasses(updated));
 
         return createdInSupabase;
       } catch (error) {
@@ -122,7 +123,7 @@ export class ClassService {
 
     const currentClasses = StorageService.getClasses<ClassInfo[]>(DEFAULT_CLASSES);
     const updated = [...currentClasses, newClass];
-    StorageService.setClasses(updated);
+    StorageService.setClasses(sortClasses(updated));
 
     return newClass;
   }
@@ -172,7 +173,7 @@ export class ClassService {
     }
 
     classes[index] = current;
-    StorageService.setClasses(classes);
+    StorageService.setClasses(sortClasses(classes));
 
     // Sync to Supabase
     if (isSupabaseConfigured) {

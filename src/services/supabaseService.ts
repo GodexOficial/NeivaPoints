@@ -2,6 +2,7 @@ import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import type { ClassInfo, Student, PointTransaction } from '../types';
 import type { TeacherAccount } from './authService';
 import { normalizePersonName } from '../utils/personName';
+import { sortClasses } from '../utils/classOrder';
 
 /**
  * Supabase Database Service
@@ -102,7 +103,7 @@ export class SupabaseService {
       throw error;
     }
 
-    return (data || []).map((row: any) => ({
+    return sortClasses((data || []).map((row: any) => ({
       id: row.id,
       name: row.name,
       gradeNumber: row.grade_number,
@@ -110,7 +111,7 @@ export class SupabaseService {
       color: row.color,
       description: row.description,
       createdAt: row.created_at,
-    }));
+    })));
   }
 
   static async getClassById(id: string): Promise<ClassInfo | undefined> {
