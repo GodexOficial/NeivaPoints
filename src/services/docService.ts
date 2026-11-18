@@ -14,6 +14,7 @@ let documents: WordDocument[] = [], drafts = new Map<string,WordDraft>(), names 
 let state = {ready:false,folder:'',loading:false,supported:typeof window !== 'undefined' && !!(window as PickerWindow).showDirectoryPicker,warning:'',revision:0};
 const listeners = new Set<()=>void>();
 export const getWordStorageState = () => state;
+export const getDocumentFolder = () => directory;
 export const subscribeWordStorage = (listener:()=>void) => {listeners.add(listener);return ()=>{listeners.delete(listener);};};
 function notify(change:Partial<typeof state>={}) {state={...state,...change,revision:state.revision+1};listeners.forEach(fn=>fn());}
 let queue:Promise<unknown>=Promise.resolve();

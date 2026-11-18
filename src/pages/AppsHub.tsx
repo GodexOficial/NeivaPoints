@@ -8,6 +8,7 @@ import { AppsService, type AppsGridSettings } from '../services/appsService';
 import type { ExternalApp } from '../types';
 const WordHome = React.lazy(() => import('../components/apps/word/WordHome').then(module => ({ default: module.WordHome })));
 const ExcelApp = React.lazy(() => import('../components/apps/excel/ExcelApp').then(module => ({ default: module.ExcelApp })));
+const WordCraftHome = React.lazy(() => import('../components/apps/wordcraft/WordCraftHome').then(module => ({ default: module.WordCraftHome })));
 
 const STANDARD_APPS_COUNT = 3;
 const MAX_COVER_SIZE = 1_500_000;
@@ -58,6 +59,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [wordOpen, setWordOpen] = useState(false);
   const [excelOpen, setExcelOpen] = useState(false);
+  const [craftOpen, setCraftOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const appGridRef = useAnimatedList<HTMLDivElement>(apps.map(app => app.id + ':' + app.position).join('|') + ':' + gridSettings.columns + ':' + isLoading);
   const gridSize = gridSettings.columns * gridSettings.rows;
@@ -169,6 +171,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
 
   if (wordOpen) return <React.Suspense fallback={<p>Carregando documentos…</p>}><WordHome onBack={() => { setWordOpen(false); onWordEditorChange(false); }} /></React.Suspense>;
   if (excelOpen) return <React.Suspense fallback={<p>Carregando planilhas…</p>}><ExcelApp onBack={() => { setExcelOpen(false); onWordEditorChange(false); }} /></React.Suspense>;
+  if (craftOpen) return <React.Suspense fallback={<p>Carregando WordCraft…</p>}><WordCraftHome onBack={() => { setCraftOpen(false); onWordEditorChange(false); }} /></React.Suspense>;
 
   return (
     <div className="space-y-6 sm:space-y-8">
@@ -190,6 +193,11 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
         <button type="button" onClick={openCreate} disabled={apps.length >= customCapacity} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-extrabold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 cursor-pointer"><Plus size={16} />Adicionar aplicativo</button>
       </section></AnimatedDisclosure>
 
+      <section aria-label="Editor experimental" className="glass-panel flex flex-wrap items-center gap-4 rounded-2xl border border-blue-300/40 p-5">
+        <FileText size={36} className="text-blue-500" />
+        <div className="flex-1"><h2 className="font-bold">WordCraft <span className="ml-2 text-xs text-blue-500">Experimental</span></h2><p className="text-sm text-slate-500 dark:text-slate-300">Editor oficial de código aberto. Abra uma cópia dos seus documentos e compare com o Word atual.</p></div>
+        <button onClick={() => { setCraftOpen(true); onWordEditorChange(true); }} className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white hover:bg-blue-700">Abrir WordCraft</button>
+      </section>
       <section aria-label="Grade de aplicativos" className="glass-panel rounded-3xl border border-slate-200 bg-white p-3 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:p-5">
         {isTeacher && <p role="status" aria-live="polite" className="mb-3 text-xs font-medium text-slate-600 dark:text-slate-300">{isOrderSaving ? 'Salvando nova ordem…' : orderMessage || 'Arraste os atalhos para reorganizar. Para editar ou organizar por cliques, use “Editar grade”.'}</p>}
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1"><div><h2 className="text-base font-extrabold text-slate-900 dark:text-white">Aplicativos</h2><span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{displayedApps.length} de {gridSize}</span></div>{isTeacher && isManaging && <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300"><label>Colunas<select value={gridSettings.columns} onChange={(event) => updateGridSettings({ columns: Number(event.target.value) as AppsGridSettings['columns'] })} className="ml-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option></select></label><label>Linhas<select value={gridSettings.rows} onChange={(event) => updateGridSettings({ rows: Number(event.target.value) as AppsGridSettings['rows'] })} className="ml-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-800"><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="6">6</option></select></label></div>}</div>
