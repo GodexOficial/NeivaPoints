@@ -27,7 +27,9 @@ try {
   throw error;
 }`;
 if(html.includes(original))html=html.replace(original,replacement);else if(!html.includes('NeivaPoints hosting adaptation'))throw Error('Unexpected loader');
-html=html.replace(/<link rel="preload"[^>]+\.wasm"[^>]*>/g,'');fs.writeFileSync(path.join(folder,'index.html'),html);
+html=html.replace(/<link rel="preload"[^>]+\.wasm"[^>]*>/g,'').replace('<html lang="en">','<html lang="pt-BR">').replace('Loading WordCraft&hellip;','Carregando WordCraft&hellip;');
+if(!html.includes("import './neiva-locale.js';"))html=html.replace('<script type="module">',"<script type=\"module\">\nimport './neiva-locale.js';");
+fs.writeFileSync(path.join(folder,'index.html'),html);
 if(!source.startsWith(root+path.sep))throw Error('Unsafe source path');if(fs.existsSync(source))fs.unlinkSync(source);
-manifest.upstreamModified=true;manifest.originalWasmSha256=expected;manifest.modifications=['2026-11-18: hosting loader reads gzip and decompresses in the browser; engine bytes unchanged.'];delete manifest.files[name];manifest.files[name+'.gz']=digest(compressed);manifest.files['index.html']=digest(Buffer.from(html));fs.writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\n');
+manifest.upstreamModified=true;manifest.originalWasmSha256=expected;manifest.modifications=[...new Set([...(manifest.modifications||[]),'2026-11-18: hosting loader reads gzip and decompresses in the browser; engine bytes unchanged.','2026-11-18: loader selects the built-in pt-br interface and localizes the loading screen; engine bytes unchanged.'])];delete manifest.files[name];manifest.files[name+'.gz']=digest(compressed);manifest.files['index.html']=digest(Buffer.from(html));manifest.files['neiva-locale.js']=digest(fs.readFileSync(path.join(folder,'neiva-locale.js')));fs.writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\n');
 console.log(JSON.stringify({engineBytes:raw.length,compressedBytes:compressed.length,sha256:expected}));

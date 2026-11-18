@@ -74,8 +74,14 @@ export function WordCraftHome({onBack}:{onBack:()=>void}){
    const packet=event.data;if(!packet||typeof packet!=='object')return;
    if(packet.type==='wordcraft:ready'){
     if(packet.version!=='1'||packet.appVersion!=='0.18.1'){setError('Versão do WordCraft incompatível com esta integração.');return;}
-    setReady(true);const value=active.current;
-    iframe.current?.contentWindow?.postMessage({type:'wordcraft:open',name:value.document.name,bytes:Uint8Array.from(value.bytes).buffer},location.origin);
+    const frame=iframe.current?.contentWindow as EngineWindow|null,value=active.current;
+    void(async()=>{
+     try{await frame?.wordcraft?.execute('ui.language',{value:'pt-br'});}
+     catch{if(mounted.current)setNotice('Não foi possível aplicar o idioma português nesta sessão.');}
+     if(!mounted.current||iframe.current?.contentWindow!==frame||active.current!==value)return;
+     setReady(true);
+     frame?.postMessage({type:'wordcraft:open',name:value.document.name,bytes:Uint8Array.from(value.bytes).buffer},location.origin);
+    })();
    }else if(packet.type==='wordcraft:dirty'&&packet.dirty===true){generation.current++;setEdited(true);clearTimeout(autoSave.current);autoSave.current=setTimeout(()=>saveAction.current(),2000);}
    else if(packet.type==='wordcraft:failed')setError(typeof packet.error==='string'?packet.error:'O WordCraft não conseguiu abrir este documento.');
    else if(packet.type==='wordcraft:save'){

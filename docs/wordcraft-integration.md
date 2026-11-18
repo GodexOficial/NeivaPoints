@@ -1,5 +1,13 @@
 # WordCraft
 
+## Interface em português do Brasil
+
+O carregador neiva-locale.js define o atributo HTML pt-BR e seleciona language=pt-br nas preferências wordcraft.ui antes do primeiro quadro do motor, preservando as demais preferências válidas. O host também executa ui.language com pt-br antes de abrir o arquivo, cobrindo navegadores com armazenamento de preferências bloqueado. A configuração vale a cada abertura no NeivaPoints, independentemente do idioma do navegador ou de uma preferência anterior em inglês.
+
+A tradução é o catálogo brasileiro nativo embutido na versão 0.18.1. Identificadores de comandos, nomes de fontes/arquivos e conteúdo dos documentos não são traduzidos. Idiomas de revisão explicitamente definidos nos documentos são preservados. Alguns rótulos e mensagens técnicas sem entrada no catálogo upstream ainda aparecem em inglês; completar essas entradas no motor exige uma nova compilação com o catálogo upstream atualizado. Não há sobreposição artificial sobre o canvas nem alteração de texto de arquivos para traduzir a interface.
+
+Validar com node tests/wordcraft-locale.cjs: navegador em en-US, preferência anterior em inglês, preservação de tema/autoria, importação e exportação de texto com en-US/fr-FR, reabertura e bloqueio de localStorage. O carregamento inicial também foi traduzido, e os hashes da adaptação constam no manifesto.
+
 O WordCraft substitui o editor anterior na primeira posição de Aplicativos. Os componentes, estilos, importador, exportador e testes do editor antigo foram removidos; os arquivos pessoais anteriormente salvos no computador não foram apagados. Para continuar um documento antigo, abrir seu DOCX original pelo botão Abrir do computador.
 
 ## Pacote abaixo de 50 MB

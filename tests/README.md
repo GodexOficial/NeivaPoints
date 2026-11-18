@@ -1,5 +1,9 @@
 # Testes do WordCraft
 
+GridCraft: `node tests/gridcraft-regression.cjs`, com Vite na porta 4186. `PLAYWRIGHT_MODULE` aponta para Playwright e `GRID_TEST_URL` muda o endereço. Usa planilhas sintéticas, Edge e IndexedDB isolados para conferir fórmulas, autosave, XLSX, reabertura, desfazer/refazer, versões, conflitos, falha de quota, limites e separação de contas/arquivos Word. Não modifica arquivos pessoais.
+
+Idioma: `node tests/wordcraft-locale.cjs`. Verifica PT-BR em navegador en-US, preferências anteriores em inglês, preservação do tema/autoria, conteúdo e idiomas de revisão en-US/fr-FR após exportação, reabertura e armazenamento de preferências bloqueado. Usa Playwright/Edge isolado e documentos sintéticos.
+
 Com `npm run dev -- --host 127.0.0.1 --port 4186 --strictPort` ativo e Playwright instalado, execute `node tests/wordcraft-regression.cjs`.
 
 `PLAYWRIGHT_MODULE` informa o caminho de uma instalação existente de Playwright. `WORD_TEST_URL` muda o endereço e `WORD_TEST_BROWSER` o navegador (msedge por padrão). `WORDCRAFT_TEST_DOCX` permite testar DOCX reais: caminhos separados por `|`. Os arquivos originais não são modificados.

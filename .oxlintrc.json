@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "typescript", "oxc"],
-  "ignorePatterns": ["public/wordcraft/0.18.1/**"],
+  "ignorePatterns": ["public/wordcraft/0.18.1/**", "public/gridcraft/0.19.1/**"],
   "rules": {
     "react/rules-of-hooks": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]

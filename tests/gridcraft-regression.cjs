@@ -1,0 +1,51 @@
+const{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright'),fs=require('node:fs'),assert=require('node:assert/strict'),JSZip=require('jszip');
+const base=process.env.GRID_TEST_URL||'http://127.0.0.1:4186';
+const eventually=async(action,timeout=90000)=>{const end=Date.now()+timeout;while(Date.now()<end){try{if(await action())return;}catch{}await new Promise(resolve=>setTimeout(resolve,100));}throw Error('GridCraft test timed out');};
+(async()=>{const browser=await chromium.launch({channel:'msedge',headless:true}),checks=[];try{
+ const page=await browser.newPage({viewport:{width:1600,height:1000},locale:'en-US'}),errors=[];page.on('pageerror',error=>errors.push(String(error)));
+ const check=(name,value)=>{assert.ok(value,name);checks.push(name);console.log('PASS',name);};
+ const execute=(command,params={})=>page.evaluate(({command,params})=>document.querySelector('iframe').contentWindow.gridcraft.execute(command,params),{command,params});
+ const inspect=()=>page.evaluate(()=>document.querySelector('iframe').contentWindow.gridcraft.docInspect());
+ await page.goto(base+'/tests/gridcraft-regression.html');await page.getByRole('button',{name:'Pasta de trabalho em branco',exact:true}).click();await eventually(async()=>(await inspect()).sheets?.[0]?.name==='Planilha1');
+ check('Official compressed engine opens the native blank workbook',true);
+ check('Portuguese UI works with an English browser',(await execute('app.language.set',{language:'pt'})).language==='pt');
+ await execute('range.setValues',{range:'A1:B3',values:[['Item','Quantidade'],['Cadernos',12],['Lápis',8]]});await execute('cell.set',{cell:'B4',input:'=SUM(B2:B3)'});
+ check('Native formula engine calculates SUM',Number((await execute('cell.get',{cell:'B4'})).value)===20);
+ await page.getByRole('button',{name:'Salvar',exact:true}).click();await eventually(()=>page.evaluate(()=>document.querySelector('.craft-status')?.textContent==='Salvo neste navegador'));
+ check('Workbook saves in isolated browser database',(await page.evaluate(()=>gridFixture.service.listCraftDocuments())).documents.length===1);
+ await execute('cell.set',{cell:'B2',input:'14'});await page.getByText(/^Salvo neste navegador ·/).waitFor();await eventually(async()=>Number((await execute('cell.get',{cell:'B4'})).value)===22);
+ await eventually(async()=>(await page.evaluate(()=>gridFixture.service.listCraftDocuments())).documents[0].revisions.length>=3);
+ check('Autosave captures edits without folder selection',true);
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'Baixar arquivo',exact:true}).click();const exported=await download,buffer=fs.readFileSync(await exported.path()),zip=await JSZip.loadAsync(buffer),xml=await zip.file('xl/worksheets/sheet1.xml').async('string');
+ check('Download is a real XLSX with formulas',exported.suggestedFilename().endsWith('.xlsx')&&xml.includes('SUM(B2:B3)'));
+ await page.screenshot({path:'output/playwright/gridcraft-integrated.png'});
+ await page.reload();await page.getByRole('button',{name:/Pasta de trabalho.xlsx/}).first().click();await eventually(async()=>(await inspect()).sheets?.length===1);
+ check('Reload restores values and formulas',Number((await execute('cell.get',{cell:'B4'})).value)===22);
+ await execute('cell.set',{cell:'A6',input:'Desfazer nativo'});await execute('edit.undo');check('Undo works after reopening XLSX',(await execute('cell.get',{cell:'A6'})).value!=='Desfazer nativo');
+ await execute('edit.redo');check('Redo restores the edited cell',(await execute('cell.get',{cell:'A6'})).value==='Desfazer nativo');
+ await page.getByRole('button',{name:'Salvar',exact:true}).click();await eventually(()=>page.evaluate(()=>document.querySelector('.craft-status')?.textContent==='Salvo neste navegador'));
+ await execute('cell.set',{cell:'A7',input:'VERSAO_ANTERIOR'});await page.getByRole('button',{name:'Salvar',exact:true}).click();await eventually(()=>page.evaluate(()=>document.querySelector('.craft-status')?.textContent==='Salvo neste navegador'));await execute('cell.set',{cell:'A7',input:'VERSAO_ATUAL'});await page.getByRole('button',{name:'Salvar',exact:true}).click();await eventually(()=>page.evaluate(()=>document.querySelector('.craft-status')?.textContent==='Salvo neste navegador'));await page.getByRole('button',{name:'Histórico',exact:true}).click();const articles=page.locator('.craft-history article');check('History is capped at three versions',await articles.count()===3);
+ const target=articles.nth(1);await target.getByRole('button',{name:'Restaurar'}).click();try{await eventually(()=>page.evaluate(async()=>{try{return(await document.querySelector('iframe').contentWindow.gridcraft.execute('cell.get',{cell:'A7'})).value==='VERSAO_ANTERIOR';}catch{return false;}}),20000);}catch(error){await page.screenshot({path:'output/playwright/gridcraft-restore-failure.png'});console.log('RESTORE STATE',await page.evaluate(()=>({src:document.querySelector('iframe')?.src,status:document.querySelector('.craft-status')?.textContent,message:document.querySelector('.craft-message')?.textContent,body:document.body.innerText.slice(0,1500)})));throw error;}
+ check('History restore keeps a valid XLSX',(await page.evaluate(()=>gridFixture.service.listCraftDocuments())).documents[0].revisions.length===3);
+ // A separate workbook file is opened as a binary copy, leaving the source buffer unchanged.
+ await page.reload();await page.locator('input[type=file]').setInputFiles({name:'Importada.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer});await eventually(async()=>(await inspect()).sheets?.length>0);
+ check('Imported Excel workbook retains formula results',Number((await execute('cell.get',{cell:'B4'})).value)===22);
+ const before=await page.evaluate(()=>gridFixture.service.listCraftDocuments());await page.evaluate(()=>window.postMessage({type:'gridcraft:save',name:'forjado.xlsx',saveAs:false,bytes:new Uint8Array([1,2]).buffer},location.origin));
+ check('Other windows cannot forge native save messages',(await page.evaluate(()=>gridFixture.service.listCraftDocuments())).documents.length===before.documents.length);
+ const storageChecks=await page.evaluate(async()=>{const s=gridFixture.service,w=gridFixture.wordService,checks=[];const check=(name,ok)=>{if(!ok)throw Error(name);checks.push(name);console.log('PASS',name);};
+  const wordsBefore=await w.listCraftDocuments();for(const doc of(await s.listCraftDocuments()).documents)await s.deleteCraftDocument(doc.id);
+  let doc=await s.saveCraftDocument('Teste.xlsx',new Uint8Array([1,2,3])),stale=doc;for(let i=0;i<5;i++)doc=await s.saveCraftDocument(doc.name,new Uint8Array([i+5]),doc);check('Binary history stays bounded',doc.revisions.length===3);
+  let conflict=false;try{await s.saveCraftDocument(doc.name,new Uint8Array([77]),stale);}catch{conflict=true;}check('Stale workbook writes are rejected',conflict);
+  const previous=JSON.stringify(doc),put=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args){if(this.name==='versions'&&this.transaction.db.name===s.GRIDCRAFT_DB)throw new DOMException('Full','QuotaExceededError');return put.apply(this,args);};let quota=false;try{await s.saveCraftDocument(doc.name,new Uint8Array([99]),doc);}catch{quota=true;}finally{IDBObjectStore.prototype.put=put;}
+  check('Quota failures preserve committed workbook and history',quota&&JSON.stringify((await s.openCraftDocument(doc.id)).document)===previous);
+  for(let i=0;i<4;i++)await s.saveCraftDocument(i+'.xlsx',new Uint8Array([1]));let limited=false;try{await s.saveCraftDocument('Sexta.xlsx',new Uint8Array([2]));}catch{limited=true;}check('Five-workbook cap does not delete user files',limited&&(await s.listCraftDocuments()).documents.length===5);
+  await s.saveCraftDocument('Privada.xlsx',new Uint8Array([3,4]),undefined,'professor-a');check('Workbook recents are isolated by account',(await s.listCraftDocuments('professor-a')).documents.length===1&&(await s.listCraftDocuments('professor-b')).documents.length===0);check('Spreadsheet storage does not change Word documents',JSON.stringify((await w.listCraftDocuments()).documents)===JSON.stringify(wordsBefore.documents));return checks;
+ });checks.push(...storageChecks);
+ const csvPage=await browser.newPage({locale:'en-US'}),csvDownloads=[];csvPage.on('download',item=>csvDownloads.push(item.suggestedFilename()));
+ await csvPage.goto(base+'/tests/gridcraft-regression.html');await csvPage.locator('input[type=file]').setInputFiles({name:'dados.csv',mimeType:'text/csv',buffer:Buffer.from('Nome,Pontos\nAna,10\nBruno,20\n')});
+ await eventually(()=>csvPage.evaluate(async()=>{try{return(await document.querySelector('iframe').contentWindow.gridcraft.execute('cell.get',{cell:'A2'})).value==='Ana';}catch{return false;}}));
+ await csvPage.evaluate(()=>document.querySelector('iframe').contentWindow.gridcraft.execute('cell.set',{cell:'B2',input:'15'}));await csvPage.getByRole('button',{name:'Salvar',exact:true}).click();
+ await eventually(()=>csvPage.evaluate(()=>document.querySelector('.craft-status')?.textContent==='Salvo neste navegador'),20000);
+ const csvStored=await csvPage.evaluate(()=>gridFixture.service.listCraftDocuments());check('CSV imports convert to one XLSX working copy without an automatic download',csvStored.documents.length===1&&csvStored.documents[0].name.endsWith('.xlsx')&&csvDownloads.length===0);await csvPage.close();
+ check('No unhandled browser errors',errors.length===0);const result={passed:true,checks};fs.writeFileSync('output/playwright/gridcraft-regression-result.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
+}finally{await browser.close();}})().catch(error=>{console.error(error);process.exitCode=1});
