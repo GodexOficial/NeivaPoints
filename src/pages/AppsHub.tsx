@@ -8,6 +8,7 @@ import { AppsService, type AppsGridSettings } from '../services/appsService';
 import type { ExternalApp } from '../types';
 const ExcelApp = React.lazy(() => import('../components/apps/excel/ExcelApp').then(module => ({ default: module.ExcelApp })));
 const GridCraftApp = React.lazy(() => import('../components/apps/gridcraft/GridCraftApp').then(module => ({ default: module.GridCraftApp })));
+const DeckCraftApp = React.lazy(() => import('../components/apps/deckcraft/DeckCraftApp').then(module => ({ default: module.DeckCraftApp })));
 const WordCraftHome = React.lazy(() => import('../components/apps/wordcraft/WordCraftHome').then(module => ({ default: module.WordCraftHome })));
 
 const STANDARD_APPS_COUNT = 3;
@@ -34,7 +35,7 @@ type HubApp = (ExternalApp & { source: 'custom'; displayPosition: number }) | St
 const STANDARD_APPS: StandardApp[] = [
   { id: 'word', name: 'WordCraft', description: 'Editor de documentos', displayPosition: 0, source: 'standard', available: true },
   { id: 'excel', name: 'GridCraft', description: 'Planilhas e fórmulas', displayPosition: 1, source: 'standard', available: true },
-  { id: 'powerpoint', name: 'PowerPoint', description: 'Apresentações', displayPosition: 2, source: 'standard', available: false },
+  { id: 'powerpoint', name: 'DeckCraft', description: 'Apresentações e slides', displayPosition: 2, source: 'standard', available: true },
 ];
 
 interface AppsHubProps {
@@ -59,6 +60,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [wordOpen, setWordOpen] = useState(false);
   const [excelOpen, setExcelOpen] = useState(false);
+  const [deckOpen, setDeckOpen] = useState(false);
   const [legacyExcelOpen, setLegacyExcelOpen] = useState(false);
   const legacyOwner = currentUser?.studentId||currentUser?.username||currentUser?.name||'local';
   const hasLegacySheets = React.useMemo(() => { if(legacyExcelOpen)return true; try { const list=JSON.parse(localStorage.getItem('neiva_excel_v1:'+encodeURIComponent(legacyOwner))||'[]'); return Array.isArray(list)&&list.length>0; } catch { return false; } }, [legacyOwner,legacyExcelOpen]);
@@ -165,6 +167,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   const slots = Array.from({ length: gridSize }, (_, index) => ({ index, app: displayedApps.find((app) => app.displayPosition === index) }));
 
   const openStandardApp = (app: StandardApp) => {
+    if (app.id === 'powerpoint') { setDeckOpen(true); onWordEditorChange(true); return; }
     if (app.id === 'excel') { setExcelOpen(true); onWordEditorChange(true); return; }
     if (app.id !== 'word') return;
     setWordOpen(true);
@@ -172,6 +175,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
   };
 
   if (wordOpen) return <React.Suspense fallback={<p>Carregando documentos…</p>}><WordCraftHome onBack={() => { setWordOpen(false); onWordEditorChange(false); }} /></React.Suspense>;
+  if (deckOpen) return <React.Suspense fallback={<p>Carregando apresentações…</p>}><DeckCraftApp key={legacyOwner} owner={legacyOwner} onBack={() => { setDeckOpen(false); onWordEditorChange(false); }} /></React.Suspense>;
   if (excelOpen) return <React.Suspense fallback={<p>Carregando planilhas…</p>}>{legacyExcelOpen?<ExcelApp onBack={() => setLegacyExcelOpen(false)} />:<GridCraftApp key={legacyOwner} owner={legacyOwner} onBack={() => { setExcelOpen(false); onWordEditorChange(false); }} onLegacy={hasLegacySheets?()=>setLegacyExcelOpen(true):undefined} />}</React.Suspense>;
 
   return (
@@ -190,7 +194,7 @@ export const AppsHub: React.FC<AppsHubProps> = ({ onWordEditorChange }) => {
       </section>
 
       <AnimatedDisclosure open={isTeacher && isManaging}><section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/35 dark:text-amber-100 sm:flex sm:items-center sm:justify-between">
-        <div className="text-sm"><strong>Modo de edição:</strong> arraste um atalho para reorganizar ou clique nele e depois no destino. WordCraft, GridCraft e PowerPoint permanecem fixos.</div>
+        <div className="text-sm"><strong>Modo de edição:</strong> arraste um atalho para reorganizar ou clique nele e depois no destino. WordCraft, GridCraft e DeckCraft permanecem fixos.</div>
         <button type="button" onClick={openCreate} disabled={apps.length >= customCapacity} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-extrabold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 sm:mt-0 cursor-pointer"><Plus size={16} />Adicionar aplicativo</button>
       </section></AnimatedDisclosure>
 

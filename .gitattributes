@@ -1,3 +1,4 @@
 # Preserve the exact bytes of the vendored engine and its SRI-verified JS modules.
 public/wordcraft/** -text
 public/gridcraft/** -text
+public/deckcraft/** -text
