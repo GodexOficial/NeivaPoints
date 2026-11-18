@@ -1,7 +1,7 @@
 import './editor-fonts.css';
 import './word-workspace.css';
 import { createPortal } from 'react-dom';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import {
   FileText, FolderOpen, History,
   Save,
@@ -34,6 +34,8 @@ import { WordPageChrome } from './WordPageChrome';
 import { WordObjectControls } from './WordObjectControls';
 import { paginateWordHtml } from '../../../utils/wordPagination';
 import { WordInkPad, WordPanels, type WordPanel } from './WordPanels';
+import {WordEditHistory} from '../../../utils/wordEditHistory';
+import {readWordClipboard, type WordClipboardContent} from '../../../utils/wordClipboard';
 import { cleanWordHtml, escapeWordText, importWordFile } from '../../../utils/wordImport';
 import { deleteTableContent, insertTableRow, rectangularCells, tableMap, type TableCell } from '../../../utils/wordTable';
 import { useWordTableResize } from '../../../hooks/useWordTableResize';
@@ -119,7 +121,9 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const [extendTableSelection, setExtendTableSelection] = useState(false);
   const [tableDrawMode, setTableDrawMode] = useState<TableDrawMode>('none');
   const tableDrawStart = useRef<{ cell: TableCell; x: number; y: number } | null>(null);
-  const tableHistory = useRef<{ undo: { before: string[]; after: string[] }[]; redo: { before: string[]; after: string[] }[] }>({ undo: [], redo: [] });
+  const [editHistory]=useState(()=>new WordEditHistory(pages));
+  const inputHistoryGroup=useRef<string|undefined>(undefined);
+  useLayoutEffect(()=>{editHistory.record(pages,inputHistoryGroup.current);inputHistoryGroup.current=undefined;},[pages,editHistory]);
   const [isFindReplaceOpen, setIsFindReplaceOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<HTMLTableElement | null>(null);
   const [activeTableCell, setActiveTableCell] = useState<TableCell | null>(null);
@@ -157,6 +161,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const formatPainterRef = useRef<ActiveFormatting | null>(null);
   const initializedSave = useRef(false);
   const saveRevision = useRef(0);
+  const clipboardBusy = useRef(false);
+  const clipboardInserting = useRef(false);
   const latestDocument = useRef<() => WordDocument>(() => initialDocument);
   const canDictate = typeof window !== 'undefined' && Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
   const portraitWidth = pageSize === 'a4' ? 21 : 21.59;
@@ -348,7 +354,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     const range = sel.getRangeAt(0);
     const selText = sel.toString().trim();
     const fullText = (activeEl.innerText || '').trim();
-    if (fullText.length > 0 && selText.length >= fullText.length && selText === fullText) {
+    if (!(sel.anchorNode instanceof Element?sel.anchorNode:sel.anchorNode?.parentElement)?.closest('td,th') && fullText.length > 0 && selText.length >= fullText.length && selText === fullText) {
       setScopeMode('all');
       setSelectedBlockElements([]);
       setSelectedBlockSummary('Documento inteiro');
@@ -385,9 +391,9 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       setSelectedBlockSummary(matched.length === 1 ? '1 linha/parágrafo' : `${matched.length} parágrafos`);
 
       const first = matched[0];
-      setParagraphIndentCm(parseDimensionCm(first.style.textIndent));
-      setParagraphLeftMarginCm(parseDimensionCm(first.style.marginLeft));
-      setParagraphRightMarginCm(parseDimensionCm(first.style.marginRight));
+      setParagraphIndentCm(parseDimensionCm(getComputedStyle(first).textIndent));
+      setParagraphLeftMarginCm(parseDimensionCm(getComputedStyle(first).marginLeft));
+      setParagraphRightMarginCm(parseDimensionCm(getComputedStyle(first).marginRight));
     } else {
       setScopeMode('all');
       setSelectedBlockElements([]);
@@ -464,10 +470,12 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     const doc = recovered && draft ? draft.document || { ...input, title: draft.title, content: draft.content, pages: undefined } : input;
     initializedSave.current = recovered; selectionRef.current = null;
     setNotice(''); setShowDraftRestoredBanner(recovered); setScopeMode('all'); setSelectedBlockElements([]); setSelectedTable(null); setActiveTableCell(null); setTableCells([]); setTableDrawMode('none');
-    tableHistory.current = { undo: [], redo: [] }; setReadOnly(false);
+    setReadOnly(false);
     setWordDoc(doc); setDocTitle(doc.title);
     const importedPages = doc.pages?.length ? doc.pages : doc.content.split(/<div[^>]*class="[^"]*a4-page-break[^"]*"[^>]*>[\s\S]*?<\/div>/gi);
-    setPages(importedPages.flatMap(html=>paginateWordHtml(normalizePageHtml(html),doc))); setActivePageIndex(0);setChromeFocus(null);
+    const nextPages=importedPages.flatMap(html=>paginateWordHtml(normalizePageHtml(html),doc));
+    editHistory.reset(nextPages);inputHistoryGroup.current=undefined;
+    setPages(nextPages); setActivePageIndex(0);setChromeFocus(null);
     setLeftMarginCm(doc.leftMarginCm ?? 2.5); setRightMarginCm(doc.rightMarginCm ?? 2.5);
     setTopMarginCm(doc.topMarginCm ?? 2.5); setBottomMarginCm(doc.bottomMarginCm ?? 2.5);
     setFirstLineIndentCm(doc.firstLineIndentCm ?? 0); setWatermarkText(doc.watermarkText || '');
@@ -521,11 +529,40 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
       const cleaned=next.map((html,index)=>{const dom=new DOMParser().parseFromString(html,'text/html');const caret=dom.querySelector('[data-word-caret]');if(caret){caretPage=index;}return dom.body.innerHTML;});
       marker?.remove();selectionRef.current=null;setPages(cleaned);setHasUnsavedChanges(true);setSaveStatus('unsaved');
       requestAnimationFrame(()=>{if(caretPage<0)return;const page=pageRefs.current[caretPage],caret=page?.querySelector('[data-word-caret]');if(page&&caret){const range=document.createRange();range.setStartBefore(caret);range.collapse(true);caret.remove();page.focus({preventScroll:true});selection?.removeAllRanges();selection?.addRange(range);selectionRef.current=range;setActivePageIndex(caretPage);setPages(current=>current.map((html,i)=>i===caretPage?page.innerHTML:html));}});
-      return;
+      return cleaned.map(html=>{const dom=new DOMParser().parseFromString(html,'text/html');dom.querySelectorAll('[data-word-caret]').forEach(node=>node.remove());return dom.body.innerHTML;});
     }
-    setPages(updatedPages); setHasUnsavedChanges(true); setSaveStatus('unsaved');
+    setPages(updatedPages); setHasUnsavedChanges(true); setSaveStatus('unsaved');return updatedPages;
   };
   const tableResize = useWordTableResize(readOnly, handleContentInput);
+  const insertClipboardContent = (content:WordClipboardContent) => {
+    if(readOnly)return;
+    inputHistoryGroup.current=undefined;
+    let inserted=false;clipboardInserting.current=true;
+    const page=pageRefs.current[activePageIndex];
+    try{
+      if(content.html&&page&&!page.textContent?.trim()&&!page.querySelector('img,svg,table,hr')){
+        // Replace the empty paragraph at the page root, avoiding invalid nested P/table HTML.
+        const template=document.createElement('template');template.innerHTML=content.html;
+        page.replaceChildren(template.content);
+        const range=document.createRange();range.selectNodeContents(page);range.collapse(false);
+        getSelection()?.removeAllRanges();getSelection()?.addRange(range);selectionRef.current=range;
+        inserted=true;
+      }else{
+        inserted=document.execCommand(content.html?'insertHTML':'insertText',false,content.html||content.text||'');
+        if(content.html&&page&&normalizePageHtml(page.innerHTML)!==page.innerHTML){
+          const selection=getSelection(),range=selection?.rangeCount?selection.getRangeAt(0):null;
+          const marker=document.createElement('span');marker.dataset.wordCaret='true';
+          if(range&&page.contains(range.commonAncestorContainer))range.insertNode(marker);
+          page.innerHTML=normalizePageHtml(page.innerHTML);
+          const caret=page.querySelector('[data-word-caret]');
+          if(caret){const restored=document.createRange();restored.setStartBefore(caret);restored.collapse(true);caret.remove();selection?.removeAllRanges();selection?.addRange(restored);selectionRef.current=restored;}
+        }
+      }
+    }finally{clipboardInserting.current=false;inputHistoryGroup.current=undefined;}
+    if(!inserted)throw new Error('Colagem não disponível. Use Ctrl+V.');
+    handleContentInput();
+  };
+
 
   // Add a new physical A4 Page
   const handleAddPage = () => {
@@ -661,13 +698,15 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const handleExecCommand = (command: string, value?: string) => {
     if (readOnly && !['copy', 'selectAll'].includes(command)) { setNotice('Desative o modo de leitura para editar.'); return; }
     if (command === 'undo' || command === 'redo') {
-      const history = tableHistory.current, from = command === 'undo' ? history.undo : history.redo, to = command === 'undo' ? history.redo : history.undo;
-      const item = from.at(-1), current = pages.map((html,index) => pageRefs.current[index]?.innerHTML || html);
-      if (item && JSON.stringify(current) === JSON.stringify(command === 'undo' ? item.after : item.before)) {
-        from.pop(); to.push(item); const next = command === 'undo' ? item.before : item.after;
-        next.forEach((html,index) => { if (pageRefs.current[index]) pageRefs.current[index]!.innerHTML = html; });
-        selectionRef.current = null; setPages([...next]); setTableCells([]); setActiveTableCell(null); setSelectedTable(null); setHasUnsavedChanges(true); setSaveStatus('unsaved'); return;
-      }
+      const current=pages.map((html,index)=>pageRefs.current[index]?.innerHTML||html);
+      const next=editHistory.step(command,current);
+      if(!next)return;
+      const index=Math.min(activePageIndex,next.length-1),owner=pageRefs.current[activePageIndex];
+      const cellIndex=activeTableCell&&owner?[...owner.querySelectorAll('td,th')].indexOf(activeTableCell):-1;
+      next.forEach((html,i)=>{if(pageRefs.current[i])pageRefs.current[i]!.innerHTML=html;});
+      selectionRef.current=null;setPages(next);setActivePageIndex(index);setTableCells([]);setActiveTableCell(null);setSelectedTable(null);setHasUnsavedChanges(true);setSaveStatus('unsaved');
+      requestAnimationFrame(()=>{const page=pageRefs.current[index];if(!page)return;const target=cellIndex>=0?page.querySelectorAll('td,th')[cellIndex]||page:page;const range=document.createRange();range.selectNodeContents(target);range.collapse(false);page.focus({preventScroll:true});getSelection()?.removeAllRanges();getSelection()?.addRange(range);selectionRef.current=range;});
+      return;
     }
     const activeRef = pageRefs.current[activePageIndex];
     if (activeRef) {
@@ -791,10 +830,7 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   const handleTableCommand = (command: TableCommand, table = selectedTable, selected = tableCells) => {
     if (readOnly || !table?.isConnected) return;
     try {
-      const before = pages.map((html,index) => pageRefs.current[index]?.innerHTML || html);
       const cells = runTableCommand(table, selected.filter(c => c.isConnected), command);
-      const after = pages.map((html,index) => pageRefs.current[index]?.innerHTML || html);
-      if (JSON.stringify(before) !== JSON.stringify(after)) { tableHistory.current.undo.push({ before, after }); tableHistory.current.undo = tableHistory.current.undo.slice(-30); tableHistory.current.redo = []; }
       setSelectedTable(table.isConnected ? table : null);
       setTableCells(cells); setActiveTableCell(cells[0] || null);
       if (!cells.length) { setSelectedTable(null); setTableDrawMode('none'); }
@@ -830,11 +866,24 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
     handleTableCommand({ action: 'split', value: dx >= dy ? 2 : 1, extra: dx >= dy ? 1 : 2 },start.cell.closest('table'),[start.cell]);
   };
 
+  // A cell selection formats only paragraphs owned by those cells, including empty cells.
+  const rulerTargets = () => {
+    const cells=tableCells.filter(cell=>cell.isConnected);
+    if(!cells.length)return selectedBlockElements.filter(block=>block.isConnected);
+    return cells.flatMap(cell=>{
+      const blocks=[...cell.querySelectorAll<HTMLElement>('p,h1,h2,h3,h4,h5,h6,li,blockquote')].filter(block=>block.closest('td,th')===cell);
+      if(blocks.length)return blocks;
+      const paragraph=document.createElement('p');
+      [...cell.childNodes].filter(node=>!(node instanceof Element&&node.tagName==='TABLE')).forEach(node=>paragraph.append(node));
+      if(!paragraph.childNodes.length)paragraph.append(document.createElement('br'));
+      cell.prepend(paragraph);return [paragraph];
+    });
+  };
   // Ruler margin / indent change handlers
   const handleRulerLeftMargin = (valCm: number) => {
-    if (scopeMode === 'paragraph' && selectedBlockElements.length > 0) {
-      selectedBlockElements.forEach((el) => {
-        el.style.marginLeft = valCm > 0 ? `${valCm}cm` : '';
+    if (tableCells.some(cell=>cell.isConnected) || (scopeMode === 'paragraph' && selectedBlockElements.length > 0)) {
+      rulerTargets().forEach((el) => {
+        el.style.marginLeft = valCm !== 0 ? `${valCm}cm` : '';
       });
       setParagraphLeftMarginCm(valCm);
       handleContentInput();
@@ -845,9 +894,9 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   };
 
   const handleRulerRightMargin = (valCm: number) => {
-    if (scopeMode === 'paragraph' && selectedBlockElements.length > 0) {
-      selectedBlockElements.forEach((el) => {
-        el.style.marginRight = valCm > 0 ? `${valCm}cm` : '';
+    if (tableCells.some(cell=>cell.isConnected) || (scopeMode === 'paragraph' && selectedBlockElements.length > 0)) {
+      rulerTargets().forEach((el) => {
+        el.style.marginRight = valCm !== 0 ? `${valCm}cm` : '';
       });
       setParagraphRightMarginCm(valCm);
       handleContentInput();
@@ -858,8 +907,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
   };
 
   const handleRulerFirstLineIndent = (valCm: number) => {
-    if (scopeMode === 'paragraph' && selectedBlockElements.length > 0) {
-      selectedBlockElements.forEach((el) => {
+    if (tableCells.some(cell=>cell.isConnected) || (scopeMode === 'paragraph' && selectedBlockElements.length > 0)) {
+      rulerTargets().forEach((el) => {
         el.style.textIndent = valCm !== 0 ? `${valCm}cm` : '';
       });
       setParagraphIndentCm(valCm);
@@ -1036,7 +1085,20 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
         if (!document.execCommand(action)) { await navigator.clipboard.writeText(selection.toString()); if (action === 'cut') document.execCommand('delete'); }
         if (action === 'cut') handleContentInput(); return;
       }
-      if (action === 'paste') { const text = await navigator.clipboard.readText(); restoreSelection(); document.execCommand('insertText', false, text); handleContentInput(); return; }
+      if (action === 'paste' || action === 'paste-text') {
+        if(clipboardBusy.current){setNotice('Aguarde a colagem em andamento.');return;}
+        clipboardBusy.current=true;
+        const revision=saveRevision.current,bookmark=selectionRef.current?.cloneRange();
+        try{
+          const content=await readWordClipboard(action==='paste-text');
+          if(!content.html&&!content.text){setNotice('A área de transferência está vazia.');return;}
+          if(!page.isConnected||revision!==saveRevision.current){setNotice('O documento mudou durante a leitura da área de transferência. Posicione o cursor e clique em Colar novamente.');return;}
+          if(bookmark&&page.contains(bookmark.commonAncestorContainer))selectionRef.current=bookmark;
+          restoreSelection();
+          insertClipboardContent(content);
+        }finally{clipboardBusy.current=false;}
+        return;
+      }
       if (action === 'font-size') {
         const size = Math.max(6, Math.min(96, Number(value) || 12));
         document.execCommand('fontSize', false, '7');
@@ -1189,12 +1251,12 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
         )}
       </div>
 
-      {rulerVisible && <WordViewportRulers canvasRef={editorContainerRef} pageIndex={activePageIndex} zoom={zoom} pageWidthCm={pageWidthCm} pageHeightCm={pageHeightCm}
+      {rulerVisible && <WordViewportRulers canvasRef={editorContainerRef} pageIndex={activePageIndex} zoom={zoom} pageWidthCm={pageWidthCm} pageHeightCm={pageHeightCm} cells={tableCells} blocks={selectedBlockElements} paragraph={scopeMode==='paragraph'} revision={pages}
         left={leftMarginCm + (scopeMode === 'paragraph' ? paragraphLeftMarginCm : 0)}
         right={rightMarginCm + (scopeMode === 'paragraph' ? paragraphRightMarginCm : 0)}
         indent={scopeMode === 'paragraph' ? paragraphIndentCm : firstLineIndentCm}
         top={topMarginCm} bottom={bottomMarginCm} readOnly={readOnly}
-        changeLeft={value => handleRulerLeftMargin(scopeMode === 'paragraph' ? Math.max(0,value-leftMarginCm) : value)} changeRight={value => handleRulerRightMargin(scopeMode === 'paragraph' ? Math.max(0,value-rightMarginCm) : value)} changeIndent={handleRulerFirstLineIndent} changeTop={setTopMarginCm} changeBottom={setBottomMarginCm} />}
+        changeLeft={handleRulerLeftMargin} changeRight={handleRulerRightMargin} changeIndent={handleRulerFirstLineIndent} changeTop={setTopMarginCm} changeBottom={setBottomMarginCm} />}
 
       {/* Main Canvas Container (Multi-Page A4 Physical View) */}
       {chromeFocus&&<div className="word-chrome-focusbar" role="toolbar" aria-label="Edição de cabeçalho e rodapé"><span>Editando {chromeFocus.kind==='header'?'cabeçalho':'rodapé'} · Página {chromeFocus.page+1}</span><button onClick={()=>{setChromeFocus(null);requestAnimationFrame(()=>pageRefs.current[activePageIndex]?.focus({preventScroll:true}));}}><X size={15}/>Fechar cabeçalho e rodapé</button></div>}
@@ -1301,7 +1363,14 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                       inspectActiveFormatting();
                     }}
                     onBlur={() => setEditingPageIndex(null)}
-                    onInput={handleContentInput}
+                    onInput={event=>{if(!clipboardInserting.current){const type=(event.nativeEvent as InputEvent).inputType;inputHistoryGroup.current=type==='insertText'||type==='deleteContentBackward'||type==='deleteContentForward'?type:undefined;handleContentInput();}}}
+                    onPaste={event=>{
+                      if(readOnly){event.preventDefault();return;}
+                      const html=event.clipboardData.getData('text/html'),text=event.clipboardData.getData('text/plain');
+                      if(!html&&!text)return;
+                      event.preventDefault();
+                      try{insertClipboardContent(html?{html:cleanWordHtml(html)}:{text});}catch{setNotice('Não foi possível colar o conteúdo.');}
+                    }}
                     onPointerDown={handleTablePointerDown}
                     onPointerMove={e => { if (tableDrawMode !== 'none') e.currentTarget.style.cursor = 'crosshair'; else tableResize.onPointerMove(e); }}
                     onPointerUp={handleTablePointerUp}
@@ -1309,6 +1378,8 @@ export const WordEditor: React.FC<WordEditorProps> = ({ initialDocument, onBackT
                     onBeforeInput={e => {
                       if (readOnly) return;
                       const type = (e.nativeEvent as InputEvent).inputType;
+                      if(type==='historyUndo'||type==='historyRedo'){e.preventDefault();handleExecCommand(type==='historyUndo'?'undo':'redo');return;}
+                      inputHistoryGroup.current=type==='insertText'||type==='deleteContentBackward'||type==='deleteContentForward'?type:undefined;
                       if (type?.startsWith('delete') && deleteTableContent(e.currentTarget, type.includes('Backward'))) { e.preventDefault(); handleContentInput(); }
                     }}
                     onKeyDown={e => {

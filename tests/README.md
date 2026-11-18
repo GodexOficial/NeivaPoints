@@ -36,3 +36,49 @@ Nesta implementação o Supabase continua responsável pelos dados já existente
 do sistema. Documentos e versões não são enviados à nuvem. Para uma futura opção
 na nuvem serão necessários armazenamento privado, permissões por usuário e uma
 política de versões, além da configuração da autenticação apropriada.
+
+
+## Régua contextual
+
+`/tests/word-ruler-regression.html` monta o editor com um DOCX sintético que passa
+pelo exportador e importador reais. Inclui parágrafo centralizado, quebra de linha,
+recuo negativo, células com recuos diferentes e célula mesclada.
+
+Para automatizar, com Playwright disponível e o servidor ativo em 4186, execute
+`node tests/word-ruler-regression.cjs`. `PLAYWRIGHT_MODULE` permite informar o
+caminho do módulo instalado no ambiente, e `WORD_TEST_URL` permite trocar o
+endereço do servidor. O teste usa Chrome isolado, verifica células únicas e
+múltiplas, limites reais do texto, preservação das margens da página, zoom,
+redimensionamento e rolagem horizontal. Não usa arquivos pessoais. Um endereço
+opcional `WORD_RULER_REAL_FIXTURE_URL` pode apontar para um ambiente local de QA
+que monte WordEditor com uma cópia de um documento real para a checagem adicional.
+
+
+## Colagem e histórico de edição de documentos importados
+
+`/tests/word-clipboard-regression.html` cria um DOCX sintético, importa-o pelo
+importador real e abre o editor com uma folha vazia adicional. Com Playwright
+instalado no ambiente e o servidor ativo, execute:
+
+- `node tests/word-clipboard-regression.cjs` (25 verificações).
+- `node tests/word-imported-editing-regression.cjs` (fluxo completo por interface).
+
+Os scripts aceitam `PLAYWRIGHT_MODULE`, `WORD_TEST_URL` e `WORD_TEST_BROWSER`
+(`chrome` por padrão; `msedge` para Edge isolado). A área de transferência é
+simulada; o conteúdo pessoal da área de transferência do computador não é lido.
+São verificados HTML versus texto simples, células mescladas, larguras de colunas,
+conteúdo, colagem em múltiplas folhas, permissões negadas, cliques concorrentes,
+editar/apagar texto em células importadas e Desfazer/Refazer por botão e teclado.
+
+O segundo script aceita `WORD_IMPORTED_FIXTURE_URL` para um ambiente local de QA
+que monte o mesmo WordEditor com uma cópia de um DOCX real. O original não deve
+ser alterado. O fluxo compara as páginas anteriores, os dados e a largura da
+tabela, apaga/restaura uma célula, desfaz/refaz a colagem e desfaz a nova folha.
+Nenhum documento pessoal é incluído nos testes versionados.
+
+O histórico do corpo do editor é mantido pelo aplicativo e sobrevive à troca do
+DOM durante a paginação. Há até 50 operações, limitadas a aproximadamente 40 MB
+para sessões comuns; uma operação grande permanece recuperável. Digitação
+contínua é agrupada, uma nova edição invalida o Refazer e a abertura de outro
+documento reinicia seu histórico de edição. O histórico de versões salvo no
+disco é independente deste histórico de Desfazer/Refazer durante a sessão.

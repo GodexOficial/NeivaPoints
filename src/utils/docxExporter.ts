@@ -142,7 +142,7 @@ async function blocks(parent: HTMLElement, numbering: { reference: string; level
         bullet: tag === 'li' && list && !list.ordered && !el.dataset.wordListId ? { level: list.level } : undefined,
         numbering: tag === 'li' && list?.ordered && !el.dataset.wordListId ? { reference: list.reference, level: list.level } : undefined,
         spacing: { before: Math.round(points(el.style.marginTop) * 20), after: el.style.marginBottom ? Math.round(points(el.style.marginBottom) * 20) : 160, line: Number(el.dataset.wordLine)||(el.style.lineHeight?Math.round(Number(el.style.lineHeight)*240)||undefined:undefined),lineRule:el.dataset.wordLineRule==='exact'?'exact':el.dataset.wordLineRule==='atLeast'?'atLeast':undefined },
-        indent: { left: Math.round(points(el.style.marginLeft) * 20), right: Math.round(points(el.style.marginRight) * 20), firstLine: Math.max(0, Math.round(points(el.style.textIndent) * 20)) },
+        indent: { left: Math.round(points(el.style.marginLeft) * 20), right: Math.round(points(el.style.marginRight) * 20), ...(points(el.style.textIndent)<0?{hanging:Math.round(-points(el.style.textIndent)*20)}:{firstLine:Math.round(points(el.style.textIndent)*20)}) },
         shading: color(el.style.backgroundColor) ? { fill: color(el.style.backgroundColor) } : undefined,
         border: el.style.borderBottom ? { bottom: { color: '64748B', style: BorderStyle.SINGLE, size: 6 } } : undefined,
       }));

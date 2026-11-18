@@ -1,0 +1,10 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import {WordEditor} from '../src/components/apps/word/WordEditor';
+import {createNewDocument} from '../src/services/docService';
+import {createDocxBlob} from '../src/utils/docxExporter';
+import {importWordFile} from '../src/utils/wordImport';
+import '../src/index.css';
+const html='<p style="text-align:center;margin-left:1cm;margin-right:.5cm;text-indent:-.3cm">Texto centralizado com recuo importado<br>Segunda linha explícita</p><table style="width:100%;border-collapse:collapse;table-layout:fixed"><colgroup><col style="width:40%"><col style="width:60%"></colgroup><tbody><tr><td style="padding:12px;border:1px solid black"><p style="margin-left:.4cm;margin-right:.2cm">Primeira célula com texto extenso para testar a quebra automática e os limites reais de cada linha ao editar o conteúdo.</p></td><td style="padding:20px;border:1px solid black"><p style="margin-left:.7cm;text-align:center">Segunda célula</p></td></tr><tr><td colspan="2" style="padding:10px;border:1px solid black"><p style="margin-left:1cm;text-indent:-.3cm;text-align:center">Célula mesclada</p></td></tr></tbody></table><p>Depois da tabela</p>';
+const source={...createNewDocument('Teste externo da régua'),content:html,pages:[html],leftMarginCm:3,rightMarginCm:2,topMarginCm:2,bottomMarginCm:2};
+(async()=>{const file=new File([await createDocxBlob(source)],'regua-externa.docx'),imported=await importWordFile(file);createRoot(document.getElementById('root')!).render(<WordEditor initialDocument={{...source,...imported.settings,content:imported.html,pages:imported.settings?.pages||[imported.html]}} onBackToHub={()=>{}}/>);})();

@@ -343,3 +343,4 @@
   .word-workspace .a4-page-sheet { width: 100% !important;height:var(--word-page-height,29.7cm) !important;min-height:0 !important;break-after:auto !important; border: 0 !important; box-shadow: none !important; border-radius: 0 !important; }
   .word-workspace .a4-page-content { min-height: 0 !important; }
 }
+.word-ruler-cell-band{box-shadow:inset 1px 0 #969aab,inset -1px 0 #969aab;background:#46526a}.word-ruler-text-line{position:absolute;bottom:0;height:3px;border-inline:1px solid #91c6ff;background:#64adf066;pointer-events:none}.word-viewport-marker{touch-action:none}
