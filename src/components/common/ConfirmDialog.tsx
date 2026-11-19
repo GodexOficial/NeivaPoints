@@ -1,3 +1,4 @@
+import { DialogPortal } from './DialogPortal';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import React, { useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
@@ -29,11 +30,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape' && [...document.querySelectorAll('[role="dialog"]')].at(-1) === dialogRef.current) onCancel();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onCancel]);
+  }, [isOpen, onCancel, dialogRef]);
 
   if (!isOpen) return null;
 
@@ -60,20 +61,21 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const styles = getVariantStyles();
 
   return (
+    <DialogPortal>
     <div
       ref={dialogRef}
       tabIndex={-1}
       onClick={onCancel}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs transition-opacity cursor-pointer"
+      className="dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs transition-opacity cursor-pointer"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-dialog-title"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="glass-panel relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-300 cursor-default"
+        className="dialog-panel glass-panel relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-300 cursor-default"
       >
-        <div className="p-6">
+        <div className="dialog-body p-6">
           <div className="flex items-start gap-4">
             <div className={`p-3 rounded-xl flex-shrink-0 ${styles.iconBg}`}>
               <AlertTriangle size={24} />
@@ -98,7 +100,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             </button>
           </div>
 
-          <div className="mt-6 flex items-center justify-end gap-3">
+        </div>
+          <div className="dialog-actions flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={onCancel}
@@ -114,8 +117,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               {confirmLabel}
             </button>
           </div>
-        </div>
       </div>
     </div>
+    </DialogPortal>
   );
 };

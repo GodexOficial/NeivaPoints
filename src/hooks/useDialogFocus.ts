@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 
+let openDialogs = 0;
+let originalOverflow = '';
+
 /** Keep keyboard navigation inside an open modal and restore its trigger. */
 export function useDialogFocus(isOpen: boolean) {
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -7,7 +10,7 @@ export function useDialogFocus(isOpen: boolean) {
     if (!isOpen || !dialogRef.current) return;
     const dialog = dialogRef.current;
     const trigger = document.activeElement as HTMLElement | null;
-    const previousOverflow = document.body.style.overflow;
+    if (openDialogs++ === 0) originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const controls = () => Array.from(dialog.querySelectorAll<HTMLElement>(
       'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]',
@@ -30,7 +33,7 @@ export function useDialogFocus(isOpen: boolean) {
     document.addEventListener('keydown', trapFocus);
     return () => {
       document.removeEventListener('keydown', trapFocus);
-      document.body.style.overflow = previousOverflow;
+      if (--openDialogs === 0) document.body.style.overflow = originalOverflow;
       if (trigger?.isConnected) trigger.focus({ preventScroll: true });
     };
   }, [isOpen]);

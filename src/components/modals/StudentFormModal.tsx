@@ -1,3 +1,4 @@
+import { DialogPortal } from '../common/DialogPortal';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Edit3, X, AlertCircle } from 'lucide-react';
@@ -120,14 +121,15 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
   };
 
   return (
+    <DialogPortal>
     <div ref={dialogRef} tabIndex={-1}
       onClick={onClose}
       role="dialog" aria-modal="true" aria-labelledby="StudentFormModal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs cursor-pointer"
+      className="dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs cursor-pointer"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="glass-panel relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-300 cursor-default"
+        className="dialog-panel glass-panel relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-300 cursor-default"
       >
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
           <div className="flex items-center gap-2.5">
@@ -155,7 +157,8 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="dialog-form">
+          <div className="dialog-body p-6 space-y-4">
           {error && (
             <div className="p-3 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-2.5 text-xs text-red-700 dark:text-red-300 font-medium">
               <AlertCircle size={16} className="text-red-500 dark:text-red-400 flex-shrink-0" />
@@ -245,7 +248,8 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-3 pt-3">
+          </div>
+          <div className="dialog-actions flex items-center justify-end gap-3 pt-3">
             <button
               type="button"
               onClick={onClose}
@@ -263,5 +267,6 @@ export const StudentFormModal: React.FC<StudentFormModalProps> = ({
         </form>
       </div>
     </div>
+    </DialogPortal>
   );
 };

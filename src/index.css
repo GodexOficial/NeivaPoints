@@ -98,9 +98,73 @@ button > svg { flex-shrink: 0; transition: transform 0.3s ease-in-out; }
 @keyframes loading-turn { to { transform: rotate(360deg); } }
 .loading-panel { display: flex; align-items: center; justify-content: center; gap: .75rem; min-height: 16rem; }
 .loading-indicator { width: 1.5rem; height: 1.5rem; border: 2px solid #c7d2fe; border-top-color: #4f46e5; border-radius: 50%; animation: loading-turn 0.3s ease-in-out infinite; }
-/* Keep dialogs usable with a virtual keyboard, landscape screens and zoom. */
-[role="dialog"].fixed { overflow-y: auto; overscroll-behavior: contain; padding-block: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-bottom)); }
-[role="dialog"].fixed > div { max-height: calc(100dvh - 2rem); overflow-y: auto; }
+/* Portals escape transformed pages. Only fields scroll; actions always remain visible. */
+.glass-theme.dialog-portal { display: contents; }
+.glass-theme.dialog-portal::before { display: none; }
+.dialog-overlay[role="dialog"].fixed {
+  z-index: 100; overflow: hidden; overscroll-behavior: contain;
+  padding: max(.75rem, env(safe-area-inset-top)) max(.75rem, env(safe-area-inset-right)) max(.75rem, env(safe-area-inset-bottom)) max(.75rem, env(safe-area-inset-left));
+}
+.dialog-overlay > .dialog-panel {
+  display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  max-height: calc(100dvh - max(.75rem, env(safe-area-inset-top)) - max(.75rem, env(safe-area-inset-bottom)));
+  overflow: hidden;
+}
+.dialog-panel > :not(.dialog-form):not(.dialog-body) { flex-shrink: 0; }
+.dialog-form { display: flex; flex-direction: column; min-height: 0; }
+.dialog-body { min-height: 0; padding: 1.5rem; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.dialog-heading { padding: 1rem 1.5rem; border-bottom: 1px solid var(--glass-border); }
+.dialog-actions {
+  flex-shrink: 0; flex-wrap: wrap; padding: .875rem 1.5rem; margin: 0;
+  border-top: 1px solid var(--glass-border);
+}
+.dialog-panel :where(button) { min-height: 2.5rem; }
+.dialog-panel :where(input, select, textarea, button) { min-width: 0; max-width: 100%; }
+.dialog-panel :where(h2, h3, p, label, button) { overflow-wrap: anywhere; }
+.dialog-panel .dialog-actions > button { white-space: normal; min-width: 0; }
+.dialog-panel .dialog-actions > button[type="submit"] { flex: 1 1 10rem; }
+.dialog-panel .dialog-actions > button:first-child { flex: 0 0 auto; }
+.dialog-panel button:has(> .lucide-x) { flex-shrink: 0; align-self: flex-start; }
+.dialog-panel .dialog-color { width: 2rem; height: 2rem; min-height: 2rem; flex-shrink: 0; }
+.dialog-body .grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.dialog-body .grid-cols-5 > button { padding-inline: .25rem; }
+@media (max-height: 740px) {
+  .dialog-body { padding: 1rem; }
+  .dialog-body > :not(:last-child) { margin-block-end: .75rem; }
+  .dialog-panel > div:first-child:not(.dialog-body), .dialog-heading { padding: .75rem 1rem; }
+  .dialog-actions { padding: .75rem 1rem; gap: .5rem; }
+  .dialog-panel :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { min-height: 2.5rem; }
+}
+@media (min-width: 640px) and (max-height: 740px) {
+  .dialog-overlay > .dialog-panel { max-width: 40rem; }
+  .class-form-body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .class-form-body > * { margin: 0 !important; }
+  .class-form-body > :first-child:has(svg) { grid-column: 1 / -1; }
+}
+@media (max-width: 420px) {
+  .dialog-actions > button { flex: 1 1 0 !important; padding-inline: .5rem; }
+  .dialog-panel .grid-cols-2 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-height: 740px) and (max-width: 1023px) {
+  .glass-nav > .safe-area-x > .flex { height: 3.5rem; }
+  .mobile-navigation { max-height: calc(100dvh - 3.5rem); }
+  .mobile-navigation > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; }
+  .mobile-navigation > div > * { margin-block: 0; }
+  .mobile-navigation > div > div:first-child { display: none; }
+  .mobile-navigation > div > div:last-of-type { grid-column: 1 / -1; padding-top: .25rem; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mobile-navigation > div > div:last-of-type > div { min-width: 0; padding: .25rem .5rem; }
+  .mobile-navigation button:has(svg) > span { min-width: 0; }
+  .mobile-navigation > div > div:last-of-type button:has(svg) > span { display: none; }
+  .mobile-navigation > div > :last-child { grid-column: 1 / -1; }
+  .glass-theme .mobile-navigation button { min-height: 2.75rem; padding-block: .375rem; }
+}
+@media (min-width: 480px) and (max-width: 1023px) and (max-height: 740px) {
+  .mobile-navigation > div { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mobile-navigation > div > button { gap: .375rem; padding-inline: .5rem; }
+}
+@media (max-width: 479px) and (max-height: 740px) {
+  .mobile-navigation > div > div:last-of-type > div > span { display: none; }
+}
 @media (max-width: 639px) {
   .dashboard-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dashboard-stats > * { padding: 1rem; }
@@ -242,11 +306,7 @@ button > svg { flex-shrink: 0; transition: transform 0.3s ease-in-out; }
 .app-grid-slot [draggable="true"] img { -webkit-user-drag: none; }
 .app-grid-slot[data-dragging="true"] { opacity: .45; }
 .app-grid-slot[data-drop-target="true"] { outline: 2px solid #6366f1; outline-offset: -2px; background-color: #818cf81a; }
-.app-tile-actions { transition: opacity 0.3s ease-in-out, translate 0.3s ease-in-out; }
-@media all {
-  :where(html[data-pointer="mouse"]) .app-tile-actions { opacity: 0; translate: 0 -4px; pointer-events: none; }
-  :where(html[data-pointer="mouse"]) .group:is(:hover, :focus-within) > .app-tile-actions { opacity: 1; translate: 0 0; pointer-events: auto; }
-}
+.app-tile-actions { z-index: 2; }
 @media all {
   :where(html[data-motion="reduced"]) .motion-card:hover { translate: none; }
 }

@@ -1,5 +1,7 @@
 # Testes do WordCraft
 
+Menus responsivos do sistema: `node tests/responsive-menus.cjs`, com Vite na porta 4187 (`MENUS_TEST_URL` altera o endereço; `PLAYWRIGHT_MODULE` indica Playwright). Usa a aplicação e os formulários reais com serviços substituídos somente na entrada de teste, dados sintéticos e bloqueio de requisições externas. Verifica dez variações de janelas em dez tamanhos de tela, ações visíveis/clicáveis sem rolagem da página, campos alcançáveis com rolagem interna, envio de formulários, confirmação sobreposta, Escape e restauração da rolagem. Inclui navegação compacta e celulares/tablet com toque emulado e ponteiro coarse. Capturas e resultados em `output/playwright`. Os motores nativos dos editores não são modificados por esta correção.
+
 GridCraft: `node tests/gridcraft-regression.cjs`, com Vite na porta 4186. `PLAYWRIGHT_MODULE` aponta para Playwright e `GRID_TEST_URL` muda o endereço. Usa planilhas sintéticas, Edge e IndexedDB isolados para conferir fórmulas, autosave, XLSX, reabertura, desfazer/refazer, versões, conflitos, falha de quota, limites e separação de contas/arquivos Word. Não modifica arquivos pessoais.
 
 Idioma: `node tests/wordcraft-locale.cjs`. Verifica PT-BR em navegador en-US, preferências anteriores em inglês, preservação do tema/autoria, conteúdo e idiomas de revisão en-US/fr-FR após exportação, reabertura e armazenamento de preferências bloqueado. Usa Playwright/Edge isolado e documentos sintéticos.

@@ -1,3 +1,4 @@
+import { DialogPortal } from '../common/DialogPortal';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, MinusCircle, X, Check, ArrowRight, AlertCircle } from 'lucide-react';
@@ -152,15 +153,15 @@ export const PointsModal: React.FC<PointsModalProps> = ({
   };
 
   return (
-    <>
+    <DialogPortal>
       <div ref={dialogRef} tabIndex={-1}
         onClick={onClose}
         role="dialog" aria-modal="true" aria-labelledby="PointsModal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs cursor-pointer"
+      className="dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs cursor-pointer"
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          className="glass-panel relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-300 cursor-default"
+          className="dialog-panel glass-panel relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-in fade-in zoom-in-95 duration-300 cursor-default"
         >
           {/* Header */}
           <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
@@ -182,7 +183,8 @@ export const PointsModal: React.FC<PointsModalProps> = ({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <form onSubmit={handleSubmit} className="dialog-form">
+          <div className="dialog-body p-6 space-y-5">
             {/* Mode Switcher */}
             <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
               <button
@@ -344,7 +346,8 @@ export const PointsModal: React.FC<PointsModalProps> = ({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            </div>
+          <div className="dialog-actions flex items-center justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={onClose}
@@ -386,6 +389,6 @@ export const PointsModal: React.FC<PointsModalProps> = ({
         }}
         onCancel={() => setShowRemoveConfirm(false)}
       />
-    </>
+    </DialogPortal>
   );
 };

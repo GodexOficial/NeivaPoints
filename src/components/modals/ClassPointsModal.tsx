@@ -1,3 +1,4 @@
+import { DialogPortal } from '../common/DialogPortal';
 import { useDialogFocus } from '../../hooks/useDialogFocus';
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, Check, Users, X } from 'lucide-react';
@@ -88,8 +89,9 @@ export const ClassPointsModal: React.FC<ClassPointsModalProps> = ({
   };
 
   return (
-    <div ref={dialogRef} tabIndex={-1} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="class-points-title">
-      <div className="glass-panel relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl animate-in zoom-in-95 border border-slate-200 dark:border-slate-800 overflow-hidden">
+    <DialogPortal>
+    <div ref={dialogRef} tabIndex={-1} className="dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-xs" role="dialog" aria-modal="true" aria-labelledby="class-points-title">
+      <div className="dialog-panel glass-panel relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl animate-in zoom-in-95 border border-slate-200 dark:border-slate-800 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
           <div>
             <h3 id="class-points-title" className="text-base font-semibold text-slate-900 dark:text-white">{t(mode === 'remove' ? 'classes.bulkRemovePointsTitle' : 'classes.bulkPointsTitle')}</h3>
@@ -98,7 +100,8 @@ export const ClassPointsModal: React.FC<ClassPointsModalProps> = ({
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer" aria-label={t('modal.cancel')}><X size={18} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="dialog-form">
+          <div className="dialog-body p-6 space-y-5">
           <p className={`rounded-xl border p-3 text-xs font-medium ${mode === 'remove' ? 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200' : 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200'}`}>{t(mode === 'remove' ? 'classes.bulkRemovePointsDesc' : 'classes.bulkPointsDesc', { count: studentCount })}</p>
 
           <div>
@@ -125,12 +128,14 @@ export const ClassPointsModal: React.FC<ClassPointsModalProps> = ({
 
           {error && <div className="p-3 bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-2.5 text-xs text-red-700 dark:text-red-300 font-medium"><AlertCircle size={16} className="text-red-500 shrink-0" /><span>{error}</span></div>}
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+          </div>
+          <div className="dialog-actions flex items-center justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">{t('modal.cancel')}</button>
             <button type="submit" disabled={saving || !numericAmount || studentCount === 0} className={`flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl text-white transition-all shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${mode === 'remove' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}><Check size={16} />{saving ? t(mode === 'remove' ? 'classes.bulkRemovePointsSaving' : 'classes.bulkPointsSaving') : t(mode === 'remove' ? 'classes.bulkRemovePointsSubmit' : 'classes.bulkPointsSubmit', { amount: numericAmount, count: studentCount })}</button>
           </div>
         </form>
       </div>
     </div>
+    </DialogPortal>
   );
 };
